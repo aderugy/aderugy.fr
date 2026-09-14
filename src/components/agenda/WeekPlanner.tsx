@@ -12,18 +12,22 @@ import {
   toISODate,
 } from "@/lib/time";
 import type {
+  AllDayItem,
   Block,
+  CalendarSource,
   Category,
   DragPayload,
   ExternalEvent,
   GoogleAccount,
+  GridItem,
   Objective,
   ScheduledBlock,
   Task,
   Week,
 } from "@/lib/types";
-import { DEFAULT_BUSY_PREFERENCES, busySegments } from "@/lib/busy";
+import { externalItems, externalMinutesByCategory } from "@/lib/external";
 import { CalendarLiveness } from "./CalendarLiveness";
+import { ExternalDetail } from "./ExternalDetail";
 import {
   createScheduledBlock,
   moveScheduled,
@@ -50,6 +54,7 @@ type Props = {
   scheduled: ScheduledBlock[];
   objectives: Objective[];
   externalEvents: ExternalEvent[];
+  calendarSources: CalendarSource[];
   googleAccount: GoogleAccount | null;
   oldestSyncAt: string | null;
 };
@@ -63,6 +68,7 @@ export function WeekPlanner({
   scheduled,
   objectives,
   externalEvents,
+  calendarSources,
   googleAccount,
   oldestSyncAt,
 }: Props) {
@@ -94,19 +100,31 @@ export function WeekPlanner({
 
   const googleConnected = Boolean(googleAccount && !googleAccount.disconnected_at);
 
-  const busy = useMemo(
-    () =>
-      googleConnected
-        ? busySegments(externalEvents, weekStartDate, {
-            ...DEFAULT_BUSY_PREFERENCES,
-            busyCalendarIds: googleAccount?.busy_calendar_ids ?? [],
-          })
-        : [],
-    [externalEvents, weekStartDate, googleConnected, googleAccount],
-  );
-
   const categories_ = useMemo(() => categoryIndex(categories), [categories]);
   const blockById = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks]);
+
+  const external = useMemo(
+    () =>
+      googleConnected
+        ? externalItems(externalEvents, calendarSources, weekStartDate)
+        : ({ items: [] as GridItem[], allDay: [] as AllDayItem[] }),
+    [externalEvents, calendarSources, weekStartDate, googleConnected],
+  );
+
+  /** Grid ids for external segments encode source and event; map back for detail. */
+  const externalById = useMemo(() => {
+    const sources = new Map(calendarSources.map((s) => [s.id, s]));
+    const out = new Map<string, { event: ExternalEvent; source: CalendarSource }>();
+    for (const item of external.items) {
+      const [sourceId, eventId] = item.id.split(":");
+      const source = sources.get(sourceId);
+      const event = externalEvents.find(
+        (e) => e.calendar_source_id === sourceId && e.external_event_id === eventId,
+      );
+      if (source && event) out.set(item.id, { event, source });
+    }
+    return out;
+  }, [external.items, externalEvents, calendarSources]);
 
   /**
    * Blocks have no title. A placed template keeps the name you gave it — it
@@ -131,6 +149,39 @@ export function WeekPlanner({
     return DEFAULT_COLOR;
   };
 
+  /**
+   * One list for the grid. Own blocks and external events are stored apart —
+   * the mirror is read-only and carries no category of its own — but they lay
+   * out together, so they are normalised here.
+   */
+  const gridItems: GridItem[] = useMemo(
+    () => [
+      ...items.map((block) => ({
+        id: block.id,
+        kind: "block" as const,
+        startsAt: block.starts_at,
+        endsAt: block.ends_at,
+        label: labelFor(block),
+        description: block.description,
+        color: colorFor(block),
+        done: block.status === "done",
+        movable: true,
+      })),
+      ...external.items,
+    ],
+    // labelFor/colorFor read the same memoised maps these depend on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, external.items, categories_, blockById],
+  );
+
+  const externalMinutes = useMemo(
+    () =>
+      googleConnected
+        ? externalMinutesByCategory(externalEvents, calendarSources, weekStartDate)
+        : new Map<string, number>(),
+    [externalEvents, calendarSources, weekStartDate, googleConnected],
+  );
+
   const totalMinutes = items.reduce(
     (sum, b) =>
       sum +
@@ -141,6 +192,7 @@ export function WeekPlanner({
   );
 
   const selected = items.find((b) => b.id === selectedId) ?? null;
+  const selectedExternal = selectedId ? externalById.get(selectedId) : undefined;
 
   function onCreateFromDrag(payload: DragPayload, startsAt: Date) {
     const endsAt = new Date(startsAt.getTime() + payload.minutes * 60_000);
@@ -286,12 +338,10 @@ export function WeekPlanner({
         <div className="min-w-0 flex-1">
           <WeekGrid
             weekStartDate={weekStartDate}
-            blocks={items}
-            colorFor={colorFor}
-            labelFor={labelFor}
+            items={gridItems}
+            allDay={external.allDay}
             selectedId={selectedId}
             pendingDrag={pendingDrag}
-            busy={busy}
             onSelect={setSelectedId}
             onCreateFromDrag={onCreateFromDrag}
             onDraw={onDraw}
@@ -300,7 +350,15 @@ export function WeekPlanner({
         </div>
 
         <aside className="w-72 shrink-0 border-l border-line">
-          {selected ? (
+          {selectedExternal ? (
+            <ExternalDetail
+              key={selectedId}
+              event={selectedExternal.event}
+              source={selectedExternal.source}
+              categories={categories}
+              onClose={() => setSelectedId(null)}
+            />
+          ) : selected ? (
             <BlockDetail
               key={selected.id}
               block={selected}
@@ -315,6 +373,7 @@ export function WeekPlanner({
               categories={categories}
               objectives={objectives}
               scheduled={items}
+              externalMinutes={externalMinutes}
             />
           )}
         </aside>

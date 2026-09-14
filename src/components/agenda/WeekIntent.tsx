@@ -17,6 +17,8 @@ type Props = {
   categories: Category[];
   objectives: Objective[];
   scheduled: ScheduledBlock[];
+  /** Minutes per category already committed by a connected calendar. */
+  externalMinutes: Map<string, number>;
 };
 
 export function WeekIntent({
@@ -25,6 +27,7 @@ export function WeekIntent({
   categories,
   objectives,
   scheduled,
+  externalMinutes,
 }: Props) {
   const [theme, setTheme] = useState(week.theme ?? "");
   const [guidelines, setGuidelines] = useState(week.guidelines ?? "");
@@ -36,11 +39,15 @@ export function WeekIntent({
   const minutesByCategory = useMemo(() => {
     const direct = new Map<string, number>();
     for (const b of scheduled) {
-      if (!b.category_id) continue;
       const minutes = Math.round(
         (new Date(b.ends_at).getTime() - new Date(b.starts_at).getTime()) / 60_000,
       );
       direct.set(b.category_id, (direct.get(b.category_id) ?? 0) + minutes);
+    }
+    // Hours a calendar already committed count the same as hours you planned:
+    // the objective asks where your time goes, not how much of it you typed in.
+    for (const [categoryId, minutes] of externalMinutes) {
+      direct.set(categoryId, (direct.get(categoryId) ?? 0) + minutes);
     }
     const rolled = new Map<string, number>();
     for (const c of flat) {
@@ -50,7 +57,7 @@ export function WeekIntent({
       rolled.set(c.id, sum);
     }
     return rolled;
-  }, [scheduled, categories, flat]);
+  }, [scheduled, externalMinutes, categories, flat]);
 
   const commit = (fn: () => Promise<unknown>) => startTransition(() => void fn());
 

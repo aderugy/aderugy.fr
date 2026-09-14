@@ -17,8 +17,8 @@ export type GoogleEvent = {
 
 export type ExternalEventRow = {
   user_id: string;
-  google_calendar_id: string;
-  google_event_id: string;
+  calendar_source_id: string;
+  external_event_id: string;
   title: string | null;
   starts_at: string;
   ends_at: string;
@@ -42,7 +42,7 @@ export type Mapped =
  */
 export function mapEvent(
   userId: string,
-  calendarId: string,
+  sourceId: string,
   event: GoogleEvent,
 ): Mapped | null {
   if (!event.id) return null;
@@ -72,8 +72,8 @@ export function mapEvent(
     action: "upsert",
     row: {
       user_id: userId,
-      google_calendar_id: calendarId,
-      google_event_id: event.id,
+      calendar_source_id: sourceId,
+      external_event_id: event.id,
       title: event.summary ?? null,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
@@ -88,14 +88,14 @@ export function mapEvent(
 
 export function mapPage(
   userId: string,
-  calendarId: string,
+  sourceId: string,
   items: GoogleEvent[],
 ): { upserts: ExternalEventRow[]; deletes: string[] } {
   const upserts: ExternalEventRow[] = [];
   const deletes: string[] = [];
 
   for (const item of items) {
-    const mapped = mapEvent(userId, calendarId, item);
+    const mapped = mapEvent(userId, sourceId, item);
     if (!mapped) continue;
     if (mapped.action === "delete") deletes.push(mapped.eventId);
     else upserts.push(mapped.row);

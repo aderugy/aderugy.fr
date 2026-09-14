@@ -108,11 +108,39 @@ export async function syncGoogleNow(): Promise<ActionResult> {
   }
 }
 
-export async function setBusyCalendars(ids: string[]): Promise<ActionResult> {
+/**
+ * The settings page owns name, colour, category and the inclusion toggles.
+ * Everything else about a calendar — which ones exist, their provider ids — is
+ * discovered by the sync engine and not editable from the browser.
+ */
+export async function updateCalendarSource(input: {
+  id: string;
+  displayName?: string;
+  color?: string;
+  categoryId?: string | null;
+  enabled?: boolean;
+  includeAllDay?: boolean;
+  includeFree?: boolean;
+  includeDeclined?: boolean;
+}): Promise<ActionResult> {
   try {
     const { supabase } = await requireUser();
-    const { error } = await supabase.rpc("set_busy_calendars", { p_ids: ids });
+
+    const { error } = await supabase.rpc("update_calendar_source", {
+      p_id: input.id,
+      p_display_name: input.displayName ?? null,
+      p_color: input.color ?? null,
+      p_category_id: input.categoryId ?? null,
+      // Distinguishes "leave it alone" from "remove the mapping": both arrive
+      // as an absent id otherwise.
+      p_clear_category: input.categoryId === null,
+      p_enabled: input.enabled ?? null,
+      p_include_all_day: input.includeAllDay ?? null,
+      p_include_free: input.includeFree ?? null,
+      p_include_declined: input.includeDeclined ?? null,
+    });
     if (error) throw error;
+
     revalidatePath("/agenda", "layout");
     return { ok: true };
   } catch (e) {

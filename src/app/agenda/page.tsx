@@ -6,6 +6,7 @@ import { addDays, fromISODate, isoWeekStartInTimeZone, toISODate } from "@/lib/t
 import { WeekPlanner } from "@/components/agenda/WeekPlanner";
 import type {
   Block,
+  CalendarSource,
   Category,
   ExternalEvent,
   GoogleAccount,
@@ -45,6 +46,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
     scheduledRes,
     objectivesRes,
     externalRes,
+    sourcesRes,
     googleRes,
     syncRes,
   ] = await Promise.all([
@@ -91,16 +93,23 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       supabase
         .from("external_events")
         .select(
-          "google_calendar_id, google_event_id, title, starts_at, ends_at, all_day, status, transparency, attendee_response",
+          "calendar_source_id, external_event_id, title, starts_at, ends_at, all_day, status, transparency, attendee_response",
         )
         .eq("user_id", user.id)
         .lt("starts_at", rangeEnd)
         .gt("ends_at", rangeStart)
         .order("starts_at"),
       supabase
+        .from("calendar_sources")
+        .select(
+          "id, provider, external_id, display_name, color, category_id, enabled, include_all_day, include_free, include_declined, position",
+        )
+        .eq("user_id", user.id)
+        .order("position"),
+      supabase
         .from("google_accounts")
         .select(
-          "google_email, busy_calendar_ids, connected_at, disconnected_at, last_error, last_error_at",
+          "google_email, connected_at, disconnected_at, last_error, last_error_at",
         )
         .eq("user_id", user.id)
         .maybeSingle(),
@@ -150,6 +159,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       scheduled={(scheduledRes.data ?? []) as unknown as ScheduledBlock[]}
       objectives={(objectivesRes.data ?? []) as Objective[]}
       externalEvents={(externalRes.data ?? []) as ExternalEvent[]}
+      calendarSources={(sourcesRes.data ?? []) as CalendarSource[]}
       googleAccount={(googleRes.data ?? null) as GoogleAccount | null}
       oldestSyncAt={oldestSyncAt}
     />

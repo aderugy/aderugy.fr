@@ -124,6 +124,30 @@ All four call the same idempotent sync. A row lease in `google_sync_state`
 prevents two from interleaving — the loser would otherwise persist a sync token
 that does not account for the rows the winner wrote.
 
+### 5. Naming your calendars
+
+Every calendar Google reports appears under **Settings** as a *disabled* row.
+Enabling one requires giving it a **category**, and that is deliberate: without
+it the hours would show on your grid and count toward nothing.
+
+Per calendar you set:
+
+- **Name** — yours, not Google's. Google says *Emploi du temps SCIA 2026-2027*;
+  you say **EPITA**, and that is what the week reads.
+- **Colour** — how its events look on the grid.
+- **Category** — what its hours count as. A lecture then lands in your `studies`
+  total and fills a "12 h studies" objective without you planning anything.
+- **Inclusions** — all-day events, events you are marked free for, invitations
+  you declined. Only the first is on by default.
+
+On the grid an external event shows the **calendar name** as its label and the
+**event's own title** as its description. It is read-only: no move, no resize,
+no edit. Google is the source of truth and the next sync would revert anything
+anyway.
+
+All-day events go to a slim strip above the grid rather than filling a column —
+they mark a day, they do not consume ten hours of it.
+
 Every table is protected by row-level security (`user_id = auth.uid()`), so the
 database is the security boundary, not the UI. The Next app holds no
 service-role key and no Google client secret: the only elevated credential in

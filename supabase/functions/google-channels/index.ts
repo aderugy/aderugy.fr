@@ -21,9 +21,24 @@ Deno.serve(async (request) => {
 
   const { data: accounts, error } = await admin
     .from("google_accounts")
-    .select("user_id, refresh_token_secret, busy_calendar_ids")
+    .select("user_id, refresh_token_secret")
     .is("disconnected_at", null);
   if (error) return json({ error: error.message }, 500);
+
+  // Only enabled calendars are worth a push channel; a disabled one is not
+  // rendered, so a notification for it would be work with no consequence.
+  const { data: enabledSources } = await admin
+    .from("calendar_sources")
+    .select("user_id, external_id")
+    .eq("provider", "google")
+    .eq("enabled", true);
+
+  const enabledByUser = new Map<string, string[]>();
+  for (const row of enabledSources ?? []) {
+    const list = enabledByUser.get(row.user_id) ?? [];
+    list.push(row.external_id);
+    enabledByUser.set(row.user_id, list);
+  }
 
   const actions: { calendar: string; action: string; error?: string }[] = [];
 
@@ -51,7 +66,9 @@ Deno.serve(async (request) => {
       (existing ?? []).map((c) => [c.google_calendar_id as string, c]),
     );
 
-    for (const calendarId of account.busy_calendar_ids ?? []) {
+    const watched = enabledByUser.get(account.user_id) ?? [];
+
+    for (const calendarId of watched) {
       const current = byCalendar.get(calendarId);
       const expiresSoon =
         !current ||
@@ -65,7 +82,7 @@ Deno.serve(async (request) => {
         // New channel first, old one after: overlapping channels only cause a
         // duplicate ping, whereas stopping first leaves a window with no
         // notifications at all.
-        const watched = await watchCalendar(accessToken, calendarId, {
+        const created = await watchCalendar(accessToken, calendarId, {
           id: channelId,
           address: webhookUrl,
           token: channelToken,
@@ -75,10 +92,10 @@ Deno.serve(async (request) => {
           user_id: account.user_id,
           google_calendar_id: calendarId,
           channel_id: channelId,
-          resource_id: watched.resourceId,
+          resource_id: created.resourceId,
           channel_token: channelToken,
-          expiration: watched.expiration
-            ? new Date(Number(watched.expiration)).toISOString()
+          expiration: created.expiration
+            ? new Date(Number(created.expiration)).toISOString()
             : new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
@@ -99,9 +116,9 @@ Deno.serve(async (request) => {
       }
     }
 
-    // Channels for calendars the user has since unticked.
+    // Channels for calendars the user has since disabled.
     for (const [calendarId, channel] of byCalendar) {
-      if ((account.busy_calendar_ids ?? []).includes(calendarId)) continue;
+      if (watched.includes(calendarId)) continue;
       await stopChannel(accessToken, channel.channel_id, channel.resource_id).catch(
         () => {},
       );

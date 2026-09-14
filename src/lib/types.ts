@@ -113,24 +113,41 @@ export type DragPayload =
       categoryId: string;
     };
 
-// ------------------------------------------------------- Google Calendar
+// ------------------------------------------------------- Calendar sources
+
+/** A calendar you connected, named and coloured yourself. */
+export type CalendarSource = {
+  id: string;
+  provider: string;
+  external_id: string;
+  /** Yours, not the provider's. This is what the grid reads. */
+  display_name: string;
+  color: string;
+  /** What this calendar's hours count as. Required before it can be enabled. */
+  category_id: string | null;
+  enabled: boolean;
+  include_all_day: boolean;
+  include_free: boolean;
+  include_declined: boolean;
+  position: number;
+};
 
 export type ExternalEvent = {
-  google_calendar_id: string;
-  google_event_id: string;
+  calendar_source_id: string;
+  external_event_id: string;
+  /** The event's own title, which becomes the block's description. */
   title: string | null;
   starts_at: string;
   ends_at: string;
   all_day: boolean;
   status: string;
-  /** "opaque" blocks time; "transparent" is Google's own "show me as free". */
+  /** "opaque" blocks time; "transparent" is the provider's own "show me as free". */
   transparency: string;
   attendee_response: string | null;
 };
 
 export type GoogleAccount = {
   google_email: string | null;
-  busy_calendar_ids: string[];
   connected_at: string;
   disconnected_at: string | null;
   last_error: string | null;
@@ -143,4 +160,31 @@ export type GoogleSyncState = {
   last_synced_at: string | null;
   last_error: string | null;
   last_error_at: string | null;
+};
+
+/**
+ * What the grid actually draws. Own blocks and external events are stored
+ * separately — the mirror is read-only and has no category of its own — but
+ * they lay out together, so the grid takes one normalised list.
+ */
+export type GridItem = {
+  id: string;
+  kind: "block" | "external";
+  startsAt: string;
+  endsAt: string;
+  /** Category leaf, template name, or calendar name. */
+  label: string;
+  description: string | null;
+  color: string;
+  done: boolean;
+  /** External events are never movable: the next sync would revert it. */
+  movable: boolean;
+};
+
+export type AllDayItem = {
+  id: string;
+  dayIndex: number;
+  label: string;
+  title: string | null;
+  color: string;
 };

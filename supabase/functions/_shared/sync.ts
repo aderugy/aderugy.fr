@@ -44,6 +44,16 @@ export async function syncCalendar(
     const refreshToken = await readRefreshToken(admin, account.refresh_token_secret);
     const accessToken = await accessTokenFrom(refreshToken);
 
+    // Every mirrored row hangs off a source, so resolve it before writing any.
+    const { data: source, error: sourceError } = await admin
+      .from("calendar_sources")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("provider", "google")
+      .eq("external_id", calendarId)
+      .single();
+    if (sourceError) throw sourceError;
+
     const { data: state } = await admin
       .from("google_sync_state")
       .select("sync_token, full_resync_needed")
@@ -54,7 +64,7 @@ export async function syncCalendar(
     let syncToken: string | null = state?.full_resync_needed ? null : (state?.sync_token ?? null);
     let full = !syncToken;
 
-    const result = await drain(admin, userId, calendarId, accessToken, syncToken);
+    const result = await drain(admin, userId, calendarId, source.id, accessToken, syncToken);
 
     if (result.expired) {
       // The token is gone: everything we hold for this calendar may be stale,
@@ -63,11 +73,11 @@ export async function syncCalendar(
         .from("external_events")
         .delete()
         .eq("user_id", userId)
-        .eq("google_calendar_id", calendarId);
+        .eq("calendar_source_id", source.id);
 
       syncToken = null;
       full = true;
-      const rebuilt = await drain(admin, userId, calendarId, accessToken, null);
+      const rebuilt = await drain(admin, userId, calendarId, source.id, accessToken, null);
       Object.assign(result, rebuilt);
     }
 
@@ -122,6 +132,7 @@ async function drain(
   admin: SupabaseClient,
   userId: string,
   calendarId: string,
+  sourceId: string,
   accessToken: string,
   syncToken: string | null,
 ) {
@@ -143,7 +154,7 @@ async function drain(
 
     const { upserts, deletes } = mapPage(
       userId,
-      calendarId,
+      sourceId,
       (page.items ?? []) as GoogleEvent[],
     );
 
@@ -151,7 +162,7 @@ async function drain(
       const { error } = await admin
         .from("external_events")
         .upsert(upserts, {
-          onConflict: "user_id,google_calendar_id,google_event_id",
+          onConflict: "user_id,calendar_source_id,external_event_id",
         });
       if (error) throw error;
       upserted += upserts.length;
@@ -162,8 +173,8 @@ async function drain(
         .from("external_events")
         .delete()
         .eq("user_id", userId)
-        .eq("google_calendar_id", calendarId)
-        .in("google_event_id", deletes);
+        .eq("calendar_source_id", sourceId)
+        .in("external_event_id", deletes);
       if (error) throw error;
       deleted += deletes.length;
     }

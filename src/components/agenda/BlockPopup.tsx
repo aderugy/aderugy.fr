@@ -10,7 +10,7 @@ import { CategoryPicker } from "./CategoryPicker";
 export type DraftBlock = {
   startsAt: Date;
   endsAt: Date;
-  overBusy?: boolean;
+  overCommitted?: boolean;
   /** Viewport coordinates of the drawn selection, for anchoring. */
   anchor: { top: number; bottom: number; left: number; right: number };
 };
@@ -189,9 +189,9 @@ export function BlockPopup({
         <TimeField value={endMin} onChange={setEndMin} />
       </div>
 
-      {draft.overBusy && (
+      {draft.overCommitted && (
         <p className="mt-2 text-amber-600 dark:text-amber-500">
-          Overlaps time already committed in Google Calendar.
+          Overlaps time one of your calendars has already committed.
         </p>
       )}
 

@@ -2,6 +2,12 @@ import { adminClient, callerFromRequest, json, storeRefreshToken } from "../_sha
 import { exchangeCode, listCalendars } from "../_shared/google.ts";
 import { syncAllCalendars } from "../_shared/sync.ts";
 
+/** Same palette the category tree uses, so a week reads as one system. */
+const PALETTE = [
+  "#3b5bdb", "#0ca678", "#e8590c", "#ae3ec9", "#1c7ed6",
+  "#2f9e44", "#e03131", "#f08c00", "#0c8599", "#64748b",
+];
+
 /**
  * Completes the Calendar consent.
  *
@@ -33,7 +39,8 @@ Deno.serve(async (request) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    await admin.from("external_events").delete().eq("user_id", user.id);
+    // calendar_sources cascades to external_events, so the mirror goes with it.
+    await admin.from("calendar_sources").delete().eq("user_id", user.id);
     await admin.from("google_sync_channels").delete().eq("user_id", user.id);
     await admin.from("google_sync_state").delete().eq("user_id", user.id);
     await admin.from("google_accounts").delete().eq("user_id", user.id);
@@ -53,20 +60,33 @@ Deno.serve(async (request) => {
     const secretId = await storeRefreshToken(admin, user.id, token.refresh_token!);
     const calendars = await listCalendars(token.access_token);
 
-    const primary = calendars.find((c) => c.primary)?.id ?? calendars[0]?.id;
-
     const { error: accountError } = await admin.from("google_accounts").upsert({
       user_id: user.id,
       google_email: user.email ?? null,
       refresh_token_secret: secretId,
       scopes: token.scope.split(" "),
-      busy_calendar_ids: primary ? [primary] : [],
       connected_at: new Date().toISOString(),
       disconnected_at: null,
       last_error: null,
       last_error_at: null,
     });
     if (accountError) throw accountError;
+
+    // Every calendar is discovered as a *disabled* source, named as Google
+    // names it. Enabling is where the user renames it and says what its hours
+    // count as — decisions that only mean something once they pick a calendar.
+    const { error: sourcesError } = await admin.from("calendar_sources").upsert(
+      calendars.map((c, i) => ({
+        user_id: user.id,
+        provider: "google",
+        external_id: c.id,
+        display_name: (c.summary ?? c.id).slice(0, 60),
+        color: PALETTE[i % PALETTE.length],
+        position: i,
+      })),
+      { onConflict: "user_id,provider,external_id", ignoreDuplicates: true },
+    );
+    if (sourcesError) throw sourcesError;
 
     // A sync-state row per calendar, so the user can toggle any of them on later
     // without a second consent. Existing rows keep their sync tokens.
