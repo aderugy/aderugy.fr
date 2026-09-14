@@ -539,8 +539,10 @@ export function WeekGrid({
                                 item.archived ? "border-dotted" : "border-dashed"
                               }`
                             : filled
-                              ? `cursor-grab ${hasMultipleChildren ? "border border-dashed p-[2px]" : ""}`
-                              : `cursor-grab ${hasMultipleChildren ? "border border-dashed px-1.5 py-0.5" : ""}`
+                              ? hasMultipleChildren
+                                ? "cursor-grab border border-dashed p-[2px]"
+                                : "cursor-grab py-0.5"
+                              : "cursor-grab border border-dashed px-1.5 py-0.5"
                         } ${isDragging ? "z-20 cursor-grabbing opacity-90" : "z-10"} ${
                           isSelected ? "ring-2 ring-accent" : ""
                         } ${item.done ? "opacity-60" : ""}`}
