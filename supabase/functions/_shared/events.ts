@@ -26,6 +26,12 @@ export type ExternalEventRow = {
   status: string;
   transparency: string;
   attendee_response: string | null;
+  /**
+   * Always null on an upsert: the provider still knows about this event, so it
+   * is not an archive. Writing it explicitly is what brings back a row that was
+   * archived after a deletion and has since reappeared upstream.
+   */
+  archived_at: null;
   updated_at: string;
 };
 
@@ -47,7 +53,9 @@ export function mapEvent(
 ): Mapped | null {
   if (!event.id) return null;
 
-  // Incremental syncs report deletions as cancelled entries.
+  // Incremental syncs report deletions as cancelled entries. What that does to
+  // the stored row is the caller's decision, not this function's: an event that
+  // has already ended is archived rather than removed.
   if (event.status === "cancelled") {
     return { action: "delete", eventId: event.id };
   }
@@ -81,6 +89,7 @@ export function mapEvent(
       status: event.status ?? "confirmed",
       transparency: event.transparency ?? "opaque",
       attendee_response: self?.responseStatus ?? null,
+      archived_at: null,
       updated_at: new Date().toISOString(),
     },
   };

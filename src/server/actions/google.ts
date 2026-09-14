@@ -109,6 +109,47 @@ export async function syncGoogleNow(): Promise<ActionResult> {
 }
 
 /**
+ * Remove an archived event for good.
+ *
+ * The only destructive thing you may do to the mirror, and the only one that
+ * makes sense: an archive is an event the provider has already forgotten, so no
+ * sync will restore it — and by the same token no sync will ever remove it
+ * either. That decision has to be yours.
+ *
+ * RLS is what enforces "archived only"; this is the door, not the lock. An
+ * event still live upstream matches nothing and comes back as the error below
+ * rather than silently doing nothing.
+ */
+export async function deleteArchivedEvent(input: {
+  calendarSourceId: string;
+  externalEventId: string;
+}): Promise<ActionResult> {
+  try {
+    const { supabase, user } = await requireUser();
+
+    const { data, error } = await supabase
+      .from("external_events")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("calendar_source_id", input.calendarSourceId)
+      .eq("external_event_id", input.externalEventId)
+      .not("archived_at", "is", null)
+      .select("external_event_id");
+    if (error) throw error;
+    if (!data?.length) {
+      throw new Error(
+        "Only archived events can be deleted here — this one still exists in your calendar. Remove it there.",
+      );
+    }
+
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
  * The settings page owns name, colour, category and the inclusion toggles.
  * Everything else about a calendar — which ones exist, their provider ids — is
  * discovered by the sync engine and not editable from the browser.

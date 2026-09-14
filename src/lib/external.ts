@@ -7,6 +7,10 @@ import { DAY_END_MIN, DAY_START_MIN, clamp, dayIndexOf, minutesOfDay } from "./t
  * `transparency: "transparent"` is the provider's own "show me as free", and a
  * declined invitation is not a commitment. Neither counts unless the calendar
  * says otherwise — the difference between a useful week and a wall of colour.
+ *
+ * An archived event — one the calendar deleted after it had already happened —
+ * is deliberately not filtered out here. It was real time; dropping it would
+ * quietly shrink a week you have already lived.
  */
 export function countsAsCommitted(
   event: ExternalEvent,
@@ -38,6 +42,8 @@ export function externalItems(
     const source = byId.get(event.calendar_source_id);
     if (!source || !countsAsCommitted(event, source)) continue;
 
+    const archived = Boolean(event.archived_at);
+
     if (event.all_day) {
       if (!source.include_all_day) continue;
       // All-day boundaries are stored at UTC midnight precisely so the date
@@ -58,6 +64,7 @@ export function externalItems(
           label: source.display_name,
           title: event.title,
           color: source.color,
+          archived,
         });
       }
       continue;
@@ -106,6 +113,7 @@ export function externalItems(
             // A mirrored event is opaque to us: no tasks, nothing to overfill.
             children: [],
             overfilled: false,
+            archived,
           });
         }
       }

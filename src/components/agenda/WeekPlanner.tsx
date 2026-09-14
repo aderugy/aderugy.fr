@@ -175,6 +175,9 @@ export function WeekPlanner({
           movable: !block.id.startsWith("temp-"),
           children,
           overfilled: childMinutes(block) > blockMinutes(block),
+          // Only a mirrored event can be an archive. A block you drew is yours
+          // already, and nothing outside the app can delete it.
+          archived: false,
         };
       }),
       ...external.items,

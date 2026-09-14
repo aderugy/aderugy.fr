@@ -50,11 +50,19 @@ select cron.schedule(
   $$ select public.invoke_edge('google-channels') $$
 );
 
--- Keep the mirror from growing without bound. Never touches sync tokens.
+-- Keep the mirror from growing without bound. Never touches sync tokens, and
+-- never touches an archive: an archived event is one the provider has already
+-- forgotten, so pruning it here would be exactly the automatic deletion the
+-- archive exists to prevent. Those leave only when their owner removes them.
+--
+-- Already scheduled? cron.schedule on an existing job name replaces its command,
+-- so re-running this one statement is enough to pick the archive clause up.
 select cron.schedule(
   'google-events-prune',
   '43 4 * * *',
-  $$ delete from public.external_events where ends_at < now() - interval '3 months' $$
+  $$ delete from public.external_events
+      where ends_at < now() - interval '3 months'
+        and archived_at is null $$
 );
 
 -- Inspect with:  select * from cron.job;

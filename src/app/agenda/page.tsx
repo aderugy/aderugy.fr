@@ -92,12 +92,14 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
         .select("id, week_id, title, category_id, target_minutes, done, position")
         .eq("week_id", week.id)
         .order("position"),
-      // The mirror of what Google says you are already committed to. Read-only,
-      // and fetched for the same window as the grid.
+      // The mirror of what Google says you are already committed to, plus the
+      // archives: events a calendar deleted once they were over, which the
+      // planner keeps so a week already lived does not lose its hours. Read-only
+      // either way, and fetched for the same window as the grid.
       supabase
         .from("external_events")
         .select(
-          "calendar_source_id, external_event_id, title, starts_at, ends_at, all_day, status, transparency, attendee_response",
+          "calendar_source_id, external_event_id, title, starts_at, ends_at, all_day, status, transparency, attendee_response, archived_at",
         )
         .eq("user_id", user.id)
         .lt("starts_at", rangeEnd)

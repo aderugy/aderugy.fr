@@ -10,7 +10,14 @@ import { readRefreshToken } from "./db.ts";
 
 export type SyncOutcome =
   | { status: "skipped"; reason: string }
-  | { status: "synced"; upserted: number; deleted: number; full: boolean }
+  | {
+      status: "synced";
+      upserted: number;
+      deleted: number;
+      /** Events removed upstream after they had already happened, kept here. */
+      archived: number;
+      full: boolean;
+    }
   | { status: "failed"; error: string };
 
 /**
@@ -68,12 +75,30 @@ export async function syncCalendar(
 
     if (result.expired) {
       // The token is gone: everything we hold for this calendar may be stale,
-      // including deletions we never saw. Wipe and rebuild rather than merge.
-      await admin
+      // including deletions we never saw. Wipe and rebuild rather than merge —
+      // but only the part of the week that is still ahead. A past event the
+      // provider has since dropped would not come back in the rebuild, so
+      // discarding it here would lose it for good; archive it instead. The
+      // rebuild clears the flag again on everything the provider still knows.
+      const wipedAt = new Date().toISOString();
+
+      const { error: archiveError } = await admin
+        .from("external_events")
+        .update({ archived_at: wipedAt })
+        .eq("user_id", userId)
+        .eq("calendar_source_id", source.id)
+        .is("archived_at", null)
+        .lte("ends_at", wipedAt);
+      if (archiveError) throw archiveError;
+
+      const { error: wipeError } = await admin
         .from("external_events")
         .delete()
         .eq("user_id", userId)
-        .eq("calendar_source_id", source.id);
+        .eq("calendar_source_id", source.id)
+        .is("archived_at", null)
+        .gt("ends_at", wipedAt);
+      if (wipeError) throw wipeError;
 
       syncToken = null;
       full = true;
@@ -99,6 +124,7 @@ export async function syncCalendar(
       status: "synced",
       upserted: result.upserted,
       deleted: result.deleted,
+      archived: result.archived,
       full,
     };
   } catch (error) {
@@ -140,6 +166,7 @@ async function drain(
   let nextSyncToken: string | null = null;
   let upserted = 0;
   let deleted = 0;
+  let archived = 0;
 
   do {
     let page;
@@ -147,7 +174,7 @@ async function drain(
       page = await listEvents(accessToken, calendarId, { syncToken, pageToken });
     } catch (error) {
       if (error instanceof SyncTokenExpiredError) {
-        return { expired: true, nextSyncToken: null, upserted, deleted };
+        return { expired: true, nextSyncToken: null, upserted, deleted, archived };
       }
       throw error;
     }
@@ -169,21 +196,66 @@ async function drain(
     }
 
     if (deletes.length) {
-      const { error } = await admin
-        .from("external_events")
-        .delete()
-        .eq("user_id", userId)
-        .eq("calendar_source_id", sourceId)
-        .in("external_event_id", deletes);
-      if (error) throw error;
-      deleted += deletes.length;
+      const outcome = await removeOrArchive(admin, userId, sourceId, deletes);
+      deleted += outcome.deleted;
+      archived += outcome.archived;
     }
 
     pageToken = page.nextPageToken ?? null;
     nextSyncToken = page.nextSyncToken ?? nextSyncToken;
   } while (pageToken);
 
-  return { expired: false, nextSyncToken, upserted, deleted };
+  return { expired: false, nextSyncToken, upserted, deleted, archived };
+}
+
+/**
+ * A deletion from the provider is obeyed only while the event is still ahead.
+ *
+ * One connected calendar drops an event the moment it is over. Mirroring that
+ * would rewrite weeks already lived — their hours would vanish from the grid
+ * and from every total computed off it. So an event that has already ended is
+ * archived rather than removed: it keeps showing, it keeps counting, and the
+ * only hand that can delete it is the owner's. An event still to come has
+ * genuinely been cancelled, and goes.
+ *
+ * Archived rows are excluded from both statements, so this is idempotent: a
+ * second cancellation for the same event changes nothing, and the original
+ * archive time survives.
+ */
+async function removeOrArchive(
+  admin: SupabaseClient,
+  userId: string,
+  sourceId: string,
+  eventIds: string[],
+) {
+  const now = new Date().toISOString();
+
+  const { data: archivedRows, error: archiveError } = await admin
+    .from("external_events")
+    .update({ archived_at: now })
+    .eq("user_id", userId)
+    .eq("calendar_source_id", sourceId)
+    .in("external_event_id", eventIds)
+    .is("archived_at", null)
+    .lte("ends_at", now)
+    .select("external_event_id");
+  if (archiveError) throw archiveError;
+
+  const { data: deletedRows, error: deleteError } = await admin
+    .from("external_events")
+    .delete()
+    .eq("user_id", userId)
+    .eq("calendar_source_id", sourceId)
+    .in("external_event_id", eventIds)
+    .is("archived_at", null)
+    .gt("ends_at", now)
+    .select("external_event_id");
+  if (deleteError) throw deleteError;
+
+  return {
+    archived: archivedRows?.length ?? 0,
+    deleted: deletedRows?.length ?? 0,
+  };
 }
 
 /** Sync every calendar the user has marked as busy-relevant. */

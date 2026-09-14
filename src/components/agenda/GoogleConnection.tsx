@@ -82,7 +82,14 @@ export function GoogleConnection({
             </button>
             <button
               onClick={() => {
-                if (confirm("Disconnect Google and delete the mirrored events?")) {
+                // The archives are called out on purpose: they are the one part
+                // of the mirror reconnecting will not rebuild, because the
+                // calendar they came from has already forgotten them.
+                if (
+                  confirm(
+                    "Disconnect Google and delete the mirrored events?\n\nThis also removes the archived past events kept after your calendar deleted them. Reconnecting will not bring those back.",
+                  )
+                ) {
                   run(disconnectGoogle);
                 }
               }}

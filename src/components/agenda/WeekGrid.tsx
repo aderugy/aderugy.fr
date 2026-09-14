@@ -83,13 +83,18 @@ function itemTitle(item: GridItem, startMin: number, endMin: number) {
     (p): p is string => Boolean(p) && p !== "",
   );
   const head = [...new Set(parts)].join(" — ");
+  const kept = item.archived
+    ? "\nArchived — your calendar deleted this once it was over. Kept here."
+    : "";
 
-  if (item.children.length === 0) return head ? `${head} · ${when}` : when;
+  if (item.children.length === 0) {
+    return `${head ? `${head} · ${when}` : when}${kept}`;
+  }
 
   const inside = item.children
     .map((c) => `${c.label} ${fmtDuration(c.minutes)}`)
     .join(", ");
-  return `${head ? `${head} · ` : ""}${when}\n${inside}`;
+  return `${head ? `${head} · ` : ""}${when}\n${inside}${kept}`;
 }
 
 export type DrawnRange = {
@@ -406,11 +411,18 @@ export function WeekGrid({
                   .map((chip) => (
                     <div
                       key={chip.id}
-                      title={`${chip.label}${chip.title ? ` — ${chip.title}` : ""}`}
+                      title={`${chip.label}${chip.title ? ` — ${chip.title}` : ""}${
+                        chip.archived
+                          ? "\nArchived — your calendar deleted this once it was over. Kept here."
+                          : ""
+                      }`}
                       className="mb-0.5 truncate rounded px-1 py-0.5 text-[10px] leading-tight"
                       style={{
                         backgroundColor: `${chip.color}22`,
                         borderLeft: `2px solid ${chip.color}`,
+                        backgroundImage: chip.archived
+                          ? `repeating-linear-gradient(45deg, ${chip.color}1f 0 4px, transparent 4px 9px)`
+                          : undefined,
                       }}
                     >
                       {chip.title ?? chip.label}
@@ -519,7 +531,11 @@ export function WeekGrid({
                         title={itemTitle(item, startMin, endMin)}
                         className={`absolute touch-none overflow-hidden rounded-md text-[11px] leading-tight ${
                           external
-                            ? "cursor-default border-l-[3px] border-y border-r border-dashed px-1.5 py-0.5"
+                            ? `cursor-default border-l-[3px] border-y border-r px-1.5 py-0.5 ${
+                                // Dotted, and hatched below: an archive is time
+                                // that happened, held by nothing but this row.
+                                item.archived ? "border-dotted" : "border-dashed"
+                              }`
                             : filled
                               ? "cursor-grab border border-dashed p-[2px]"
                               : "cursor-grab border border-dashed px-1.5 py-0.5"
@@ -539,6 +555,11 @@ export function WeekGrid({
                                 borderBottomColor: `${item.color}55`,
                                 // Flatter fill for time you do not control.
                                 backgroundColor: `${item.color}14`,
+                                // An archive reads as hatched rather than faded:
+                                // it still counts, so it must not look spent.
+                                backgroundImage: item.archived
+                                  ? `repeating-linear-gradient(45deg, ${item.color}1f 0 4px, transparent 4px 9px)`
+                                  : undefined,
                               }
                             : {
                                 // Amber says the tasks ask for more time than the
@@ -593,9 +614,13 @@ export function WeekGrid({
                               {external && (
                                 <span
                                   className="shrink-0 opacity-60"
-                                  title="From a calendar"
+                                  title={
+                                    item.archived
+                                      ? "Archived from a calendar"
+                                      : "From a calendar"
+                                  }
                                 >
-                                  ⧉
+                                  {item.archived ? "⧗" : "⧉"}
                                 </span>
                               )}
                               <span className="truncate font-medium">

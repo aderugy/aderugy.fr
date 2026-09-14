@@ -159,6 +159,14 @@ export type ExternalEvent = {
   /** "opaque" blocks time; "transparent" is the provider's own "show me as free". */
   transparency: string;
   attendee_response: string | null;
+  /**
+   * Set when the calendar dropped this event after it had already happened.
+   *
+   * The row outlives the deletion — an hour you spent does not stop having been
+   * spent because the calendar tidied itself up — so it keeps its place on the
+   * grid and in the totals. Nothing but you can remove it.
+   */
+  archived_at: string | null;
 };
 
 export type GoogleAccount = {
@@ -211,6 +219,12 @@ export type GridItem = {
   children: GridChild[];
   /** The children ask for more time than the block holds. */
   overfilled: boolean;
+  /**
+   * An external event the calendar has deleted and the planner kept. Drawn
+   * differently, counted the same, and removable only from the detail panel.
+   * Always false for your own blocks.
+   */
+  archived: boolean;
 };
 
 export type AllDayItem = {
@@ -219,4 +233,6 @@ export type AllDayItem = {
   label: string;
   title: string | null;
   color: string;
+  /** Kept after the calendar deleted it. See `GridItem.archived`. */
+  archived: boolean;
 };
