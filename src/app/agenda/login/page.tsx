@@ -18,7 +18,7 @@ export default async function LoginPage({
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-24">
       <h1 className="text-xl font-semibold tracking-tight">Agenda</h1>
       <p className="mt-1 text-sm text-muted">
-        Sign in with a magic link — no password to remember.
+        Sign in with your Google account.
       </p>
 
       {error && (

@@ -21,23 +21,32 @@ npm run dev
 3. Copy the project URL and anon key from **Project Settings → API** into
    `.env.local`.
 4. Under **Authentication → URL Configuration**:
-   - **Site URL** → your production origin. It defaults to `http://localhost:3000`,
+   - **Site URL** → `https://aderugy.fr`. It defaults to `http://localhost:3000`,
      and Supabase silently falls back to it whenever a requested redirect is not
      allow-listed — which is why links sometimes land on localhost from prod.
-   - **Redirect URLs** → `http://localhost:3000/auth/callback`, your production
-     callback, and `https://*-<team>.vercel.app/auth/callback` for previews.
+   - **Redirect URLs** →
+
+     ```
+     http://localhost:3000/auth/callback
+     https://aderugy.fr/auth/callback
+     https://*-<your-vercel-team>.vercel.app/auth/callback
+     ```
+
 5. Optional but recommended — **Authentication → Email Templates → Magic Link**:
 
    ```html
-   <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink&next=/agenda">
-     Sign in
-   </a>
+   <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink">Sign in</a>
    ```
 
    The default template produces a PKCE `?code=` link that can only be completed
    in the browser that requested it, so opening it on a phone fails. The
    `token_hash` form verifies server-side and works anywhere. `/auth/callback`
    accepts both, so switching is safe either way.
+
+   Use `{{ .RedirectTo }}`, not `{{ .SiteURL }}` — `.RedirectTo` is the callback
+   this app asked for, so local and preview sign-ins come back to themselves
+   instead of every link pointing at production. The login form always sends a
+   `?next=` parameter, so appending with `&` is well-formed.
 
 Every table is protected by row-level security (`user_id = auth.uid()`). The
 app never uses a service-role key, so the database is the security boundary,
