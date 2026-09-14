@@ -26,6 +26,19 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const onLoginPage = path === LOGIN_PATH;
 
+  // Safety net. When a redirect_to is not allow-listed, Supabase does not fail —
+  // it substitutes the project's Site URL, dropping the OAuth code on the site
+  // root where nothing can exchange it. The sign-in then fails silently and the
+  // user loops back to the login page. Forward it to the callback instead.
+  if (path === "/") {
+    if (request.nextUrl.searchParams.has("code")) {
+      const target = request.nextUrl.clone();
+      target.pathname = "/auth/callback";
+      return NextResponse.redirect(target);
+    }
+    return response; // the landing page is public
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

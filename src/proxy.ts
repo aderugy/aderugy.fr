@@ -6,5 +6,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/agenda/:path*"],
+  // "/" is matched only to rescue an OAuth code that Supabase dropped there;
+  // updateSession returns immediately for any other request to it, so the
+  // landing page costs nothing.
+  matcher: ["/", "/agenda/:path*"],
 };
