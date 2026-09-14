@@ -160,6 +160,35 @@ service-role key and no Google client secret: the only elevated credential in
 the system lives inside Supabase Edge Functions, which is also the only place
 that talks to Google.
 
+## Poker rake presets
+
+`/poker` prices every call net of rake, so the presets it offers — Betclic and
+Winamax today — live in `public.rake_profiles` rather than in the code. A cap
+that changes is one `update` in the SQL editor, not a deploy.
+
+1. Run `supabase/migrations/0006_rake_profiles.sql`. It creates the table and
+   seeds the 33 rows currently in use (5 Betclic limits, 7 Winamax limits × 4
+   table sizes).
+2. Nothing else. The table is world-readable (`for select to anon,
+   authenticated`) because the tool has no login, and it has **no** write
+   policy: rows change from the SQL editor or a migration.
+
+Two details worth knowing before editing rows by hand:
+
+- `cap_bb` is what the maths uses; `cap_amount` / `big_blind` / `currency` are
+  how the site itself states the cap ("1,50 € = 3 bb"). A check constraint
+  refuses a row where the two disagree, since that is the one mistake here that
+  would be quietly, expensively wrong.
+- `seats` is the number of players dealt in, for sites whose cap depends on it;
+  the top of a ladder means "and up", which is what `seats_label` says. Leave
+  both null when the cap does not vary. `is_default` marks the preset a
+  first-time visitor opens, and a unique index allows only one.
+
+The chosen preset is remembered in `localStorage` on the visitor's own device
+(`aderugy:poker:rake`) — nothing about it reaches the database. If the presets
+cannot be read at all, the menu falls back to its manual percent/cap fields and
+the page still works.
+
 ## The agenda model
 
 | Concept | Meaning |

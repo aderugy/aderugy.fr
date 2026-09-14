@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { PokerCalculator } from "@/components/poker/PokerCalculator";
+import { getRakeProfiles } from "@/server/rake";
 
 export const metadata = {
   title: "Poker odds — aderugy.fr",
   description: "Pot odds, drawing equity and semi-bluff fold equity, rake included.",
 };
 
-export default function PokerPage() {
+// The rake presets change a few times a year, and nothing on this page is
+// per-visitor, so it is rendered once and revalidated daily rather than on
+// every request.
+export const revalidate = 86400;
+
+export default async function PokerPage() {
+  const profiles = await getRakeProfiles();
+
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
       <Link href="/" className="text-xs text-muted hover:text-foreground">
@@ -19,7 +27,7 @@ export default function PokerPage() {
       </p>
 
       <div className="mt-6">
-        <PokerCalculator />
+        <PokerCalculator profiles={profiles} />
       </div>
     </main>
   );

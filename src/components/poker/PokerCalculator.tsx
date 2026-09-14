@@ -1,20 +1,25 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  DEFAULT_RAKE_CONFIG,
   EQUITY_FORMULA,
   MAX_OUTS,
   STREETS,
   asRatio,
   equity,
   foldEquityRows,
+  initialSelection,
+  normalizeSelection,
   pct,
   potOdds,
   rakeOn,
+  readStoredSelection,
   resolveRake,
+  storeSelection,
   trimNumber,
-  type RakeConfig,
+  type Rake,
+  type RakeProfile,
+  type RakeSelection,
   type Street,
 } from "@/lib/poker";
 import { RakeMenu } from "./RakeMenu";
@@ -27,16 +32,33 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "fold", label: "Fold equity" },
 ];
 
-export function PokerCalculator() {
+export function PokerCalculator({ profiles }: { profiles: RakeProfile[] }) {
   const [tab, setTab] = useState<Tab>("odds");
-  const [rakeConfig, setRakeConfig] = useState<RakeConfig>(DEFAULT_RAKE_CONFIG);
-  const rake = useMemo(() => resolveRake(rakeConfig), [rakeConfig]);
+  const [selection, setSelection] = useState<RakeSelection>(() =>
+    initialSelection(profiles),
+  );
+
+  // The stored choice is read after mount rather than during render: the server
+  // has no localStorage, and rendering from it directly would hydrate into a
+  // different menu than the HTML it is matching against.
+  useEffect(() => {
+    const stored = readStoredSelection();
+    if (stored) setSelection(normalizeSelection(stored, profiles));
+  }, [profiles]);
+
+  const update = (next: RakeSelection) => {
+    const normalized = normalizeSelection(next, profiles);
+    setSelection(normalized);
+    storeSelection(normalized);
+  };
+
+  const rake = useMemo(() => resolveRake(selection, profiles), [selection, profiles]);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Segmented value={tab} onChange={setTab} options={TABS} />
-        <RakeMenu config={rakeConfig} onChange={setRakeConfig} />
+        <RakeMenu profiles={profiles} selection={selection} onChange={update} />
       </div>
 
       {tab === "odds" ? <PotOddsTab rake={rake} /> : <FoldEquityTab rake={rake} />}
@@ -46,7 +68,7 @@ export function PokerCalculator() {
 
 /* ---------------------------------------------------------------- pot odds */
 
-function PotOddsTab({ rake }: { rake: ReturnType<typeof resolveRake> }) {
+function PotOddsTab({ rake }: { rake: Rake }) {
   const [pot, setPot] = useState("100");
   const [call, setCall] = useState("50");
   const [outs, setOuts] = useState("9");
@@ -183,7 +205,7 @@ function PotOddsTab({ rake }: { rake: ReturnType<typeof resolveRake> }) {
 
 /* ------------------------------------------------------------- fold equity */
 
-function FoldEquityTab({ rake }: { rake: ReturnType<typeof resolveRake> }) {
+function FoldEquityTab({ rake }: { rake: Rake }) {
   const [pot, setPot] = useState("100");
   const [outs, setOuts] = useState("9");
   const [street, setStreet] = useState<Street>("flop2");
