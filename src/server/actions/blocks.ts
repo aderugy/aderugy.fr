@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 
 export async function createBlock(input: {
@@ -25,7 +25,7 @@ export async function createBlock(input: {
     });
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -59,7 +59,7 @@ export async function updateBlock(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -76,7 +76,7 @@ export async function deleteBlock(id: string): Promise<ActionResult> {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -112,7 +112,7 @@ export async function addBlockItem(input: {
     });
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -129,7 +129,7 @@ export async function deleteBlockItem(id: string): Promise<ActionResult> {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);

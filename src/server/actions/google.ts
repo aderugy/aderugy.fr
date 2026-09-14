@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
@@ -80,7 +80,7 @@ export async function completeGoogleConnect(
       code,
       redirectUri,
     });
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -90,7 +90,7 @@ export async function completeGoogleConnect(
 export async function disconnectGoogle(): Promise<ActionResult> {
   try {
     await callEdge("google-oauth", await accessTokenOf(), { action: "disconnect" });
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -101,7 +101,7 @@ export async function disconnectGoogle(): Promise<ActionResult> {
 export async function syncGoogleNow(): Promise<ActionResult> {
   try {
     await callEdge("google-sync", await accessTokenOf(), {});
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -141,7 +141,7 @@ export async function updateCalendarSource(input: {
     });
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);

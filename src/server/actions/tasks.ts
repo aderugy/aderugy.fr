@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 
 export async function createTask(input: {
@@ -27,7 +27,7 @@ export async function createTask(input: {
     });
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -71,7 +71,7 @@ export async function updateTask(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -88,7 +88,7 @@ export async function deleteTask(id: string): Promise<ActionResult> {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { categoryIndex, DEFAULT_COLOR } from "@/lib/categories";
 import {
   addDays,
@@ -41,10 +40,6 @@ import { PlannerRail } from "./PlannerRail";
 import { WeekGrid, type DrawnRange } from "./WeekGrid";
 import { WeekIntent } from "./WeekIntent";
 
-type OptimisticAction =
-  | { type: "add"; block: ScheduledBlock }
-  | { type: "move"; id: string; startsAt: string; endsAt: string };
-
 type Props = {
   weekStart: string;
   week: Week;
@@ -72,30 +67,33 @@ export function WeekPlanner({
   googleAccount,
   oldestSyncAt,
 }: Props) {
-  const router = useRouter();
   const weekStartDate = useMemo(() => fromISODate(weekStart), [weekStart]);
 
-  // Drags feel instant because the grid renders the optimistic view; when the
-  // server action settles, React drops back to the revalidated props.
-  const [items, applyOptimistic] = useOptimistic(
-    scheduled,
-    (state: ScheduledBlock[], action: OptimisticAction) => {
-      switch (action.type) {
-        case "add":
-          return [...state, action.block];
-        case "move":
-          return state.map((b) =>
-            b.id === action.id
-              ? { ...b, starts_at: action.startsAt, ends_at: action.endsAt }
-              : b,
-          );
-      }
-    },
-  );
+  /**
+   * The grid owns the placed blocks between server renders.
+   *
+   * This used to be `useOptimistic` over the `scheduled` prop, which meant
+   * every drag had to be followed by a route re-render: as soon as the action
+   * settled React dropped the optimistic value and fell back to the prop, so
+   * without a refresh the block snapped back to where it started. Holding the
+   * list in real state lets a move persist on the strength of the write alone.
+   *
+   * The prop is still the source of truth whenever the server sends a new one —
+   * a week navigation, or any action that does refresh — so it re-seeds on a
+   * new prop identity. Adjusting state during render is the documented way to
+   * do that; an effect would paint the stale list first.
+   */
+  const [items, setItems] = useState<ScheduledBlock[]>(scheduled);
+  const [seededFrom, setSeededFrom] = useState(scheduled);
+  if (seededFrom !== scheduled) {
+    setSeededFrom(scheduled);
+    setItems(scheduled);
+  }
 
   const [pendingDrag, setPendingDrag] = useState<DragPayload | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftBlock | null>(null);
+  const [gridError, setGridError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const googleConnected = Boolean(googleAccount && !googleAccount.disconnected_at);
@@ -165,7 +163,9 @@ export function WeekPlanner({
         description: block.description,
         color: colorFor(block),
         done: block.status === "done",
-        movable: true,
+        // A block the server has not acknowledged has no real id yet, so a
+        // move would address a row that does not exist.
+        movable: !block.id.startsWith("temp-"),
       })),
       ...external.items,
     ],
@@ -211,22 +211,30 @@ export function WeekPlanner({
       scheduled_block_tasks: [],
     };
     setPendingDrag(null);
+    setGridError(null);
+    setItems((prev) => [...prev, temp]);
 
     startTransition(async () => {
-      applyOptimistic({ type: "add", block: temp });
-      if (payload.kind === "task") {
-        await placeTask({
-          weekStart,
-          taskId: payload.id,
-          startsAt: startsAt.toISOString(),
-          minutes: payload.minutes,
-        });
-      } else {
-        await placeBlock({
-          weekStart,
-          blockId: payload.id,
-          startsAt: startsAt.toISOString(),
-        });
+      const result =
+        payload.kind === "task"
+          ? await placeTask({
+              weekStart,
+              taskId: payload.id,
+              startsAt: startsAt.toISOString(),
+              minutes: payload.minutes,
+            })
+          : await placeBlock({
+              weekStart,
+              blockId: payload.id,
+              startsAt: startsAt.toISOString(),
+            });
+
+      // On success the action refreshes the route and the real row arrives as
+      // a new prop, replacing this placeholder. On failure nothing will, so
+      // take it back out rather than leaving a block that does not exist.
+      if (!result.ok) {
+        setItems((prev) => prev.filter((b) => b.id !== temp.id));
+        setGridError(result.error);
       }
     });
   }
@@ -256,24 +264,41 @@ export function WeekPlanner({
 
     if (!result.ok) return result.error;
 
+    // No refresh here: the action already re-renders the route, and the row it
+    // just wrote arrives with it.
     setDraft(null);
-    router.refresh();
     return null;
   }
 
+  /**
+   * Move and resize both land here, and neither waits on the server to paint.
+   * The write is fire-and-forget in the happy path; a rejection puts the block
+   * back where it was and says why.
+   */
   function onMove(id: string, startsAt: Date, endsAt: Date) {
+    const previous = items.find((b) => b.id === id);
+    if (!previous) return;
+
+    setGridError(null);
+    setItems((prev) =>
+      prev.map((b) =>
+        b.id === id
+          ? { ...b, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() }
+          : b,
+      ),
+    );
+
     startTransition(async () => {
-      applyOptimistic({
-        type: "move",
+      const result = await moveScheduled({
         id,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
       });
-      await moveScheduled({
-        id,
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
-      });
+
+      if (!result.ok) {
+        setItems((prev) => prev.map((b) => (b.id === id ? previous : b)));
+        setGridError(result.error);
+      }
     });
   }
 
@@ -309,6 +334,16 @@ export function WeekPlanner({
           <span className="rounded bg-accent/10 px-2 py-0.5 text-xs text-accent">
             {week.theme}
           </span>
+        )}
+        {gridError && (
+          <button
+            type="button"
+            onClick={() => setGridError(null)}
+            className="rounded bg-red-500/10 px-2 py-0.5 text-xs text-red-500"
+            title="Dismiss"
+          >
+            {gridError}
+          </button>
         )}
         <span className="ml-auto flex items-center gap-3 text-xs text-muted">
           {googleConnected && (

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 import { ensureWeek, syncTaskStatus } from "@/server/weeks";
 
@@ -53,7 +53,7 @@ export async function placeTask(input: {
     if (linkError) throw linkError;
 
     await syncTaskStatus(supabase, user.id, [task.id]);
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true, id: block.id };
   } catch (e) {
     return fail(e) as PlacedResult;
@@ -107,7 +107,7 @@ export async function placeBlock(input: {
       .single();
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true, id: created.id };
   } catch (e) {
     return fail(e) as PlacedResult;
@@ -151,14 +151,21 @@ export async function createScheduledBlock(input: {
       .single();
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true, id: data.id };
   } catch (e) {
     return fail(e) as PlacedResult;
   }
 }
 
-/** Move or resize: both are just a new start/end pair. */
+/**
+ * Move or resize: both are just a new start/end pair.
+ *
+ * Deliberately does not refresh. The grid already holds the new geometry — it
+ * is where the drag came from — so re-rendering the route would recompute the
+ * whole week only to hand back the position the client just drew. This is the
+ * hot path: every drag and every resize goes through here.
+ */
 export async function moveScheduled(input: {
   id: string;
   startsAt: string;
@@ -181,7 +188,6 @@ export async function moveScheduled(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -215,7 +221,7 @@ export async function updateScheduled(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -246,7 +252,7 @@ export async function deleteScheduled(id: string): Promise<ActionResult> {
       user.id,
       (links ?? []).map((l) => l.task_id as string),
     );
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -270,7 +276,7 @@ export async function attachTask(input: {
     if (error) throw error;
 
     await syncTaskStatus(supabase, user.id, [input.taskId]);
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -292,7 +298,7 @@ export async function detachTask(input: {
     if (error) throw error;
 
     await syncTaskStatus(supabase, user.id, [input.taskId]);
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -321,7 +327,7 @@ export async function updateWeekMeta(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -357,7 +363,7 @@ export async function createObjective(input: {
     });
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -385,7 +391,7 @@ export async function updateObjective(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -402,7 +408,7 @@ export async function deleteObjective(id: string): Promise<ActionResult> {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);

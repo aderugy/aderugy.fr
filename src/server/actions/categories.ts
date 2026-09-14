@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 
 export async function createCategory(input: {
@@ -34,7 +34,7 @@ export async function createCategory(input: {
     });
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -65,7 +65,7 @@ export async function updateCategory(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -110,7 +110,7 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/agenda", "layout");
+    refresh();
     return { ok: true };
   } catch (e) {
     return fail(e);
