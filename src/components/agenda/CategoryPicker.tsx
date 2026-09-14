@@ -13,10 +13,12 @@ import { eventHitsElement } from "@/lib/dom";
  * Enter to pick. The full path is matched, not just the leaf, so "poker gr"
  * finds `poker > grind`.
  *
- * With no query the list is a tree: only roots show, and hovering a parent
- * expands its children (hovering another branch collapses the previous one, so
- * the list stays short). Arrow keys walk the visible rows; →/← expand and
- * collapse. Typing switches back to the flat, path-matched result list.
+ * With no query the list is a tree: only roots show. Clicking a parent row —
+ * the whole row, so it is a wide target — expands it; clicking a leaf picks it.
+ * Leaves are what gets picked in practice, so they are one click away with no
+ * precision needed. A parent can still be picked: Enter on it, or its "select"
+ * button on the right of the row. →/← expand and collapse; typing switches back
+ * to the flat, path-matched result list.
  */
 export function CategoryPicker({
   categories,
@@ -98,12 +100,14 @@ export function CategoryPicker({
     setExpanded(new Set(value ? (ancestors.get(value) ?? []) : []));
   }, [open, value, ancestors]);
 
-  /** Hovering a row opens its branch and closes every other one. */
-  function revealBranch(node: CategoryNode) {
+  function toggle(node: CategoryNode) {
     setActiveId(node.id);
-    if (searching) return;
-    const chain = ancestors.get(node.id) ?? [];
-    setExpanded(new Set(node.children.length ? [...chain, node.id] : chain));
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(node.id)) next.delete(node.id);
+      else next.add(node.id);
+      return next;
+    });
   }
 
   function move(delta: number) {
@@ -158,7 +162,6 @@ export function CategoryPicker({
               if (parent) {
                 e.preventDefault();
                 setActiveId(parent);
-                setExpanded(new Set(chain.slice(0, -1)));
               }
             }
           } else if (e.key === "Enter") {
@@ -185,7 +188,10 @@ export function CategoryPicker({
       )}
 
       {open && (
-        <ul className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded border border-line bg-surface py-1 shadow-lg">
+        <ul
+          role="listbox"
+          className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded border border-line bg-surface py-1 shadow-lg"
+        >
           {visible.length === 0 && (
             <li className="px-2 py-1.5 text-xs text-muted">
               No category matches. Create it on the Backlog page.
@@ -193,21 +199,24 @@ export function CategoryPicker({
           )}
           {visible.map((node) => {
             const hasChildren = !searching && node.children.length > 0;
+            const isActive = node.id === activeNode?.id;
             return (
               <li key={node.id}>
-                <button
-                  type="button"
+                <div
+                  role="option"
+                  aria-selected={node.id === value}
+                  aria-expanded={hasChildren ? expanded.has(node.id) : undefined}
                   // pointerdown, not click: the outside-click listener fires on
                   // pointerdown and would close the list before click lands.
                   onPointerDown={(e) => {
                     e.preventDefault();
-                    pick(node);
+                    if (hasChildren) toggle(node);
+                    else pick(node);
                   }}
-                  onMouseEnter={() => revealBranch(node)}
-                  onFocus={() => revealBranch(node)}
+                  onMouseEnter={() => setActiveId(node.id)}
                   style={{ paddingLeft: searching ? 8 : 8 + node.depth * 12 }}
-                  className={`flex w-full items-center gap-1.5 py-1 pr-2 text-left text-xs ${
-                    node.id === activeNode?.id ? "bg-accent/10" : ""
+                  className={`flex w-full cursor-pointer select-none items-center gap-1.5 py-1.5 pr-1 text-left text-xs ${
+                    isActive ? "bg-accent/10" : ""
                   }`}
                 >
                   <span
@@ -223,7 +232,22 @@ export function CategoryPicker({
                     style={{ backgroundColor: node.effectiveColor }}
                   />
                   <span className="truncate">{searching ? node.path : node.name}</span>
-                </button>
+
+                  {hasChildren && isActive && (
+                    <button
+                      type="button"
+                      title={`Use “${node.name}” itself`}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        pick(node);
+                      }}
+                      className="ml-auto shrink-0 rounded px-1 py-0.5 text-[10px] text-muted hover:bg-accent/10 hover:text-accent"
+                    >
+                      select
+                    </button>
+                  )}
+                </div>
               </li>
             );
           })}
