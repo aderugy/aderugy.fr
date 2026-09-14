@@ -522,6 +522,8 @@ export function WeekGrid({
                     // outline drawn around them.
                     const filled = item.children.length > 0;
 
+                    const hasMultipleChildren = item.children.length > 1;
+
                     return (
                       <div
                         key={item.id}
@@ -537,8 +539,8 @@ export function WeekGrid({
                                 item.archived ? "border-dotted" : "border-dashed"
                               }`
                             : filled
-                              ? "cursor-grab border border-dashed p-[2px]"
-                              : "cursor-grab border border-dashed px-1.5 py-0.5"
+                              ? `cursor-grab border ${hasMultipleChildren ? "border-dashed" : ""} p-[2px]`
+                              : `cursor-grab border ${hasMultipleChildren ? "border-dashed" : ""} px-1.5 py-0.5`
                         } ${isDragging ? "z-20 cursor-grabbing opacity-90" : "z-10"} ${
                           isSelected ? "ring-2 ring-accent" : ""
                         } ${item.done ? "opacity-60" : ""}`}
