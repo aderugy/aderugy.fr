@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { categoryIndex, DEFAULT_COLOR } from "@/lib/categories";
 import {
@@ -65,6 +66,7 @@ export function WeekPlanner({
   googleAccount,
   oldestSyncAt,
 }: Props) {
+  const router = useRouter();
   const weekStartDate = useMemo(() => fromISODate(weekStart), [weekStart]);
 
   // Drags feel instant because the grid renders the optimistic view; when the
@@ -182,37 +184,29 @@ export function WeekPlanner({
     setDraft(range);
   }
 
-  function onDraftSubmit(input: {
+  /**
+   * Returns an error message instead of throwing it away, so a rejected insert
+   * shows up in the popup rather than silently leaving the grid unchanged.
+   */
+  async function onDraftSubmit(input: {
     categoryId: string;
     description: string | null;
     startsAt: Date;
     endsAt: Date;
-  }) {
-    setDraft(null);
-    startTransition(async () => {
-      applyOptimistic({
-        type: "add",
-        block: {
-          id: `temp-${crypto.randomUUID()}`,
-          week_id: week.id,
-          starts_at: input.startsAt.toISOString(),
-          ends_at: input.endsAt.toISOString(),
-          description: input.description,
-          category_id: input.categoryId,
-          source_block_id: null,
-          status: "planned",
-          actual_minutes: null,
-          scheduled_block_tasks: [],
-        },
-      });
-      await createScheduledBlock({
-        weekStart,
-        categoryId: input.categoryId,
-        description: input.description,
-        startsAt: input.startsAt.toISOString(),
-        endsAt: input.endsAt.toISOString(),
-      });
+  }): Promise<string | null> {
+    const result = await createScheduledBlock({
+      weekStart,
+      categoryId: input.categoryId,
+      description: input.description,
+      startsAt: input.startsAt.toISOString(),
+      endsAt: input.endsAt.toISOString(),
     });
+
+    if (!result.ok) return result.error;
+
+    setDraft(null);
+    router.refresh();
+    return null;
   }
 
   function onMove(id: string, startsAt: Date, endsAt: Date) {

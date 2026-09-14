@@ -35,18 +35,20 @@ export function BlockPopup({
   categories: Category[];
   defaultCategoryId: string | null;
   onCancel: () => void;
+  /** Resolves to an error message, or null when the block was created. */
   onSubmit: (input: {
     categoryId: string;
     description: string | null;
     startsAt: Date;
     endsAt: Date;
-  }) => void;
+  }) => Promise<string | null>;
 }) {
   const [categoryId, setCategoryId] = useState<string | null>(defaultCategoryId);
   const [description, setDescription] = useState("");
   const [startMin, setStartMin] = useState(minutesOfDay(draft.startsAt));
   const [endMin, setEndMin] = useState(minutesOfDay(draft.endsAt));
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -74,19 +76,24 @@ export function BlockPopup({
     };
   }, [onCancel]);
 
-  // Safe to touch `document` and `window` here: the parent renders this only
-  // once a drag has happened, which cannot occur during server rendering.
-  // Flip to the other side when the popup would run off the viewport.
-  const left = Math.min(
-    draft.anchor.right + GAP,
-    window.innerWidth - POPUP_WIDTH - GAP,
+  // Safe to touch `window` here: the parent renders this only once a drag has
+  // happened, which cannot occur during server rendering.
+  //
+  // Anchoring by a guessed height put the buttons below the fold when the
+  // selection sat low on screen — the form looked like it did nothing because
+  // Add was off-screen. Growing upward from the selection instead needs no
+  // measurement, and the max-height keeps it inside the viewport regardless.
+  const left = Math.max(
+    GAP,
+    Math.min(draft.anchor.right + GAP, window.innerWidth - POPUP_WIDTH - GAP),
   );
-  const top = Math.min(
-    Math.max(GAP, draft.anchor.top),
-    Math.max(GAP, window.innerHeight - 260),
-  );
+  const growUpward = draft.anchor.top > window.innerHeight * 0.55;
+  const vertical = growUpward
+    ? { bottom: Math.max(GAP, window.innerHeight - draft.anchor.bottom) }
+    : { top: Math.max(GAP, draft.anchor.top) };
 
-  function submit() {
+  async function submit() {
+    if (saving) return;
     if (!categoryId) {
       setError("Pick a category");
       return;
@@ -100,13 +107,33 @@ export function BlockPopup({
     const endsAt = new Date(draft.startsAt);
     endsAt.setHours(0, endMin, 0, 0);
 
-    onSubmit({ categoryId, description: description.trim() || null, startsAt, endsAt });
+    setSaving(true);
+    setError(null);
+    // Stay open and say so if the write failed. Closing regardless is how a
+    // rejected insert turns into "nothing happened".
+    const failure = await onSubmit({
+      categoryId,
+      description: description.trim() || null,
+      startsAt,
+      endsAt,
+    });
+    if (failure) {
+      setError(failure);
+      setSaving(false);
+    }
   }
 
   return createPortal(
     <div
       ref={ref}
-      style={{ position: "fixed", top, left, width: POPUP_WIDTH }}
+      style={{
+        position: "fixed",
+        left,
+        width: POPUP_WIDTH,
+        maxHeight: "calc(100vh - 16px)",
+        overflowY: "auto",
+        ...vertical,
+      }}
       className="z-50 rounded-lg border border-line bg-surface p-3 text-xs shadow-xl"
       onKeyDown={(e) => {
         // Ctrl/Cmd+Enter saves from anywhere, including the description.
@@ -149,7 +176,7 @@ export function BlockPopup({
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          rows={3}
+          rows={2}
           placeholder="What this session actually covers"
           className="mt-1 w-full resize-none rounded border border-line bg-surface px-2 py-1 outline-none focus:border-accent"
         />
@@ -173,16 +200,18 @@ export function BlockPopup({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded border border-line px-2 py-1 text-muted hover:text-foreground"
+          disabled={saving}
+          className="rounded border border-line px-2 py-1 text-muted hover:text-foreground disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={submit}
-          className="rounded bg-accent px-3 py-1 font-medium text-white"
+          disabled={saving}
+          className="rounded bg-accent px-3 py-1 font-medium text-white disabled:opacity-60"
         >
-          Add
+          {saving ? "Adding…" : "Add"}
         </button>
       </div>
     </div>,
