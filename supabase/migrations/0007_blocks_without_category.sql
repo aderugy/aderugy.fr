@@ -108,8 +108,6 @@ end $$;
 -- the distribution counted, so it is simply dropped.
 alter table public.scheduled_blocks
   drop constraint if exists scheduled_blocks_category_id_fkey;
-alter table public.scheduled_blocks
-  drop column if exists category_id;
 
 -- --------------------------------------------------------------- insights view
 
@@ -117,6 +115,11 @@ alter table public.scheduled_blocks
 -- block's span to the sum of its tasks. Time inside a block that is not covered
 -- by any task is deliberately uncounted: it is planned but not yet attributed.
 drop view if exists public.week_category_minutes;
+
+-- A block that already had tasks keeps them; its own category was never what
+-- the distribution counted, so it is simply dropped.
+alter table public.scheduled_blocks
+  drop column if exists category_id;
 
 create view public.week_category_minutes
 with (security_invoker = true)
