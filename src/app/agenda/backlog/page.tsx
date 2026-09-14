@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { LOGIN_PATH } from "@/lib/supabase/session";
 import { CategoryTree } from "@/components/agenda/CategoryTree";
 import { TaskTable } from "@/components/agenda/TaskTable";
 import type { Category, Task } from "@/lib/types";
@@ -10,7 +12,9 @@ export default async function BacklogPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  // Defence in depth: the proxy already gates this, but a bypassed or
+  // misconfigured proxy must not render a blank page.
+  if (!user) redirect(LOGIN_PATH);
 
   const [categoriesRes, tasksRes] = await Promise.all([
     supabase

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return fail(origin, "Supabase is not configured");
+  if (!url || !key) return fail(origin, "Supabase is not configured", next);
 
   // Built first so the Supabase client can write session cookies straight onto
   // the response we are about to return.

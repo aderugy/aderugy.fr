@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { LOGIN_PATH } from "@/lib/supabase/session";
 import { ensureWeek } from "@/server/weeks";
 import { addDays, fromISODate, isoWeekStartInTimeZone, toISODate } from "@/lib/time";
 import { WeekPlanner } from "@/components/agenda/WeekPlanner";
@@ -18,7 +20,9 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null; // middleware redirects; this satisfies the type checker
+  // Defence in depth: the proxy already gates this, but a bypassed or
+  // misconfigured proxy must not render a blank page.
+  if (!user) redirect(LOGIN_PATH);
 
   const week = await ensureWeek(supabase, user.id, weekStart);
 

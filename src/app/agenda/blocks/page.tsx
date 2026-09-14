@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { LOGIN_PATH } from "@/lib/supabase/session";
 import { BlockLibrary } from "@/components/agenda/BlockLibrary";
 import type { Block, Category } from "@/lib/types";
 
@@ -9,7 +11,9 @@ export default async function BlocksPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  // Defence in depth: the proxy already gates this, but a bypassed or
+  // misconfigured proxy must not render a blank page.
+  if (!user) redirect(LOGIN_PATH);
 
   const [categoriesRes, blocksRes] = await Promise.all([
     supabase

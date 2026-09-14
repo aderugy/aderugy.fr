@@ -4,24 +4,38 @@ import { NextResponse, type NextRequest } from "next/server";
 export const LOGIN_PATH = "/agenda/login";
 export const HOME_PATH = "/agenda";
 
-/** Only same-origin agenda paths may be used as a post-login destination. */
+/**
+ * The only function allowed to turn a `next` parameter into a redirect target.
+ *
+ * Accepts same-origin agenda paths and nothing else. `/agenda` must be a whole
+ * segment: a bare prefix test would also pass `/agendafoo`, and `//evil.com`
+ * is protocol-relative, so the browser would leave the origin entirely.
+ */
 export function safeNext(value: string | null | undefined): string {
   if (!value) return HOME_PATH;
-  if (!value.startsWith("/agenda")) return HOME_PATH;
+  if (value !== HOME_PATH && !value.startsWith(`${HOME_PATH}/`)) return HOME_PATH;
   if (value.startsWith("//")) return HOME_PATH;
-  if (value.startsWith(LOGIN_PATH)) return HOME_PATH;
+  if (value === LOGIN_PATH || value.startsWith(`${LOGIN_PATH}?`)) return HOME_PATH;
+  if (value.startsWith(`${LOGIN_PATH}/`)) return HOME_PATH;
   return value;
 }
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  const path = request.nextUrl.pathname;
+  const onLoginPage = path === LOGIN_PATH;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Without credentials there is no session to refresh; let the page render and
-  // surface a configuration message rather than crashing the whole proxy.
-  if (!url || !key) return response;
+  // Misconfiguration must not fail open. With no credentials nobody can hold a
+  // session, so every protected path behaves as signed out; only the login page
+  // renders, where it explains what is missing.
+  if (!url || !key) {
+    if (onLoginPage) return response;
+    return redirectKeepingCookies(request, response, LOGIN_PATH, { next: path });
+  }
 
   const supabase = createServerClient(url, key, {
     cookies: {
@@ -43,9 +57,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const path = request.nextUrl.pathname;
-  const onLoginPage = path === LOGIN_PATH;
 
   if (!user && !onLoginPage) {
     return redirectKeepingCookies(request, response, LOGIN_PATH, { next: path });
