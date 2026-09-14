@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fbfbfa;
+  --surface: #ffffff;
+  --foreground: #1a1a19;
+  --muted: #6b7280;
+  --border: #e5e5e3;
+  --accent: #3b5bdb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111110;
+    --surface: #1a1a19;
+    --foreground: #eceae4;
+    --muted: #9a9a92;
+    --border: #2c2c2a;
+    --accent: #7c93f5;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+}
+
+/* System stack on purpose: no webfont round-trip, nothing to self-host, and it
+   already looks native on every platform this is used from. */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}
+
+/* The planner grid must not select text while dragging blocks around. */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}

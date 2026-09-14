@@ -1,0 +1,49 @@
+import { createClient } from "@/lib/supabase/server";
+import { BlockLibrary } from "@/components/agenda/BlockLibrary";
+import type { Block, Category } from "@/lib/types";
+
+export const metadata = { title: "Blocks — Agenda" };
+
+export default async function BlocksPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [categoriesRes, blocksRes] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id, parent_id, name, color, position, archived")
+      .eq("user_id", user.id)
+      .eq("archived", false)
+      .order("position"),
+    supabase
+      .from("blocks")
+      .select(
+        "id, name, color, default_minutes, default_category_id, preferred_daypart, archived, block_items(id, block_id, position, label, estimated_minutes, category_id)",
+      )
+      .eq("user_id", user.id)
+      .eq("archived", false)
+      .order("name"),
+  ]);
+
+  const error = categoriesRes.error ?? blocksRes.error;
+  if (error) {
+    return (
+      <main className="mx-auto max-w-lg px-6 py-20 text-sm">
+        <h1 className="font-medium">Could not load blocks</h1>
+        <p className="mt-2 text-muted">{error.message}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-3xl px-6 py-8">
+      <BlockLibrary
+        categories={(categoriesRes.data ?? []) as Category[]}
+        blocks={(blocksRes.data ?? []) as unknown as Block[]}
+      />
+    </main>
+  );
+}
