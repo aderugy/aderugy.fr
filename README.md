@@ -20,9 +20,24 @@ npm run dev
    `supabase db push` with the CLI linked to the project).
 3. Copy the project URL and anon key from **Project Settings → API** into
    `.env.local`.
-4. Under **Authentication → URL Configuration**, add
-   `http://localhost:3000/auth/callback` and your production callback to the
-   redirect allow-list. Sign-in is a magic link, so no password setup is needed.
+4. Under **Authentication → URL Configuration**:
+   - **Site URL** → your production origin. It defaults to `http://localhost:3000`,
+     and Supabase silently falls back to it whenever a requested redirect is not
+     allow-listed — which is why links sometimes land on localhost from prod.
+   - **Redirect URLs** → `http://localhost:3000/auth/callback`, your production
+     callback, and `https://*-<team>.vercel.app/auth/callback` for previews.
+5. Optional but recommended — **Authentication → Email Templates → Magic Link**:
+
+   ```html
+   <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink&next=/agenda">
+     Sign in
+   </a>
+   ```
+
+   The default template produces a PKCE `?code=` link that can only be completed
+   in the browser that requested it, so opening it on a phone fails. The
+   `token_hash` form verifies server-side and works anywhere. `/auth/callback`
+   accepts both, so switching is safe either way.
 
 Every table is protected by row-level security (`user_id = auth.uid()`). The
 app never uses a service-role key, so the database is the security boundary,

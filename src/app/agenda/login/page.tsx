@@ -1,8 +1,15 @@
 import { LoginForm } from "@/components/agenda/LoginForm";
+import { safeNext } from "@/lib/supabase/session";
 
 export const metadata = { title: "Sign in — Agenda" };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: PageProps<"/agenda/login">) {
+  const params = await searchParams;
+  const next = safeNext(typeof params.next === "string" ? params.next : null);
+  const error = typeof params.error === "string" ? params.error : null;
+
   const configured =
     !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -14,8 +21,14 @@ export default function LoginPage() {
         Sign in with a magic link — no password to remember.
       </p>
 
+      {error && (
+        <p className="mt-4 rounded-lg border border-red-500/40 bg-red-500/5 p-3 text-sm text-red-500">
+          {error}
+        </p>
+      )}
+
       {configured ? (
-        <LoginForm />
+        <LoginForm next={next} />
       ) : (
         <p className="mt-6 rounded-lg border border-line bg-surface p-4 text-sm text-muted">
           Supabase is not configured. Copy <code>.env.example</code> to{" "}

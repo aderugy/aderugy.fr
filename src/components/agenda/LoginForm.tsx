@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next: string }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -13,12 +13,15 @@ export function LoginForm() {
     setState("sending");
     setError(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
+    // Built from the current origin so localhost, previews and production each
+    // come back to themselves. Supabase still has to allow-list these URLs, or
+    // it silently substitutes the project's Site URL.
+    const redirect = new URL("/auth/callback", window.location.origin);
+    redirect.searchParams.set("next", next);
+
+    const { error } = await createClient().auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/agenda`,
-      },
+      options: { emailRedirectTo: redirect.toString() },
     });
 
     if (error) {
@@ -31,9 +34,17 @@ export function LoginForm() {
 
   if (state === "sent") {
     return (
-      <p className="mt-6 rounded-lg border border-line bg-surface p-4 text-sm">
-        Check <span className="font-medium">{email}</span> for the sign-in link.
-      </p>
+      <div className="mt-6 rounded-lg border border-line bg-surface p-4 text-sm">
+        <p>
+          Check <span className="font-medium">{email}</span> for the sign-in link.
+        </p>
+        <button
+          onClick={() => setState("idle")}
+          className="mt-2 text-xs text-muted underline hover:text-foreground"
+        >
+          Use a different address
+        </button>
+      </div>
     );
   }
 
