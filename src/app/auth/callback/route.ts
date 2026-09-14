@@ -4,17 +4,25 @@ import { NextResponse, type NextRequest } from "next/server";
 import { LOGIN_PATH, safeNext } from "@/lib/supabase/session";
 
 /**
- * Magic-link landing. Two shapes arrive here and both must work:
+ * OAuth / e-mail landing. Three shapes arrive here:
  *
- * - `?code=…`        PKCE. Only verifiable in the browser that requested the
- *                    link, because the code verifier lives in a cookie there.
- * - `?token_hash=…`  Server-side verification. Works from any browser, so the
- *                    link survives being opened on a phone or a second profile.
- *                    Emitted when the email template uses `{{ .TokenHash }}`.
+ * - `?code=…`        PKCE, used by the Google sign-in flow. The verifier lives
+ *                    in a cookie, which is fine: the round trip starts and ends
+ *                    in the same browser.
+ * - `?token_hash=…`  Server-side verification, for e-mail links. Kept so a
+ *                    magic-link or invite flow can be re-enabled without
+ *                    touching this route.
+ * - `?error=…`       The provider or Supabase refused. Surface it rather than
+ *                    bouncing to a blank form.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const next = safeNext(searchParams.get("next"));
+
+  // Providers report failures on the redirect itself — no code will follow.
+  const upstreamError =
+    searchParams.get("error_description") ?? searchParams.get("error");
+  if (upstreamError) return fail(origin, upstreamError, next);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -53,9 +61,7 @@ export async function GET(request: NextRequest) {
     return response;
   }
 
-  // Supabase forwards its own failures here as ?error_description=…
-  const upstream = searchParams.get("error_description");
-  return fail(origin, upstream ?? "This sign-in link is missing its token.", next);
+  return fail(origin, "This sign-in link is missing its token.", next);
 }
 
 function fail(origin: string, message: string, next?: string) {

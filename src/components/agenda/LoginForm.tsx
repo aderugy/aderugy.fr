@@ -4,13 +4,11 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm({ next }: { next: string }) {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setState("sending");
+  async function signIn() {
+    setPending(true);
     setError(null);
 
     // Built from the current origin so localhost, previews and production each
@@ -19,54 +17,31 @@ export function LoginForm({ next }: { next: string }) {
     const redirect = new URL("/auth/callback", window.location.origin);
     redirect.searchParams.set("next", next);
 
-    const { error } = await createClient().auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirect.toString() },
+    const { error } = await createClient().auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: redirect.toString() },
+      // Login asks for identity only. Calendar scopes come later as their own
+      // consent, so a planning feature can never silently widen sign-in access.
     });
 
+    // On success the browser has already navigated to Google.
     if (error) {
       setError(error.message);
-      setState("idle");
-      return;
+      setPending(false);
     }
-    setState("sent");
-  }
-
-  if (state === "sent") {
-    return (
-      <div className="mt-6 rounded-lg border border-line bg-surface p-4 text-sm">
-        <p>
-          Check <span className="font-medium">{email}</span> for the sign-in link.
-        </p>
-        <button
-          onClick={() => setState("idle")}
-          className="mt-2 text-xs text-muted underline hover:text-foreground"
-        >
-          Use a different address
-        </button>
-      </div>
-    );
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-3">
-      <input
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        autoComplete="email"
-        className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-      />
+    <div className="mt-6 space-y-3">
       <button
-        type="submit"
-        disabled={state === "sending"}
+        type="button"
+        onClick={signIn}
+        disabled={pending}
         className="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
       >
-        {state === "sending" ? "Sending…" : "Send magic link"}
+        {pending ? "Redirecting…" : "Continue with Google"}
       </button>
       {error && <p className="text-sm text-red-500">{error}</p>}
-    </form>
+    </div>
   );
 }
