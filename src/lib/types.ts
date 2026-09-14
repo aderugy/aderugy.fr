@@ -107,3 +107,35 @@ export type DragPayload =
       minutes: number;
       categoryId: string | null;
     };
+
+// ------------------------------------------------------- Google Calendar
+
+export type ExternalEvent = {
+  google_calendar_id: string;
+  google_event_id: string;
+  title: string | null;
+  starts_at: string;
+  ends_at: string;
+  all_day: boolean;
+  status: string;
+  /** "opaque" blocks time; "transparent" is Google's own "show me as free". */
+  transparency: string;
+  attendee_response: string | null;
+};
+
+export type GoogleAccount = {
+  google_email: string | null;
+  busy_calendar_ids: string[];
+  connected_at: string;
+  disconnected_at: string | null;
+  last_error: string | null;
+  last_error_at: string | null;
+};
+
+export type GoogleSyncState = {
+  google_calendar_id: string;
+  summary: string | null;
+  last_synced_at: string | null;
+  last_error: string | null;
+  last_error_at: string | null;
+};

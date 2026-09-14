@@ -14,17 +14,22 @@ import type {
   Block,
   Category,
   DragPayload,
+  ExternalEvent,
+  GoogleAccount,
   Objective,
   ScheduledBlock,
   Task,
   Week,
 } from "@/lib/types";
+import { DEFAULT_BUSY_PREFERENCES, busySegments } from "@/lib/busy";
+import { CalendarLiveness } from "./CalendarLiveness";
 import {
   moveScheduled,
   placeAdhoc,
   placeBlock,
   placeTask,
 } from "@/server/actions/schedule";
+import { relativeTime } from "./GoogleConnection";
 import { BlockDetail } from "./BlockDetail";
 import { PlannerRail } from "./PlannerRail";
 import { WeekGrid } from "./WeekGrid";
@@ -42,6 +47,9 @@ type Props = {
   blocks: Block[];
   scheduled: ScheduledBlock[];
   objectives: Objective[];
+  externalEvents: ExternalEvent[];
+  googleAccount: GoogleAccount | null;
+  oldestSyncAt: string | null;
 };
 
 export function WeekPlanner({
@@ -52,6 +60,9 @@ export function WeekPlanner({
   blocks,
   scheduled,
   objectives,
+  externalEvents,
+  googleAccount,
+  oldestSyncAt,
 }: Props) {
   const weekStartDate = useMemo(() => fromISODate(weekStart), [weekStart]);
 
@@ -76,6 +87,19 @@ export function WeekPlanner({
   const [pendingDrag, setPendingDrag] = useState<DragPayload | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const googleConnected = Boolean(googleAccount && !googleAccount.disconnected_at);
+
+  const busy = useMemo(
+    () =>
+      googleConnected
+        ? busySegments(externalEvents, weekStartDate, {
+            ...DEFAULT_BUSY_PREFERENCES,
+            busyCalendarIds: googleAccount?.busy_calendar_ids ?? [],
+          })
+        : [],
+    [externalEvents, weekStartDate, googleConnected, googleAccount],
+  );
 
   const categories_ = useMemo(() => categoryIndex(categories), [categories]);
   const blockById = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks]);
@@ -173,6 +197,7 @@ export function WeekPlanner({
 
   return (
     <div className="flex h-[calc(100vh-49px)] flex-col">
+      <CalendarLiveness connected={googleConnected} oldestSyncAt={oldestSyncAt} />
       <div className="flex items-center gap-3 border-b border-line px-4 py-2 text-sm">
         <div className="flex items-center gap-1">
           <Link
@@ -200,8 +225,19 @@ export function WeekPlanner({
             {week.theme}
           </span>
         )}
-        <span className="ml-auto tabular-nums text-xs text-muted">
-          {fmtDuration(totalMinutes)} planned
+        <span className="ml-auto flex items-center gap-3 text-xs text-muted">
+          {googleConnected && (
+            <Link
+              href="/agenda/settings"
+              className="tabular-nums hover:text-foreground"
+              title="Google Calendar sync status"
+            >
+              {googleAccount?.last_error
+                ? "⚠ calendar sync failing"
+                : `calendar synced ${relativeTime(oldestSyncAt)}`}
+            </Link>
+          )}
+          <span className="tabular-nums">{fmtDuration(totalMinutes)} planned</span>
         </span>
       </div>
 
@@ -221,6 +257,7 @@ export function WeekPlanner({
             colorFor={colorFor}
             selectedId={selectedId}
             pendingDrag={pendingDrag}
+            busy={busy}
             onSelect={setSelectedId}
             onCreateFromDrag={onCreateFromDrag}
             onCreateAdhoc={onCreateAdhoc}

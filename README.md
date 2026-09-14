@@ -32,25 +32,103 @@ npm run dev
      https://*-<your-vercel-team>.vercel.app/auth/callback
      ```
 
-5. Optional but recommended — **Authentication → Email Templates → Magic Link**:
+### Google sign-in
 
-   ```html
-   <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink">Sign in</a>
+Sign-in is Google OAuth. Nothing is e-mailed, so there is no sending quota to
+run into.
+
+1. **Google Cloud Console → APIs & Services → Credentials → Create OAuth client
+   ID**, type *Web application*. Under **Authorized redirect URIs** add exactly
+   one entry — Supabase's own callback, not this app's:
+
+   ```
+   https://<project-ref>.supabase.co/auth/v1/callback
    ```
 
-   The default template produces a PKCE `?code=` link that can only be completed
-   in the browser that requested it, so opening it on a phone fails. The
-   `token_hash` form verifies server-side and works anywhere. `/auth/callback`
-   accepts both, so switching is safe either way.
+   The browser goes Google → Supabase → `/auth/callback`, so Google never needs
+   to know about `aderugy.fr`.
+2. Configure the **OAuth consent screen** (External). While it is in *Testing*,
+   only accounts listed under **Test users** can sign in — add your own address
+   or you will be refused at the Google step.
+3. **Supabase → Authentication → Providers → Google**: enable it and paste the
+   client ID and client secret.
 
-   Use `{{ .RedirectTo }}`, not `{{ .SiteURL }}` — `.RedirectTo` is the callback
-   this app asked for, so local and preview sign-ins come back to themselves
-   instead of every link pointing at production. The login form always sends a
-   `?next=` parameter, so appending with `&` is well-formed.
+Login requests identity scopes only. Google Calendar will be a separate consent
+later, so a planning feature can never silently widen what sign-in can reach.
 
-Every table is protected by row-level security (`user_id = auth.uid()`). The
-app never uses a service-role key, so the database is the security boundary,
-not the UI.
+## Google Calendar (read-only)
+
+Your commitments block time in the planner. Nothing is ever written back to
+Google, and no Google credential reaches Vercel: the whole sync engine runs as
+Supabase Edge Functions.
+
+### 1. Google Cloud Console
+
+Add **three** authorized redirect URIs to the OAuth client. The first is for
+signing in (Google → Supabase); the others are for the Calendar grant, which
+this app initiates itself:
+
+```
+https://<project-ref>.supabase.co/auth/v1/callback
+https://www.aderugy.fr/agenda/settings/google/callback
+http://localhost:3000/agenda/settings/google/callback
+```
+
+Add `.../auth/calendar.readonly` to the consent screen's scopes.
+
+**The publishing status matters more than anything else here.** While it is
+*Testing*, Google expires refresh tokens after 7 days and background sync dies
+every week, silently. Publish the app — the unverified-app interstitial at
+consent time is the price, and the 100-user cap is irrelevant for a personal
+tool.
+
+### 2. Migrations
+
+Run `0002_google_calendar.sql` then `0003_google_secrets.sql`. The second needs
+the `supabase_vault` extension, which is on by default for dashboard-created
+projects.
+
+### 3. Edge Functions
+
+```bash
+supabase functions deploy google-oauth google-sync google-channels google-webhook
+
+supabase secrets set GOOGLE_CLIENT_ID=...
+supabase secrets set GOOGLE_CLIENT_SECRET=...
+supabase secrets set GOOGLE_WEBHOOK_URL=https://<project-ref>.supabase.co/functions/v1/google-webhook
+```
+
+`google-webhook` is deployed with `verify_jwt = false` (see `config.toml`):
+Google cannot present a Supabase JWT, so the channel token it echoes back is
+what authenticates a ping.
+
+### 4. Scheduled jobs
+
+Run `supabase/cron.sql` in the SQL editor after filling in the two placeholders.
+It schedules the 5-minute sync sweep, daily channel renewal, and pruning.
+
+The cron lives here rather than on Vercel because **Vercel's Hobby plan caps
+cron at once per day** — a `*/5` expression fails at deployment. `pg_cron` has a
+one-minute floor.
+
+### How freshness is maintained
+
+| Layer | Trigger | Covers |
+|---|---|---|
+| Push | Google → `google-webhook` | The normal case, seconds |
+| Cron | `pg_cron`, every 5 min | Missed notifications, dead channels |
+| On load | `/agenda`, if the mirror is over a minute old | The week you are looking at |
+| Realtime | Supabase Realtime on `external_events` | An open tab updates itself |
+
+All four call the same idempotent sync. A row lease in `google_sync_state`
+prevents two from interleaving — the loser would otherwise persist a sync token
+that does not account for the rows the winner wrote.
+
+Every table is protected by row-level security (`user_id = auth.uid()`), so the
+database is the security boundary, not the UI. The Next app holds no
+service-role key and no Google client secret: the only elevated credential in
+the system lives inside Supabase Edge Functions, which is also the only place
+that talks to Google.
 
 ## The agenda model
 

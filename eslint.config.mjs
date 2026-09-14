@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Deno Edge Functions: different runtime, different globals. Linting them
+    // with the Next config reports the app's rules against code it cannot see.
+    "supabase/functions/**",
   ]),
 ]);
 

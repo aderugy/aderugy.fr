@@ -19,6 +19,7 @@ import {
   yToMinutes,
 } from "@/lib/time";
 import type { DragPayload, ScheduledBlock } from "@/lib/types";
+import { busyMinutesByDay, overlapsBusy, type BusySegment } from "@/lib/busy";
 
 /** Soft cap per day; crossing it turns the day total red. */
 export const DAILY_CAPACITY_MIN = 10 * 60;
@@ -87,6 +88,7 @@ type Props = {
   colorFor: (block: ScheduledBlock) => string;
   selectedId: string | null;
   pendingDrag: DragPayload | null;
+  busy: BusySegment[];
   onSelect: (id: string | null) => void;
   onCreateFromDrag: (payload: DragPayload, startsAt: Date) => void;
   onCreateAdhoc: (startsAt: Date, minutes: number) => void;
@@ -99,6 +101,7 @@ export function WeekGrid({
   colorFor,
   selectedId,
   pendingDrag,
+  busy,
   onSelect,
   onCreateFromDrag,
   onCreateAdhoc,
@@ -142,6 +145,16 @@ export function WeekGrid({
       return sum + (endMin - startMin);
     }, 0),
   );
+
+  // Time already committed in Google is not time you can plan into, so capacity
+  // is what remains after it — otherwise the overload warning lies.
+  const busyPerDay = busyMinutesByDay(busy);
+
+  /** Placing over committed time is allowed, but never by accident. */
+  function confirmOverBusy(dayIndex: number, startMin: number, endMin: number) {
+    if (!overlapsBusy(busy, dayIndex, startMin, endMin)) return true;
+    return confirm("That time is already committed in Google Calendar. Place it anyway?");
+  }
 
   function slotFromPointer(clientX: number, clientY: number) {
     const rect = colsRef.current!.getBoundingClientRect();
@@ -230,6 +243,8 @@ export function WeekGrid({
             const date = addDays(weekStartDate, i);
             const isToday = date.toDateString() === today.toDateString();
             const total = dayTotals[i];
+            const committed = busyPerDay[i];
+            const available = Math.max(0, DAILY_CAPACITY_MIN - committed);
             return (
               <div key={label} className="px-1 py-2 text-center">
                 <div className="text-xs text-muted">{label}</div>
@@ -240,10 +255,18 @@ export function WeekGrid({
                 </div>
                 <div
                   className={`text-[10px] tabular-nums ${
-                    total > DAILY_CAPACITY_MIN ? "text-red-500" : "text-muted"
+                    total > available ? "text-red-500" : "text-muted"
                   }`}
+                  title={
+                    committed > 0
+                      ? `${fmtDuration(committed)} committed in Google, ${fmtDuration(available)} left to plan`
+                      : undefined
+                  }
                 >
                   {total > 0 ? fmtDuration(total) : "—"}
+                  {committed > 0 && (
+                    <span className="text-muted"> +{fmtDuration(committed)}</span>
+                  )}
                 </div>
               </div>
             );
@@ -314,6 +337,9 @@ export function WeekGrid({
                       e.clientY,
                     );
                     setHover(null);
+                    if (!confirmOverBusy(di, startMin, startMin + pendingDrag.minutes)) {
+                      return;
+                    }
                     onCreateFromDrag(pendingDrag, dateAt(weekStartDate, di, startMin));
                   }}
                   onDoubleClick={(e) => {
@@ -324,6 +350,24 @@ export function WeekGrid({
                     onCreateAdhoc(dateAt(weekStartDate, di, startMin), 60);
                   }}
                 >
+                  {busy
+                    .filter((segment) => segment.dayIndex === dayIndex)
+                    .map((segment) => (
+                      <div
+                        key={segment.id}
+                        title={segment.title ?? "Busy"}
+                        className="pointer-events-none absolute inset-x-0 z-0 border-y border-line/60"
+                        style={{
+                          top: slotToY(segment.startMin),
+                          height:
+                            ((segment.endMin - segment.startMin) / SLOT_MIN) * PX_PER_SLOT,
+                          backgroundImage:
+                            "repeating-linear-gradient(45deg, var(--color-muted) 0 1px, transparent 1px 7px)",
+                          opacity: 0.28,
+                        }}
+                      />
+                    ))}
+
                   {dayBlocks.map((block) => {
                     const { startMin, endMin } = positionOf(block);
                     const lane = lanes.get(block.id) ?? { lane: 0, lanes: 1 };

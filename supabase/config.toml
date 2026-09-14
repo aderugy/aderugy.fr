@@ -1,0 +1,17 @@
+project_id = "aderugy"
+
+[functions.google-oauth]
+verify_jwt = true
+
+[functions.google-sync]
+# Accepts either a user JWT or the service-role key; the function itself decides
+# which path applies, so the platform gate stays on.
+verify_jwt = true
+
+[functions.google-channels]
+verify_jwt = true
+
+[functions.google-webhook]
+# Google cannot present a Supabase JWT. The X-Goog-Channel-Token secret, matched
+# against google_sync_channels, is what authenticates a ping.
+verify_jwt = false

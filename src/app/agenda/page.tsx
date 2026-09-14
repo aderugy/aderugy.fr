@@ -4,7 +4,15 @@ import { LOGIN_PATH } from "@/lib/supabase/session";
 import { ensureWeek } from "@/server/weeks";
 import { addDays, fromISODate, isoWeekStartInTimeZone, toISODate } from "@/lib/time";
 import { WeekPlanner } from "@/components/agenda/WeekPlanner";
-import type { Block, Category, Objective, ScheduledBlock, Task } from "@/lib/types";
+import type {
+  Block,
+  Category,
+  ExternalEvent,
+  GoogleAccount,
+  Objective,
+  ScheduledBlock,
+  Task,
+} from "@/lib/types";
 
 export const metadata = { title: "Week — Agenda" };
 
@@ -30,8 +38,16 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   const rangeStart = addDays(weekStartDate, -1).toISOString();
   const rangeEnd = addDays(weekStartDate, 8).toISOString();
 
-  const [categoriesRes, tasksRes, blocksRes, scheduledRes, objectivesRes] =
-    await Promise.all([
+  const [
+    categoriesRes,
+    tasksRes,
+    blocksRes,
+    scheduledRes,
+    objectivesRes,
+    externalRes,
+    googleRes,
+    syncRes,
+  ] = await Promise.all([
       supabase
         .from("categories")
         .select("id, parent_id, name, color, position, archived")
@@ -70,8 +86,32 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
         .select("id, week_id, title, category_id, target_minutes, done, position")
         .eq("week_id", week.id)
         .order("position"),
+      // The mirror of what Google says you are already committed to. Read-only,
+      // and fetched for the same window as the grid.
+      supabase
+        .from("external_events")
+        .select(
+          "google_calendar_id, google_event_id, title, starts_at, ends_at, all_day, status, transparency, attendee_response",
+        )
+        .eq("user_id", user.id)
+        .lt("starts_at", rangeEnd)
+        .gt("ends_at", rangeStart)
+        .order("starts_at"),
+      supabase
+        .from("google_accounts")
+        .select(
+          "google_email, busy_calendar_ids, connected_at, disconnected_at, last_error, last_error_at",
+        )
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("google_sync_state")
+        .select("google_calendar_id, last_synced_at")
+        .eq("user_id", user.id),
     ]);
 
+  // Calendar errors are deliberately excluded: a broken integration degrades the
+  // planner, it does not replace it with an error page.
   const error =
     categoriesRes.error ??
     tasksRes.error ??
@@ -92,6 +132,14 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
     );
   }
 
+  // The weakest link decides how fresh the picture is, so report the oldest.
+  const syncTimes = ((syncRes.data ?? []) as { last_synced_at: string | null }[]).map(
+    (row) => row.last_synced_at,
+  );
+  const oldestSyncAt = syncTimes.includes(null)
+    ? null
+    : syncTimes.sort()[0] ?? null;
+
   return (
     <WeekPlanner
       weekStart={toISODate(weekStartDate)}
@@ -101,6 +149,9 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       blocks={(blocksRes.data ?? []) as unknown as Block[]}
       scheduled={(scheduledRes.data ?? []) as unknown as ScheduledBlock[]}
       objectives={(objectivesRes.data ?? []) as Objective[]}
+      externalEvents={(externalRes.data ?? []) as ExternalEvent[]}
+      googleAccount={(googleRes.data ?? null) as GoogleAccount | null}
+      oldestSyncAt={oldestSyncAt}
     />
   );
 }

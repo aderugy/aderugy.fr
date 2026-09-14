@@ -6,6 +6,7 @@ const nav = [
   { href: "/agenda", label: "Week" },
   { href: "/agenda/backlog", label: "Backlog" },
   { href: "/agenda/blocks", label: "Blocks" },
+  { href: "/agenda/settings", label: "Settings" },
 ];
 
 export default async function AgendaLayout({ children }: LayoutProps<"/agenda">) {
