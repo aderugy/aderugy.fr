@@ -4,27 +4,25 @@ import { revalidatePath } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 
 export async function createTask(input: {
-  title: string;
-  categoryId: string | null;
+  categoryId: string;
+  description: string | null;
   estimatedMinutes: number;
   priority: number;
   deadline: string | null;
-  notes?: string | null;
   splittable?: boolean;
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    const title = input.title.trim();
-    if (!title) return { ok: false, error: "Title is required" };
+    // The category is the label, so there is nothing to show without it.
+    if (!input.categoryId) return { ok: false, error: "Pick a category" };
 
     const { error } = await supabase.from("tasks").insert({
       user_id: user.id,
-      title,
       category_id: input.categoryId,
+      description: input.description?.trim() || null,
       estimated_minutes: input.estimatedMinutes,
       priority: input.priority,
       deadline: input.deadline,
-      notes: input.notes ?? null,
       splittable: input.splittable ?? true,
     });
     if (error) throw error;
@@ -38,28 +36,29 @@ export async function createTask(input: {
 
 export async function updateTask(input: {
   id: string;
-  title?: string;
-  categoryId?: string | null;
+  categoryId?: string;
+  description?: string | null;
   estimatedMinutes?: number;
   priority?: number;
   deadline?: string | null;
-  notes?: string | null;
   status?: "backlog" | "scheduled" | "done" | "dropped";
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
     const patch: Record<string, unknown> = {};
-    if (input.title !== undefined) {
-      const title = input.title.trim();
-      if (!title) return { ok: false, error: "Title is required" };
-      patch.title = title;
+
+    if (input.categoryId !== undefined) {
+      if (!input.categoryId) return { ok: false, error: "Pick a category" };
+      patch.category_id = input.categoryId;
     }
-    if (input.categoryId !== undefined) patch.category_id = input.categoryId;
-    if (input.estimatedMinutes !== undefined)
+    if (input.description !== undefined) {
+      patch.description = input.description?.trim() || null;
+    }
+    if (input.estimatedMinutes !== undefined) {
       patch.estimated_minutes = input.estimatedMinutes;
+    }
     if (input.priority !== undefined) patch.priority = input.priority;
     if (input.deadline !== undefined) patch.deadline = input.deadline;
-    if (input.notes !== undefined) patch.notes = input.notes;
     if (input.status !== undefined) {
       patch.status = input.status;
       patch.completed_at = input.status === "done" ? new Date().toISOString() : null;

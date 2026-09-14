@@ -21,9 +21,9 @@ export type TaskStatus = "backlog" | "scheduled" | "done" | "dropped";
 
 export type Task = {
   id: string;
-  category_id: string | null;
-  title: string;
-  notes: string | null;
+  /** Required: the category is the label. */
+  category_id: string;
+  description: string | null;
   estimated_minutes: number;
   priority: number;
   deadline: string | null;
@@ -44,10 +44,11 @@ export type BlockItem = {
 
 export type Block = {
   id: string;
+  /** Templates keep a name of their own — it spans categories. */
   name: string;
   color: string | null;
   default_minutes: number;
-  default_category_id: string | null;
+  default_category_id: string;
   preferred_daypart: "morning" | "afternoon" | "evening" | null;
   archived: boolean;
   block_items: BlockItem[];
@@ -58,7 +59,10 @@ export type ScheduledStatus = "planned" | "done" | "skipped";
 export type ScheduledBlockTask = {
   task_id: string;
   planned_minutes: number;
-  tasks: Pick<Task, "id" | "title" | "category_id" | "estimated_minutes"> | null;
+  tasks: Pick<
+    Task,
+    "id" | "description" | "category_id" | "estimated_minutes"
+  > | null;
 };
 
 export type ScheduledBlock = {
@@ -66,8 +70,8 @@ export type ScheduledBlock = {
   week_id: string;
   starts_at: string;
   ends_at: string;
-  title: string;
-  category_id: string | null;
+  description: string | null;
+  category_id: string;
   source_block_id: string | null;
   status: ScheduledStatus;
   actual_minutes: number | null;
@@ -96,16 +100,17 @@ export type DragPayload =
   | {
       kind: "task";
       id: string;
-      title: string;
+      /** What the rail showed — the category leaf, or the template's name. */
+      label: string;
       minutes: number;
-      categoryId: string | null;
+      categoryId: string;
     }
   | {
       kind: "block";
       id: string;
-      title: string;
+      label: string;
       minutes: number;
-      categoryId: string | null;
+      categoryId: string;
     };
 
 // ------------------------------------------------------- Google Calendar

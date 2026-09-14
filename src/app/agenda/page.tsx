@@ -57,7 +57,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       supabase
         .from("tasks")
         .select(
-          "id, category_id, title, notes, estimated_minutes, priority, deadline, status, splittable, completed_at, created_at",
+          "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, completed_at, created_at",
         )
         .eq("user_id", user.id)
         .in("status", ["backlog", "scheduled"])
@@ -75,7 +75,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       supabase
         .from("scheduled_blocks")
         .select(
-          "id, week_id, starts_at, ends_at, title, category_id, source_block_id, status, actual_minutes, scheduled_block_tasks(task_id, planned_minutes, tasks(id, title, category_id, estimated_minutes))",
+          "id, week_id, starts_at, ends_at, description, category_id, source_block_id, status, actual_minutes, scheduled_block_tasks(task_id, planned_minutes, tasks(id, description, category_id, estimated_minutes))",
         )
         .eq("user_id", user.id)
         .gte("starts_at", rangeStart)

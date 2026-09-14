@@ -19,7 +19,7 @@ export async function placeTask(input: {
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, title, category_id")
+      .select("id, description, category_id")
       .eq("id", input.taskId)
       .eq("user_id", user.id)
       .single();
@@ -35,7 +35,7 @@ export async function placeTask(input: {
         week_id: week.id,
         starts_at: startsAt.toISOString(),
         ends_at: endsAt.toISOString(),
-        title: task.title,
+        description: task.description,
         category_id: task.category_id,
       })
       .select("id")
@@ -77,7 +77,7 @@ export async function placeBlock(input: {
 
     const { data: block, error: blockError } = await supabase
       .from("blocks")
-      .select("id, name, default_minutes, default_category_id, block_items(estimated_minutes)")
+      .select("id, default_minutes, default_category_id, block_items(estimated_minutes)")
       .eq("id", input.blockId)
       .eq("user_id", user.id)
       .single();
@@ -97,7 +97,9 @@ export async function placeBlock(input: {
         week_id: week.id,
         starts_at: startsAt.toISOString(),
         ends_at: endsAt.toISOString(),
-        title: block.name,
+        // No description: a placed template is labelled by its own name, which
+        // is resolved from source_block_id when rendering.
+        description: null,
         category_id: block.default_category_id,
         source_block_id: block.id,
       })
@@ -112,21 +114,28 @@ export async function placeBlock(input: {
   }
 }
 
-/** Draw a block directly on the grid without a task or template behind it. */
-export async function placeAdhoc(input: {
+/**
+ * Create a block from a timeframe drawn on the grid.
+ *
+ * Both ends come from the drag, so unlike the task and template paths there is
+ * no implied duration to derive.
+ */
+export async function createScheduledBlock(input: {
   weekStart: string;
-  title: string;
+  categoryId: string;
+  description: string | null;
   startsAt: string;
-  minutes: number;
-  categoryId: string | null;
+  endsAt: string;
 }): Promise<PlacedResult> {
   try {
     const { supabase, user } = await requireUser();
+    if (!input.categoryId) return { ok: false, error: "Pick a category" };
+
     const week = await ensureWeek(supabase, user.id, input.weekStart);
 
-    const title = input.title.trim() || "Untitled";
     const startsAt = new Date(input.startsAt);
-    const endsAt = new Date(startsAt.getTime() + input.minutes * 60_000);
+    const endsAt = new Date(input.endsAt);
+    if (endsAt <= startsAt) return { ok: false, error: "End must be after start" };
 
     const { data, error } = await supabase
       .from("scheduled_blocks")
@@ -135,7 +144,7 @@ export async function placeAdhoc(input: {
         week_id: week.id,
         starts_at: startsAt.toISOString(),
         ends_at: endsAt.toISOString(),
-        title,
+        description: input.description?.trim() || null,
         category_id: input.categoryId,
       })
       .select("id")
@@ -181,16 +190,21 @@ export async function moveScheduled(input: {
 
 export async function updateScheduled(input: {
   id: string;
-  title?: string;
-  categoryId?: string | null;
+  description?: string | null;
+  categoryId?: string;
   status?: "planned" | "done" | "skipped";
   actualMinutes?: number | null;
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
     const patch: Record<string, unknown> = {};
-    if (input.title !== undefined) patch.title = input.title.trim() || "Untitled";
-    if (input.categoryId !== undefined) patch.category_id = input.categoryId;
+    if (input.description !== undefined) {
+      patch.description = input.description?.trim() || null;
+    }
+    if (input.categoryId !== undefined) {
+      if (!input.categoryId) return { ok: false, error: "Pick a category" };
+      patch.category_id = input.categoryId;
+    }
     if (input.status !== undefined) patch.status = input.status;
     if (input.actualMinutes !== undefined) patch.actual_minutes = input.actualMinutes;
 

@@ -72,10 +72,37 @@ export async function updateCategory(input: {
   }
 }
 
-/** Cascades to children; tasks keep existing but lose their category. */
+/**
+ * Deleting cascades to child categories, so the check covers the whole subtree.
+ *
+ * Since the category is now the label, a row cannot outlive it. The foreign keys
+ * already refuse the delete; this asks first so the refusal can say what is in
+ * the way instead of surfacing a constraint violation.
+ */
 export async function deleteCategory(id: string): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
+
+    const { data: usage, error: usageError } = await supabase
+      .rpc("category_usage", { p_id: id })
+      .single<{ tasks: number; scheduled: number; templates: number }>();
+    if (usageError) throw usageError;
+
+    const inUse = [
+      usage.tasks > 0 && `${usage.tasks} task${usage.tasks > 1 ? "s" : ""}`,
+      usage.scheduled > 0 &&
+        `${usage.scheduled} scheduled block${usage.scheduled > 1 ? "s" : ""}`,
+      usage.templates > 0 &&
+        `${usage.templates} template${usage.templates > 1 ? "s" : ""}`,
+    ].filter(Boolean) as string[];
+
+    if (inUse.length > 0) {
+      return {
+        ok: false,
+        error: `Still in use by ${inUse.join(", ")}. Move or delete those first.`,
+      };
+    }
+
     const { error } = await supabase
       .from("categories")
       .delete()

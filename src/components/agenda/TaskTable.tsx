@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { buildTree, flattenTree, DEFAULT_COLOR } from "@/lib/categories";
+import { CategoryPicker } from "./CategoryPicker";
 import { fmtDuration } from "@/lib/time";
 import { PRIORITY_LABELS, type Category, type Task } from "@/lib/types";
 import { createTask, deleteTask, updateTask } from "@/server/actions/tasks";
@@ -34,7 +35,7 @@ export function TaskTable({
         </label>
       </div>
 
-      <NewTaskForm categories={flat} />
+      <NewTaskForm categories={categories} />
 
       <ul className="mt-3 space-y-1">
         {visible.length === 0 && (
@@ -44,7 +45,7 @@ export function TaskTable({
           <TaskRow
             key={task.id}
             task={task}
-            categories={flat}
+            categories={categories}
             color={
               task.category_id
                 ? (byId.get(task.category_id)?.effectiveColor ?? DEFAULT_COLOR)
@@ -57,18 +58,16 @@ export function TaskTable({
   );
 }
 
-type FlatCategory = { id: string; name: string; depth: number };
-
 function TaskRow({
   task,
   categories,
   color,
 }: {
   task: Task;
-  categories: FlatCategory[];
+  categories: Category[];
   color: string;
 }) {
-  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? "");
   const [, startTransition] = useTransition();
   const commit = (fn: () => Promise<unknown>) => startTransition(() => void fn());
 
@@ -77,17 +76,24 @@ function TaskRow({
       className="flex flex-wrap items-center gap-2 rounded border border-line bg-surface px-2 py-1.5"
       style={{ borderLeft: `3px solid ${color}` }}
     >
+      <div className="w-44 shrink-0">
+        <CategoryPicker
+          categories={categories}
+          value={task.category_id}
+          onChange={(id) => commit(() => updateTask({ id: task.id, categoryId: id }))}
+        />
+      </div>
+
       <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
         onBlur={() => {
-          if (title.trim() && title !== task.title) {
-            commit(() => updateTask({ id: task.id, title }));
-          } else {
-            setTitle(task.title);
+          if (description !== (task.description ?? "")) {
+            commit(() => updateTask({ id: task.id, description }));
           }
         }}
-        className="min-w-40 flex-1 bg-transparent outline-none"
+        placeholder="Description"
+        className="min-w-40 flex-1 bg-transparent outline-none placeholder:text-muted"
       />
 
       {task.status === "scheduled" && (
@@ -95,22 +101,6 @@ function TaskRow({
           scheduled
         </span>
       )}
-
-      <select
-        value={task.category_id ?? ""}
-        onChange={(e) =>
-          commit(() => updateTask({ id: task.id, categoryId: e.target.value || null }))
-        }
-        className="rounded border border-line bg-surface px-1 py-0.5 text-xs outline-none focus:border-accent"
-      >
-        <option value="">No category</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {"— ".repeat(c.depth)}
-            {c.name}
-          </option>
-        ))}
-      </select>
 
       <input
         type="number"
@@ -171,11 +161,12 @@ function TaskRow({
   );
 }
 
-function NewTaskForm({ categories }: { categories: FlatCategory[] }) {
-  const [title, setTitle] = useState("");
+function NewTaskForm({ categories }: { categories: Category[] }) {
+  const [description, setDescription] = useState("");
   const [minutes, setMinutes] = useState(30);
   const [priority, setPriority] = useState(3);
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   return (
@@ -183,39 +174,41 @@ function NewTaskForm({ categories }: { categories: FlatCategory[] }) {
       className="flex flex-wrap gap-1"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!title.trim()) return;
+        // The category is the label, so it is the one field that cannot be skipped.
+        if (!categoryId) {
+          setError("Pick a category");
+          return;
+        }
         const payload = {
-          title,
-          categoryId: categoryId || null,
+          categoryId,
+          description: description.trim() || null,
           estimatedMinutes: minutes,
           priority,
           deadline: null,
         };
-        setTitle("");
+        setDescription("");
+        setError(null);
         startTransition(async () => {
           await createTask(payload);
         });
       }}
     >
+      <div className="w-44 shrink-0">
+        <CategoryPicker
+          categories={categories}
+          value={categoryId}
+          onChange={(id) => {
+            setCategoryId(id);
+            setError(null);
+          }}
+        />
+      </div>
       <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="New task"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description (optional)"
         className="min-w-40 flex-1 rounded border border-line bg-surface px-2 py-1 text-sm outline-none focus:border-accent"
       />
-      <select
-        value={categoryId}
-        onChange={(e) => setCategoryId(e.target.value)}
-        className="rounded border border-line bg-surface px-1 py-1 text-xs outline-none focus:border-accent"
-      >
-        <option value="">No category</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {"— ".repeat(c.depth)}
-            {c.name}
-          </option>
-        ))}
-      </select>
       <input
         type="number"
         min={5}
@@ -242,6 +235,7 @@ function NewTaskForm({ categories }: { categories: FlatCategory[] }) {
       >
         Add
       </button>
+      {error && <p className="w-full text-xs text-red-500">{error}</p>}
     </form>
   );
 }

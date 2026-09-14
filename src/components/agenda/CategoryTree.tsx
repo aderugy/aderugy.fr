@@ -61,6 +61,7 @@ function CategoryRow({
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(node.name);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const commit = (fn: () => Promise<unknown>) => startTransition(() => void fn());
@@ -126,12 +127,13 @@ function CategoryRow({
           </button>
           <button
             onClick={() => {
-              if (
-                confirm(
-                  `Delete "${node.name}" and its sub-categories? Tasks are kept but lose their category.`,
-                )
-              ) {
-                commit(() => deleteCategory(node.id));
+              // The category is the label now, so nothing can outlive it: the
+              // server refuses while anything still points here.
+              if (confirm(`Delete "${node.name}" and its sub-categories?`)) {
+                commit(async () => {
+                  const result = await deleteCategory(node.id);
+                  if (!result.ok) setError(result.error);
+                });
               }
             }}
             className="rounded border border-line px-1.5 text-xs text-muted hover:border-red-500 hover:text-red-500"
@@ -140,6 +142,15 @@ function CategoryRow({
           </button>
         </div>
       </div>
+
+      {error && (
+        <p
+          className="py-0.5 text-xs text-red-500"
+          style={{ paddingLeft: node.depth * 16 + 20 }}
+        >
+          {error}
+        </p>
+      )}
 
       {adding && (
         <div style={{ paddingLeft: (node.depth + 1) * 16 + 4 }}>

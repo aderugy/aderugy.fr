@@ -24,15 +24,16 @@ import type {
 import { DEFAULT_BUSY_PREFERENCES, busySegments } from "@/lib/busy";
 import { CalendarLiveness } from "./CalendarLiveness";
 import {
+  createScheduledBlock,
   moveScheduled,
-  placeAdhoc,
   placeBlock,
   placeTask,
 } from "@/server/actions/schedule";
+import { BlockPopup, type DraftBlock } from "./BlockPopup";
 import { relativeTime } from "./GoogleConnection";
 import { BlockDetail } from "./BlockDetail";
 import { PlannerRail } from "./PlannerRail";
-import { WeekGrid } from "./WeekGrid";
+import { WeekGrid, type DrawnRange } from "./WeekGrid";
 import { WeekIntent } from "./WeekIntent";
 
 type OptimisticAction =
@@ -86,6 +87,7 @@ export function WeekPlanner({
 
   const [pendingDrag, setPendingDrag] = useState<DragPayload | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<DraftBlock | null>(null);
   const [, startTransition] = useTransition();
 
   const googleConnected = Boolean(googleAccount && !googleAccount.disconnected_at);
@@ -104,11 +106,22 @@ export function WeekPlanner({
   const categories_ = useMemo(() => categoryIndex(categories), [categories]);
   const blockById = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks]);
 
-  const colorFor = (block: ScheduledBlock) => {
-    if (block.category_id) {
-      const category = categories_.get(block.category_id);
-      if (category) return category.effectiveColor;
+  /**
+   * Blocks have no title. A placed template keeps the name you gave it — it
+   * spans categories, so collapsing it to one would lose what you chose.
+   * Everything else reads as its category's leaf name.
+   */
+  const labelFor = (block: ScheduledBlock) => {
+    if (block.source_block_id) {
+      const source = blockById.get(block.source_block_id);
+      if (source) return source.name;
     }
+    return categories_.get(block.category_id)?.name ?? "Uncategorised";
+  };
+
+  const colorFor = (block: ScheduledBlock) => {
+    const category = categories_.get(block.category_id);
+    if (category) return category.effectiveColor;
     if (block.source_block_id) {
       const source = blockById.get(block.source_block_id);
       if (source?.color) return source.color;
@@ -136,7 +149,7 @@ export function WeekPlanner({
       week_id: week.id,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
-      title: payload.title,
+      description: payload.kind === "task" ? payload.label : null,
       category_id: payload.categoryId,
       source_block_id: payload.kind === "block" ? payload.id : null,
       status: "planned",
@@ -164,14 +177,40 @@ export function WeekPlanner({
     });
   }
 
-  function onCreateAdhoc(startsAt: Date, minutes: number) {
+  function onDraw(range: DrawnRange) {
+    setSelectedId(null);
+    setDraft(range);
+  }
+
+  function onDraftSubmit(input: {
+    categoryId: string;
+    description: string | null;
+    startsAt: Date;
+    endsAt: Date;
+  }) {
+    setDraft(null);
     startTransition(async () => {
-      await placeAdhoc({
+      applyOptimistic({
+        type: "add",
+        block: {
+          id: `temp-${crypto.randomUUID()}`,
+          week_id: week.id,
+          starts_at: input.startsAt.toISOString(),
+          ends_at: input.endsAt.toISOString(),
+          description: input.description,
+          category_id: input.categoryId,
+          source_block_id: null,
+          status: "planned",
+          actual_minutes: null,
+          scheduled_block_tasks: [],
+        },
+      });
+      await createScheduledBlock({
         weekStart,
-        title: "New block",
-        startsAt: startsAt.toISOString(),
-        minutes,
-        categoryId: null,
+        categoryId: input.categoryId,
+        description: input.description,
+        startsAt: input.startsAt.toISOString(),
+        endsAt: input.endsAt.toISOString(),
       });
     });
   }
@@ -255,12 +294,13 @@ export function WeekPlanner({
             weekStartDate={weekStartDate}
             blocks={items}
             colorFor={colorFor}
+            labelFor={labelFor}
             selectedId={selectedId}
             pendingDrag={pendingDrag}
             busy={busy}
             onSelect={setSelectedId}
             onCreateFromDrag={onCreateFromDrag}
-            onCreateAdhoc={onCreateAdhoc}
+            onDraw={onDraw}
             onMove={onMove}
           />
         </div>
@@ -285,6 +325,16 @@ export function WeekPlanner({
           )}
         </aside>
       </div>
+
+      {draft && (
+        <BlockPopup
+          draft={draft}
+          categories={categories}
+          defaultCategoryId={null}
+          onCancel={() => setDraft(null)}
+          onSubmit={onDraftSubmit}
+        />
+      )}
     </div>
   );
 }

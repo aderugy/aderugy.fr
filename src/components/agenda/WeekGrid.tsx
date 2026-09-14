@@ -82,16 +82,26 @@ type DragState = {
   moved: boolean;
 };
 
+export type DrawnRange = {
+  startsAt: Date;
+  endsAt: Date;
+  /** True when the drawn span lands on time already committed in Google. */
+  overBusy: boolean;
+  anchor: { top: number; bottom: number; left: number; right: number };
+};
+
 type Props = {
   weekStartDate: Date;
   blocks: ScheduledBlock[];
   colorFor: (block: ScheduledBlock) => string;
+  /** Category leaf, or a template's own name. Titles no longer exist. */
+  labelFor: (block: ScheduledBlock) => string;
   selectedId: string | null;
   pendingDrag: DragPayload | null;
   busy: BusySegment[];
   onSelect: (id: string | null) => void;
   onCreateFromDrag: (payload: DragPayload, startsAt: Date) => void;
-  onCreateAdhoc: (startsAt: Date, minutes: number) => void;
+  onDraw: (range: DrawnRange) => void;
   onMove: (id: string, startsAt: Date, endsAt: Date) => void;
 };
 
@@ -99,12 +109,13 @@ export function WeekGrid({
   weekStartDate,
   blocks,
   colorFor,
+  labelFor,
   selectedId,
   pendingDrag,
   busy,
   onSelect,
   onCreateFromDrag,
-  onCreateAdhoc,
+  onDraw,
   onMove,
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
@@ -112,6 +123,14 @@ export function WeekGrid({
   const [hover, setHover] = useState<{ dayIndex: number; startMin: number } | null>(
     null,
   );
+  // A drawn range lives only in the UI until the popup is submitted: an
+  // abandoned drag must never leave a row behind.
+  const [draw, setDraw] = useState<{
+    dayIndex: number;
+    anchorMin: number;
+    currentMin: number;
+    moved: boolean;
+  } | null>(null);
 
   const today = new Date();
 
@@ -156,6 +175,73 @@ export function WeekGrid({
     return confirm("That time is already committed in Google Calendar. Place it anyway?");
   }
 
+  /** Selection bounds, normalised so dragging upward works. */
+  const drawnRange = draw
+    ? {
+        startMin: Math.min(draw.anchorMin, draw.currentMin),
+        endMin: Math.max(draw.anchorMin, draw.currentMin),
+      }
+    : null;
+
+  function onColumnPointerDown(e: React.PointerEvent<HTMLDivElement>, dayIndex: number) {
+    // Blocks are children of this column. Without this guard, grabbing a block
+    // would also start a selection underneath it.
+    if (e.target !== e.currentTarget) return;
+    if (e.button !== 0) return;
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const { startMin } = slotFromPointer(e.clientX, e.clientY);
+    setDraw({ dayIndex, anchorMin: startMin, currentMin: startMin + SLOT_MIN, moved: false });
+  }
+
+  function onColumnPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!draw) return;
+    const rect = colsRef.current!.getBoundingClientRect();
+    const currentMin = clamp(
+      yToMinutes(e.clientY - rect.top),
+      DAY_START_MIN,
+      DAY_END_MIN,
+    );
+    if (currentMin === draw.currentMin) return;
+    setDraw({ ...draw, currentMin, moved: true });
+  }
+
+  function onColumnPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!draw || !drawnRange) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+
+    const span = drawnRange.endMin - drawnRange.startMin;
+    const current = draw;
+    setDraw(null);
+
+    // A stationary press is a click, not a zero-length event.
+    if (!current.moved || span < SLOT_MIN) {
+      onSelect(null);
+      return;
+    }
+    openDraw(current.dayIndex, drawnRange.startMin, drawnRange.endMin);
+  }
+
+  /** Hand the drawn range up with viewport coordinates so the popup can anchor. */
+  function openDraw(dayIndex: number, startMin: number, endMin: number) {
+    const rect = colsRef.current!.getBoundingClientRect();
+    const colWidth = rect.width / 7;
+
+    onDraw({
+      startsAt: dateAt(weekStartDate, dayIndex, startMin),
+      endsAt: dateAt(weekStartDate, dayIndex, endMin),
+      // Surfaced in the popup rather than as a confirm(): interrupting a drag
+      // with a modal to say something the form can state calmly is hostile.
+      overBusy: overlapsBusy(busy, dayIndex, startMin, endMin),
+      anchor: {
+        top: rect.top + slotToY(startMin),
+        bottom: rect.top + slotToY(endMin),
+        left: rect.left + dayIndex * colWidth,
+        right: rect.left + (dayIndex + 1) * colWidth,
+      },
+    });
+  }
+
   function slotFromPointer(clientX: number, clientY: number) {
     const rect = colsRef.current!.getBoundingClientRect();
     const colWidth = rect.width / 7;
@@ -174,6 +260,7 @@ export function WeekGrid({
     const mode: "move" | "resize" = target.dataset.resize === "true" ? "resize" : "move";
 
     e.preventDefault();
+    e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
 
     const rect = colsRef.current!.getBoundingClientRect();
@@ -321,7 +408,10 @@ export function WeekGrid({
               return (
                 <div
                   key={dayIndex}
-                  className="relative border-l border-line"
+                  className="relative touch-none border-l border-line"
+                  onPointerDown={(e) => onColumnPointerDown(e, dayIndex)}
+                  onPointerMove={onColumnPointerMove}
+                  onPointerUp={onColumnPointerUp}
                   onDragOver={(e) => {
                     if (!pendingDrag) return;
                     e.preventDefault();
@@ -343,11 +433,13 @@ export function WeekGrid({
                     onCreateFromDrag(pendingDrag, dateAt(weekStartDate, di, startMin));
                   }}
                   onDoubleClick={(e) => {
+                    if (e.target !== e.currentTarget) return;
                     const { dayIndex: di, startMin } = slotFromPointer(
                       e.clientX,
                       e.clientY,
                     );
-                    onCreateAdhoc(dateAt(weekStartDate, di, startMin), 60);
+                    const endMin = Math.min(startMin + 60, DAY_END_MIN);
+                    openDraw(di, startMin, endMin);
                   }}
                 >
                   {busy
@@ -396,8 +488,11 @@ export function WeekGrid({
                           backgroundColor: `${color}22`,
                         }}
                       >
-                        <div className="truncate font-medium">{block.title}</div>
-                        {height >= PX_PER_SLOT * 3 && (
+                        <div className="truncate font-medium">{labelFor(block)}</div>
+                        {block.description && height >= PX_PER_SLOT * 3 && (
+                          <div className="truncate text-muted">{block.description}</div>
+                        )}
+                        {height >= PX_PER_SLOT * 5 && (
                           <div className="truncate text-muted">
                             {fmtTime(startMin)}–{fmtTime(endMin)}
                           </div>
@@ -409,6 +504,23 @@ export function WeekGrid({
                       </div>
                     );
                   })}
+
+                  {/* Selection being drawn */}
+                  {drawnRange && draw?.dayIndex === dayIndex && (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 z-20 rounded-md border-2 border-accent bg-accent/15"
+                      style={{
+                        top: slotToY(drawnRange.startMin),
+                        height:
+                          ((drawnRange.endMin - drawnRange.startMin) / SLOT_MIN) *
+                          PX_PER_SLOT,
+                      }}
+                    >
+                      <div className="px-1.5 py-0.5 text-[10px] tabular-nums text-accent">
+                        {fmtTime(drawnRange.startMin)}–{fmtTime(drawnRange.endMin)}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Drop preview */}
                   {hover && hover.dayIndex === dayIndex && pendingDrag && (

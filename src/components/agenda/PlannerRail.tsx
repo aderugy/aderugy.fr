@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { buildTree, flattenTree, subtreeIds, DEFAULT_COLOR } from "@/lib/categories";
 import { fmtDuration } from "@/lib/time";
 import { PRIORITY_LABELS, type Block, type Category, type DragPayload, type Task } from "@/lib/types";
-import { createTask } from "@/server/actions/tasks";
 
 const PRIORITY_COLOR: Record<number, string> = {
   1: "#e03131",
@@ -48,7 +47,7 @@ export function PlannerRail({
     return tasks
       .filter((t) => t.status === "backlog")
       .filter((t) => !allowed || (t.category_id && allowed.has(t.category_id)))
-      .filter((t) => !q || t.title.toLowerCase().includes(q))
+      .filter((t) => !q || (t.description ?? "").toLowerCase().includes(q))
       .sort((a, b) => {
         // Deadlines inside the planning horizon outrank raw priority.
         const da = a.deadline ? Date.parse(a.deadline) : Infinity;
@@ -109,12 +108,10 @@ export function PlannerRail({
             </select>
           </div>
 
-          <QuickAddTask categories={categories} />
-
           <ul className="flex-1 overflow-y-auto p-2">
             {visibleTasks.length === 0 && (
               <li className="px-1 py-6 text-center text-xs text-muted">
-                Nothing waiting. Add a task above.
+                Nothing waiting. Add tasks on the Backlog page, or draw straight on the grid.
               </li>
             )}
             {visibleTasks.map((task) => {
@@ -126,12 +123,13 @@ export function PlannerRail({
                   key={task.id}
                   draggable
                   onDragStart={(e) => {
+                    const label = category?.name ?? "Uncategorised";
                     e.dataTransfer.effectAllowed = "copy";
-                    e.dataTransfer.setData("text/plain", task.title);
+                    e.dataTransfer.setData("text/plain", label);
                     onDragStart({
                       kind: "task",
                       id: task.id,
-                      title: task.title,
+                      label,
                       minutes: task.estimated_minutes,
                       categoryId: task.category_id,
                     });
@@ -141,21 +139,27 @@ export function PlannerRail({
                   style={{
                     borderLeft: `3px solid ${category?.effectiveColor ?? DEFAULT_COLOR}`,
                   }}
-                  title={`${PRIORITY_LABELS[task.priority]} · ${category?.path ?? "No category"}`}
+                  title={`${PRIORITY_LABELS[task.priority]} · ${category?.path ?? "Uncategorised"}${
+                    task.description ? ` — ${task.description}` : ""
+                  }`}
                 >
                   <div className="flex items-start gap-1.5">
                     <span
                       className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
                       style={{ backgroundColor: PRIORITY_COLOR[task.priority] }}
                     />
-                    <span className="flex-1 leading-snug">{task.title}</span>
+                    <span className="flex-1 leading-snug font-medium">
+                      {category?.name ?? "Uncategorised"}
+                    </span>
                     <span className="shrink-0 tabular-nums text-muted">
                       {fmtDuration(task.estimated_minutes)}
                     </span>
                   </div>
-                  {(category || task.deadline) && (
+                  {(task.description || task.deadline) && (
                     <div className="mt-0.5 flex gap-2 pl-3 text-[10px] text-muted">
-                      {category && <span className="truncate">{category.path}</span>}
+                      {task.description && (
+                        <span className="truncate">{task.description}</span>
+                      )}
                       {task.deadline && (
                         <span className="ml-auto shrink-0">
                           due{" "}
@@ -200,7 +204,7 @@ export function PlannerRail({
                   onDragStart({
                     kind: "block",
                     id: block.id,
-                    title: block.name,
+                    label: block.name,
                     minutes,
                     categoryId: block.default_category_id,
                   });
@@ -226,69 +230,5 @@ export function PlannerRail({
         </ul>
       )}
     </aside>
-  );
-}
-
-function QuickAddTask({ categories }: { categories: Category[] }) {
-  const [title, setTitle] = useState("");
-  const [minutes, setMinutes] = useState(30);
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [pending, startTransition] = useTransition();
-
-  const flat = useMemo(() => flattenTree(buildTree(categories)), [categories]);
-
-  return (
-    <form
-      className="flex gap-1 border-b border-line p-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!title.trim()) return;
-        const payload = {
-          title,
-          categoryId: categoryId || null,
-          estimatedMinutes: minutes,
-          priority: 3,
-          deadline: null,
-        };
-        setTitle("");
-        startTransition(async () => {
-          await createTask(payload);
-        });
-      }}
-    >
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Quick add…"
-        className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
-      />
-      <input
-        type="number"
-        min={5}
-        step={5}
-        value={minutes}
-        onChange={(e) => setMinutes(Number(e.target.value))}
-        className="w-12 rounded border border-line bg-surface px-1 py-1 text-xs tabular-nums outline-none focus:border-accent"
-      />
-      <select
-        value={categoryId}
-        onChange={(e) => setCategoryId(e.target.value)}
-        className="w-16 rounded border border-line bg-surface px-1 py-1 text-xs outline-none focus:border-accent"
-      >
-        <option value="">—</option>
-        {flat.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded bg-accent px-2 py-1 text-xs text-white disabled:opacity-50"
-      >
-        +
-      </button>
-    </form>
   );
 }

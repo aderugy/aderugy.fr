@@ -1,0 +1,212 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { fmtDuration, fmtTime, minutesOfDay } from "@/lib/time";
+import type { Category } from "@/lib/types";
+import { CategoryPicker } from "./CategoryPicker";
+
+export type DraftBlock = {
+  startsAt: Date;
+  endsAt: Date;
+  overBusy?: boolean;
+  /** Viewport coordinates of the drawn selection, for anchoring. */
+  anchor: { top: number; bottom: number; left: number; right: number };
+};
+
+const POPUP_WIDTH = 264;
+const GAP = 8;
+
+/**
+ * The form that opens after drawing a timeframe on the grid.
+ *
+ * Rendered through a portal: the grid body scrolls with `overflow-y-auto`, so a
+ * popup inside it would be clipped at the edges and would slide away from its
+ * anchor as soon as the grid scrolled.
+ */
+export function BlockPopup({
+  draft,
+  categories,
+  defaultCategoryId,
+  onCancel,
+  onSubmit,
+}: {
+  draft: DraftBlock;
+  categories: Category[];
+  defaultCategoryId: string | null;
+  onCancel: () => void;
+  onSubmit: (input: {
+    categoryId: string;
+    description: string | null;
+    startsAt: Date;
+    endsAt: Date;
+  }) => void;
+}) {
+  const [categoryId, setCategoryId] = useState<string | null>(defaultCategoryId);
+  const [description, setDescription] = useState("");
+  const [startMin, setStartMin] = useState(minutesOfDay(draft.startsAt));
+  const [endMin, setEndMin] = useState(minutesOfDay(draft.endsAt));
+  const [error, setError] = useState<string | null>(null);
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onCancel();
+    };
+    // Deferred a tick: the pointerup that ended the drag would otherwise be
+    // seen as an outside click and close the popup the instant it opens.
+    const id = setTimeout(
+      () => document.addEventListener("pointerdown", onPointerDown),
+      0,
+    );
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [onCancel]);
+
+  // Safe to touch `document` and `window` here: the parent renders this only
+  // once a drag has happened, which cannot occur during server rendering.
+  // Flip to the other side when the popup would run off the viewport.
+  const left = Math.min(
+    draft.anchor.right + GAP,
+    window.innerWidth - POPUP_WIDTH - GAP,
+  );
+  const top = Math.min(
+    Math.max(GAP, draft.anchor.top),
+    Math.max(GAP, window.innerHeight - 260),
+  );
+
+  function submit() {
+    if (!categoryId) {
+      setError("Pick a category");
+      return;
+    }
+    if (endMin <= startMin) {
+      setError("End must be after start");
+      return;
+    }
+    const startsAt = new Date(draft.startsAt);
+    startsAt.setHours(0, startMin, 0, 0);
+    const endsAt = new Date(draft.startsAt);
+    endsAt.setHours(0, endMin, 0, 0);
+
+    onSubmit({ categoryId, description: description.trim() || null, startsAt, endsAt });
+  }
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{ position: "fixed", top, left, width: POPUP_WIDTH }}
+      className="z-50 rounded-lg border border-line bg-surface p-3 text-xs shadow-xl"
+      onKeyDown={(e) => {
+        // Ctrl/Cmd+Enter saves from anywhere, including the description.
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          submit();
+        }
+      }}
+    >
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="font-medium">
+          {draft.startsAt.toLocaleDateString(undefined, {
+            weekday: "long",
+            day: "numeric",
+            month: "short",
+          })}
+        </span>
+        <span className="tabular-nums text-muted">
+          {fmtDuration(Math.max(0, endMin - startMin))}
+        </span>
+      </div>
+
+      <label className="block">
+        <span className="text-muted">Category</span>
+        <div className="mt-1">
+          <CategoryPicker
+            categories={categories}
+            value={categoryId}
+            onChange={(id) => {
+              setCategoryId(id);
+              setError(null);
+            }}
+            autoFocus
+          />
+        </div>
+      </label>
+
+      <label className="mt-2 block">
+        <span className="text-muted">Description</span>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          placeholder="What this session actually covers"
+          className="mt-1 w-full resize-none rounded border border-line bg-surface px-2 py-1 outline-none focus:border-accent"
+        />
+      </label>
+
+      <div className="mt-2 flex items-center gap-2">
+        <TimeField value={startMin} onChange={setStartMin} />
+        <span className="text-muted">→</span>
+        <TimeField value={endMin} onChange={setEndMin} />
+      </div>
+
+      {draft.overBusy && (
+        <p className="mt-2 text-amber-600 dark:text-amber-500">
+          Overlaps time already committed in Google Calendar.
+        </p>
+      )}
+
+      {error && <p className="mt-2 text-red-500">{error}</p>}
+
+      <div className="mt-3 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded border border-line px-2 py-1 text-muted hover:text-foreground"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={submit}
+          className="rounded bg-accent px-3 py-1 font-medium text-white"
+        >
+          Add
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function TimeField({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (minutes: number) => void;
+}) {
+  return (
+    <input
+      type="time"
+      step={900}
+      value={fmtTime(value)}
+      onChange={(e) => {
+        const [h, m] = e.target.value.split(":").map(Number);
+        if (Number.isFinite(h) && Number.isFinite(m)) onChange(h * 60 + m);
+      }}
+      className="flex-1 rounded border border-line bg-surface px-1 py-1 tabular-nums outline-none focus:border-accent"
+    />
+  );
+}

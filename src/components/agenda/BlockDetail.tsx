@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { buildTree, flattenTree } from "@/lib/categories";
+import { CategoryPicker } from "./CategoryPicker";
 import { fmtDuration, fmtTime, minutesOfDay } from "@/lib/time";
 import type { Category, ScheduledBlock } from "@/lib/types";
 import {
@@ -17,10 +17,9 @@ type Props = {
 };
 
 export function BlockDetail({ block, categories, onClose }: Props) {
-  const [title, setTitle] = useState(block.title);
+  const [description, setDescription] = useState(block.description ?? "");
   const [pending, startTransition] = useTransition();
 
-  const flat = flattenTree(buildTree(categories));
   const start = new Date(block.starts_at);
   const end = new Date(block.ends_at);
   const minutes = Math.round((end.getTime() - start.getTime()) / 60_000);
@@ -43,36 +42,30 @@ export function BlockDetail({ block, categories, onClose }: Props) {
       </div>
 
       <label className="block">
-        <span className="text-muted">Title</span>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => {
-            if (title !== block.title) commit(() => updateScheduled({ id: block.id, title }));
-          }}
-          className="mt-1 w-full rounded border border-line bg-surface px-2 py-1 outline-none focus:border-accent"
-        />
+        <span className="text-muted">Category</span>
+        <div className="mt-1">
+          <CategoryPicker
+            categories={categories}
+            value={block.category_id}
+            onChange={(id) => commit(() => updateScheduled({ id: block.id, categoryId: id }))}
+          />
+        </div>
       </label>
 
       <label className="block">
-        <span className="text-muted">Category</span>
-        <select
-          value={block.category_id ?? ""}
-          onChange={(e) =>
-            commit(() =>
-              updateScheduled({ id: block.id, categoryId: e.target.value || null }),
-            )
-          }
-          className="mt-1 w-full rounded border border-line bg-surface px-2 py-1 outline-none focus:border-accent"
-        >
-          <option value="">No category</option>
-          {flat.map((c) => (
-            <option key={c.id} value={c.id}>
-              {"— ".repeat(c.depth)}
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <span className="text-muted">Description</span>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={() => {
+            if (description !== (block.description ?? "")) {
+              commit(() => updateScheduled({ id: block.id, description }));
+            }
+          }}
+          rows={3}
+          placeholder="What this session actually covers"
+          className="mt-1 w-full resize-none rounded border border-line bg-surface px-2 py-1 outline-none focus:border-accent"
+        />
       </label>
 
       <div>
@@ -103,7 +96,9 @@ export function BlockDetail({ block, categories, onClose }: Props) {
                 key={link.task_id}
                 className="flex items-center gap-2 rounded border border-line bg-surface px-2 py-1"
               >
-                <span className="flex-1 truncate">{link.tasks?.title ?? "Task"}</span>
+                <span className="flex-1 truncate">
+                  {link.tasks?.description ?? "Linked task"}
+                </span>
                 <span className="tabular-nums text-muted">
                   {fmtDuration(link.planned_minutes)}
                 </span>
