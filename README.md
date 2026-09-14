@@ -2,8 +2,14 @@
 
 Personal website and utility tools. Next.js (App Router) · Tailwind · Supabase · Vercel.
 
-The first tool is **`/agenda`** — a weekly planner: typed tasks in a backlog,
-reusable blocks, and a week grid you assemble by hand.
+Two tools live here so far:
+
+- **`/agenda`** — a weekly planner: typed tasks in a backlog, reusable blocks,
+  and a week grid you assemble by hand.
+- **`/poker`** — pot odds, drawing equity and the fold equity a semi-bluff
+  needs, with the site's rake taken off the pot. No account and nothing stored:
+  the whole model is pure functions in `src/lib/poker.ts`, and the page is
+  static.
 
 ## Getting started
 

@@ -6,6 +6,11 @@ const tools = [
     name: "Agenda",
     description: "Plan the week: typed tasks, reusable blocks, a timetable.",
   },
+  {
+    href: "/poker",
+    name: "Poker odds",
+    description: "Pot odds, drawing equity and fold equity, rake included.",
+  },
 ];
 
 export default function Home() {
