@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildTree, flattenTree, type CategoryNode } from "@/lib/categories";
 import type { Category } from "@/lib/types";
+import { eventHitsElement } from "@/lib/dom";
 
 /**
  * Searchable category select.
@@ -53,7 +54,7 @@ export function CategoryPicker({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!eventHitsElement(e, rootRef.current)) setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);

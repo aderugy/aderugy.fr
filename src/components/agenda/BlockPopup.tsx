@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { fmtDuration, fmtTime, minutesOfDay } from "@/lib/time";
 import type { Category } from "@/lib/types";
+import { eventHitsElement } from "@/lib/dom";
 import { CategoryPicker } from "./CategoryPicker";
 
 export type DraftBlock = {
@@ -62,7 +63,7 @@ export function BlockPopup({
 
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onCancel();
+      if (!eventHitsElement(e, ref.current)) onCancel();
     };
     // Deferred a tick: the pointerup that ended the drag would otherwise be
     // seen as an outside click and close the popup the instant it opens.
