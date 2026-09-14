@@ -25,6 +25,7 @@ import type {
   Week,
 } from "@/lib/types";
 import { externalItems, externalMinutesByCategory } from "@/lib/external";
+import { blockChildren, blockMinutes, childMinutes } from "@/lib/blocks";
 import { CalendarLiveness } from "./CalendarLiveness";
 import { ExternalDetail } from "./ExternalDetail";
 import {
@@ -125,21 +126,25 @@ export function WeekPlanner({
   }, [external.items, externalEvents, calendarSources]);
 
   /**
-   * Blocks have no title. A placed template keeps the name you gave it — it
-   * spans categories, so collapsing it to one would lose what you chose.
-   * Everything else reads as its category's leaf name.
+   * A block has no category and no title of its own. A placed template keeps
+   * the name you gave it; otherwise the only thing the block says about itself
+   * is its description. Either can be empty — the tasks inside carry the
+   * labels, and the grid draws the block as the outline around them.
    */
   const labelFor = (block: ScheduledBlock) => {
     if (block.source_block_id) {
       const source = blockById.get(block.source_block_id);
       if (source) return source.name;
     }
-    return categories_.get(block.category_id)?.name ?? "Uncategorised";
+    return block.description ?? "";
   };
 
+  /**
+   * The outline's colour. With no category to borrow from, a block takes the
+   * template's colour if it came from one, and otherwise stays neutral so the
+   * children are the only thing carrying category colour.
+   */
   const colorFor = (block: ScheduledBlock) => {
-    const category = categories_.get(block.category_id);
-    if (category) return category.effectiveColor;
     if (block.source_block_id) {
       const source = blockById.get(block.source_block_id);
       if (source?.color) return source.color;
@@ -154,19 +159,24 @@ export function WeekPlanner({
    */
   const gridItems: GridItem[] = useMemo(
     () => [
-      ...items.map((block) => ({
-        id: block.id,
-        kind: "block" as const,
-        startsAt: block.starts_at,
-        endsAt: block.ends_at,
-        label: labelFor(block),
-        description: block.description,
-        color: colorFor(block),
-        done: block.status === "done",
-        // A block the server has not acknowledged has no real id yet, so a
-        // move would address a row that does not exist.
-        movable: !block.id.startsWith("temp-"),
-      })),
+      ...items.map((block) => {
+        const children = blockChildren(block, categories_);
+        return {
+          id: block.id,
+          kind: "block" as const,
+          startsAt: block.starts_at,
+          endsAt: block.ends_at,
+          label: labelFor(block),
+          description: block.description,
+          color: colorFor(block),
+          done: block.status === "done",
+          // A block the server has not acknowledged has no real id yet, so a
+          // move would address a row that does not exist.
+          movable: !block.id.startsWith("temp-"),
+          children,
+          overfilled: childMinutes(block) > blockMinutes(block),
+        };
+      }),
       ...external.items,
     ],
     // labelFor/colorFor read the same memoised maps these depend on.
@@ -198,17 +208,36 @@ export function WeekPlanner({
     const endsAt = new Date(startsAt.getTime() + payload.minutes * 60_000);
 
     // Optimistic placeholder; replaced when the server round-trip lands.
+    //
+    // A dragged task can be drawn in full straight away — the rail already knows
+    // its category and minutes. A template cannot: its steps live on the server,
+    // so the block appears empty for one round trip and fills in on the refresh.
     const temp: ScheduledBlock = {
       id: `temp-${crypto.randomUUID()}`,
       week_id: week.id,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
-      description: payload.kind === "task" ? payload.label : null,
-      category_id: payload.categoryId,
+      description: null,
       source_block_id: payload.kind === "block" ? payload.id : null,
       status: "planned",
       actual_minutes: null,
-      scheduled_block_tasks: [],
+      scheduled_block_tasks:
+        payload.kind === "task"
+          ? [
+              {
+                task_id: payload.id,
+                planned_minutes: payload.minutes,
+                position: 0,
+                tasks: {
+                  id: payload.id,
+                  description: payload.description,
+                  category_id: payload.categoryId,
+                  estimated_minutes: payload.minutes,
+                  ad_hoc: false,
+                },
+              },
+            ]
+          : [],
     };
     setPendingDrag(null);
     setGridError(null);

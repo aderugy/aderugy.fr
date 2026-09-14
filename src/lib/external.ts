@@ -103,6 +103,9 @@ export function externalItems(
             color: source.color,
             done: false,
             movable: false,
+            // A mirrored event is opaque to us: no tasks, nothing to overfill.
+            children: [],
+            overfilled: false,
           });
         }
       }

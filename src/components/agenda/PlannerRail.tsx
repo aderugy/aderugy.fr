@@ -132,6 +132,7 @@ export function PlannerRail({
                       label,
                       minutes: task.estimated_minutes,
                       categoryId: task.category_id,
+                      description: task.description,
                     });
                   }}
                   onDragEnd={onDragEnd}

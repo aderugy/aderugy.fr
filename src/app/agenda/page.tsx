@@ -59,10 +59,14 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       supabase
         .from("tasks")
         .select(
-          "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, completed_at, created_at",
+          "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at",
         )
         .eq("user_id", user.id)
         .in("status", ["backlog", "scheduled"])
+        // The rail is for work waiting on a slot. A task that exists only
+        // inside a block is already placed, and reaches the grid through the
+        // block's own join rather than through here.
+        .eq("ad_hoc", false)
         .order("created_at"),
       supabase
         .from("blocks")
@@ -77,7 +81,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       supabase
         .from("scheduled_blocks")
         .select(
-          "id, week_id, starts_at, ends_at, description, category_id, source_block_id, status, actual_minutes, scheduled_block_tasks(task_id, planned_minutes, tasks(id, description, category_id, estimated_minutes))",
+          "id, week_id, starts_at, ends_at, description, source_block_id, status, actual_minutes, scheduled_block_tasks(task_id, planned_minutes, position, tasks(id, description, category_id, estimated_minutes, ad_hoc))",
         )
         .eq("user_id", user.id)
         .gte("starts_at", rangeStart)

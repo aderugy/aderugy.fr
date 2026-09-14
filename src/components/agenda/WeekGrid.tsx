@@ -72,6 +72,26 @@ function layoutLanes(spans: Span[]) {
   return out;
 }
 
+/**
+ * A block with tasks in it gives its own text to the tooltip: the children take
+ * the space inside, and what the block itself is called would otherwise have
+ * nowhere to show.
+ */
+function itemTitle(item: GridItem, startMin: number, endMin: number) {
+  const when = `${fmtTime(startMin)}–${fmtTime(endMin)}`;
+  const parts = [item.label, item.description].filter(
+    (p): p is string => Boolean(p) && p !== "",
+  );
+  const head = [...new Set(parts)].join(" — ");
+
+  if (item.children.length === 0) return head ? `${head} · ${when}` : when;
+
+  const inside = item.children
+    .map((c) => `${c.label} ${fmtDuration(c.minutes)}`)
+    .join(", ");
+  return `${head ? `${head} · ` : ""}${when}\n${inside}`;
+}
+
 export type DrawnRange = {
   startsAt: Date;
   endsAt: Date;
@@ -485,6 +505,10 @@ export function WeekGrid({
                     const isSelected = selectedId === item.id;
                     const height = ((endMin - startMin) / SLOT_MIN) * PX_PER_SLOT;
                     const external = item.kind === "external";
+                    // A block is a container: once it holds tasks, they carry the
+                    // labels and the colour, and the block is only the dashed
+                    // outline drawn around them.
+                    const filled = item.children.length > 0;
 
                     return (
                       <div
@@ -492,10 +516,13 @@ export function WeekGrid({
                         onPointerDown={(e) => onItemPointerDown(e, item)}
                         onPointerMove={onItemPointerMove}
                         onPointerUp={(e) => onItemPointerUp(e, item)}
-                        className={`absolute touch-none overflow-hidden rounded-md border-l-[3px] px-1.5 py-0.5 text-[11px] leading-tight ${
+                        title={itemTitle(item, startMin, endMin)}
+                        className={`absolute touch-none overflow-hidden rounded-md text-[11px] leading-tight ${
                           external
-                            ? "cursor-default border-y border-r border-dashed"
-                            : "cursor-grab shadow-sm"
+                            ? "cursor-default border-l-[3px] border-y border-r border-dashed px-1.5 py-0.5"
+                            : filled
+                              ? "cursor-grab border border-dashed p-[2px]"
+                              : "cursor-grab border border-dashed px-1.5 py-0.5"
                         } ${isDragging ? "z-20 cursor-grabbing opacity-90" : "z-10"} ${
                           isSelected ? "ring-2 ring-accent" : ""
                         } ${item.done ? "opacity-60" : ""}`}
@@ -504,29 +531,92 @@ export function WeekGrid({
                           height: Math.max(height, PX_PER_SLOT),
                           left: `${(lane.lane / lane.lanes) * 100}%`,
                           width: `calc(${100 / lane.lanes}% - 3px)`,
-                          borderLeftColor: item.color,
-                          borderTopColor: `${item.color}55`,
-                          borderRightColor: `${item.color}55`,
-                          borderBottomColor: `${item.color}55`,
-                          // Flatter fill for time you do not control.
-                          backgroundColor: external ? `${item.color}14` : `${item.color}22`,
+                          ...(external
+                            ? {
+                                borderLeftColor: item.color,
+                                borderTopColor: `${item.color}55`,
+                                borderRightColor: `${item.color}55`,
+                                borderBottomColor: `${item.color}55`,
+                                // Flatter fill for time you do not control.
+                                backgroundColor: `${item.color}14`,
+                              }
+                            : {
+                                // Amber says the tasks ask for more time than the
+                                // block holds, so the last of them is clipped.
+                                borderColor: item.overfilled
+                                  ? "#e8590c"
+                                  : `${item.color}66`,
+                                backgroundColor: filled
+                                  ? "transparent"
+                                  : `${item.color}12`,
+                              }),
                         }}
                       >
-                        <div className="flex items-baseline gap-1">
-                          {external && (
-                            <span className="shrink-0 opacity-60" title="From a calendar">
-                              ⧉
-                            </span>
-                          )}
-                          <span className="truncate font-medium">{item.label}</span>
-                        </div>
-                        {item.description && height >= PX_PER_SLOT * 3 && (
-                          <div className="truncate text-muted">{item.description}</div>
-                        )}
-                        {height >= PX_PER_SLOT * 5 && (
-                          <div className="truncate text-muted">
-                            {fmtTime(startMin)}–{fmtTime(endMin)}
+                        {filled ? (
+                          <div className="relative h-full">
+                            {item.children.map((child) => {
+                              const childTop =
+                                (child.offsetMinutes / SLOT_MIN) * PX_PER_SLOT;
+                              const childHeight =
+                                (child.minutes / SLOT_MIN) * PX_PER_SLOT;
+
+                              return (
+                                <div
+                                  key={child.id}
+                                  title={`${child.label}${
+                                    child.description ? ` — ${child.description}` : ""
+                                  } · ${fmtDuration(child.minutes)}`}
+                                  className="absolute inset-x-0 overflow-hidden rounded-sm border-l-[3px] px-1 shadow-sm"
+                                  style={{
+                                    top: childTop,
+                                    height: Math.max(childHeight - 1, 8),
+                                    borderLeftColor: child.color,
+                                    backgroundColor: `${child.color}26`,
+                                  }}
+                                >
+                                  <span className="block truncate font-medium">
+                                    {child.label}
+                                  </span>
+                                  {child.description &&
+                                    childHeight >= PX_PER_SLOT * 3 && (
+                                      <span className="block truncate text-muted">
+                                        {child.description}
+                                      </span>
+                                    )}
+                                </div>
+                              );
+                            })}
                           </div>
+                        ) : (
+                          <>
+                            <div className="flex items-baseline gap-1">
+                              {external && (
+                                <span
+                                  className="shrink-0 opacity-60"
+                                  title="From a calendar"
+                                >
+                                  ⧉
+                                </span>
+                              )}
+                              <span className="truncate font-medium">
+                                {item.label || (
+                                  <span className="text-muted">Empty block</span>
+                                )}
+                              </span>
+                            </div>
+                            {item.description &&
+                              item.description !== item.label &&
+                              height >= PX_PER_SLOT * 3 && (
+                                <div className="truncate text-muted">
+                                  {item.description}
+                                </div>
+                              )}
+                            {height >= PX_PER_SLOT * 5 && (
+                              <div className="truncate text-muted">
+                                {fmtTime(startMin)}–{fmtTime(endMin)}
+                              </div>
+                            )}
+                          </>
                         )}
                         {item.movable && (
                           <div

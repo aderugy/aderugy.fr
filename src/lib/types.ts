@@ -29,6 +29,11 @@ export type Task = {
   deadline: string | null;
   status: TaskStatus;
   splittable: boolean;
+  /**
+   * Created inside a block and owned by it. It never reaches the backlog, and
+   * it is deleted with the block rather than surviving it.
+   */
+  ad_hoc: boolean;
   completed_at: string | null;
   created_at: string;
 };
@@ -59,19 +64,27 @@ export type ScheduledStatus = "planned" | "done" | "skipped";
 export type ScheduledBlockTask = {
   task_id: string;
   planned_minutes: number;
+  /** Order inside the block: children are stacked top to bottom by this. */
+  position: number;
   tasks: Pick<
     Task,
-    "id" | "description" | "category_id" | "estimated_minutes"
+    "id" | "description" | "category_id" | "estimated_minutes" | "ad_hoc"
   > | null;
 };
 
+/**
+ * A span of time on the grid, and nothing more.
+ *
+ * A block has no category of its own: what its hours count as is decided by the
+ * tasks inside it, each with its own category and its own planned minutes. A
+ * block with no tasks is time you have reserved but not yet attributed.
+ */
 export type ScheduledBlock = {
   id: string;
   week_id: string;
   starts_at: string;
   ends_at: string;
   description: string | null;
-  category_id: string;
   source_block_id: string | null;
   status: ScheduledStatus;
   actual_minutes: number | null;
@@ -104,12 +117,14 @@ export type DragPayload =
       label: string;
       minutes: number;
       categoryId: string;
+      description: string | null;
     }
   | {
       kind: "block";
       id: string;
       label: string;
       minutes: number;
+      /** Only a fallback colour for the drop preview; the block itself has none. */
       categoryId: string;
     };
 
@@ -162,6 +177,19 @@ export type GoogleSyncState = {
   last_error_at: string | null;
 };
 
+/** One task drawn inside its block, already resolved and placed. */
+export type GridChild = {
+  /** The task id. Unique within the block, which is all the grid needs. */
+  id: string;
+  /** The task's category leaf — what this slice of the block counts as. */
+  label: string;
+  description: string | null;
+  color: string;
+  minutes: number;
+  /** Minutes from the top of the block: children stack in order. */
+  offsetMinutes: number;
+};
+
 /**
  * What the grid actually draws. Own blocks and external events are stored
  * separately — the mirror is read-only and has no category of its own — but
@@ -172,13 +200,17 @@ export type GridItem = {
   kind: "block" | "external";
   startsAt: string;
   endsAt: string;
-  /** Category leaf, template name, or calendar name. */
+  /** Template name, own description, or calendar name. May be empty. */
   label: string;
   description: string | null;
   color: string;
   done: boolean;
   /** External events are never movable: the next sync would revert it. */
   movable: boolean;
+  /** The tasks inside a block. Always empty for an external event. */
+  children: GridChild[];
+  /** The children ask for more time than the block holds. */
+  overfilled: boolean;
 };
 
 export type AllDayItem = {

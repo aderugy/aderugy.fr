@@ -26,10 +26,14 @@ export default async function BacklogPage() {
     supabase
       .from("tasks")
       .select(
-        "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, completed_at, created_at",
+        "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at",
       )
       .eq("user_id", user.id)
       .in("status", ["backlog", "scheduled"])
+      // Tasks created inside a block are instances of a plan, not work waiting
+      // to be planned. They belong to their block, and listing them here would
+      // fill the backlog with rows you cannot act on.
+      .eq("ad_hoc", false)
       .order("created_at", { ascending: false }),
   ]);
 
