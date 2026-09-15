@@ -32,6 +32,7 @@ export function blockChildren(
       const child: GridChild = {
         id: link.task_id,
         label: category?.name ?? "Uncategorised",
+        categoryId: link.tasks?.category_id ?? null,
         description: link.tasks?.description ?? null,
         color: category?.effectiveColor ?? DEFAULT_COLOR,
         minutes: link.planned_minutes,

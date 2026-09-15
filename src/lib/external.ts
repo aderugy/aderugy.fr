@@ -62,6 +62,7 @@ export function externalItems(
           id: `${event.calendar_source_id}:${event.external_event_id}:${dayIndex}`,
           dayIndex,
           label: source.display_name,
+          categoryId: source.category_id,
           title: event.title,
           color: source.color,
           archived,
@@ -102,6 +103,7 @@ export function externalItems(
           items.push({
             id: `${event.calendar_source_id}:${event.external_event_id}:${dayIndex}`,
             kind: "external",
+            categoryId: source.category_id,
             startsAt: segmentStart.toISOString(),
             endsAt: segmentEnd.toISOString(),
             // The calendar names it; the event describes it.

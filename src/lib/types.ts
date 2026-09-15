@@ -191,6 +191,8 @@ export type GridChild = {
   id: string;
   /** The task's category leaf — what this slice of the block counts as. */
   label: string;
+  /** That leaf's id, so the grid can tell whether it is currently hidden. */
+  categoryId: string | null;
   description: string | null;
   color: string;
   minutes: number;
@@ -206,6 +208,12 @@ export type GridChild = {
 export type GridItem = {
   id: string;
   kind: "block" | "external";
+  /**
+   * What this item's hours count as, when the item knows: a calendar's
+   * category. Always null for your own blocks — a block has no category, only
+   * the tasks inside it do.
+   */
+  categoryId: string | null;
   startsAt: string;
   endsAt: string;
   /** Template name, own description, or calendar name. May be empty. */
@@ -231,6 +239,8 @@ export type AllDayItem = {
   id: string;
   dayIndex: number;
   label: string;
+  /** The calendar's category. See `GridItem.categoryId`. */
+  categoryId: string | null;
   title: string | null;
   color: string;
   /** Kept after the calendar deleted it. See `GridItem.archived`. */
