@@ -48,7 +48,7 @@ export default async function SettingsPage({
   ]);
 
   return (
-    <main className="mx-auto w-full max-w-2xl space-y-6 px-6 py-8">
+    <main className="mx-auto w-full max-w-2xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
 
       <GoogleConnection

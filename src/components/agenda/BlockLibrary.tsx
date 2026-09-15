@@ -76,7 +76,7 @@ function BlockCard({
               commit(() => updateBlock({ id: block.id, name: e.target.value }));
             }
           }}
-          className="min-w-32 flex-1 bg-transparent font-medium outline-none"
+          className="min-w-32 flex-1 bg-transparent font-medium outline-none max-sm:min-w-0 max-sm:basis-full"
         />
 
         <span className="text-xs tabular-nums text-muted">{fmtDuration(minutes)}</span>
@@ -202,7 +202,7 @@ function NewItemForm({
 
   return (
     <form
-      className="mt-2 flex gap-1"
+      className="mt-2 flex flex-wrap gap-1"
       onSubmit={(e) => {
         e.preventDefault();
         if (!label.trim()) return;
@@ -222,7 +222,7 @@ function NewItemForm({
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="Add a step…"
-        className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
+        className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-accent max-sm:basis-full"
       />
       <input
         type="number"
@@ -284,7 +284,7 @@ function NewBlockForm({ categories }: { categories: FlatCategory[] }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="New block — e.g. Deep work"
-        className="min-w-40 flex-1 rounded border border-line bg-surface px-2 py-1 text-sm outline-none focus:border-accent"
+        className="min-w-40 flex-1 rounded border border-line bg-surface px-2 py-1 text-sm outline-none focus:border-accent max-sm:min-w-0 max-sm:basis-full"
       />
       <input
         type="number"

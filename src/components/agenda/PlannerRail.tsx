@@ -18,6 +18,12 @@ type Props = {
   blocks: Block[];
   onDragStart: (payload: DragPayload) => void;
   onDragEnd: () => void;
+  /**
+   * The rail is a column at full width and a sheet below it, and which one it
+   * is belongs to the planner that lays them out — not here.
+   */
+  className?: string;
+  onClose: () => void;
 };
 
 export function PlannerRail({
@@ -26,6 +32,8 @@ export function PlannerRail({
   blocks,
   onDragStart,
   onDragEnd,
+  className,
+  onClose,
 }: Props) {
   const [tab, setTab] = useState<"tasks" | "blocks">("tasks");
   const [filter, setFilter] = useState<string>("all");
@@ -64,8 +72,8 @@ export function PlannerRail({
   );
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-line">
-      <div className="flex gap-1 border-b border-line p-2 text-xs">
+    <aside className={className}>
+      <div className="flex items-center gap-1 border-b border-line p-2 text-xs">
         {(["tasks", "blocks"] as const).map((t) => (
           <button
             key={t}
@@ -77,12 +85,27 @@ export function PlannerRail({
             {t}
           </button>
         ))}
-        <span className="ml-auto self-center tabular-nums text-muted">
+        <span className="ml-auto tabular-nums text-muted">
           {tab === "tasks"
             ? `${visibleTasks.length} · ${fmtDuration(unscheduledMinutes)}`
             : `${blocks.length}`}
         </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded px-1.5 py-1 text-muted hover:text-foreground xl:hidden"
+        >
+          ✕
+        </button>
       </div>
+
+      {/* Dragging onto the grid needs the grid on screen, which it is not while
+          this is covering it. Tapping a task is the way in on a phone. */}
+      <p className="border-b border-line px-2 py-1.5 text-[10px] leading-snug text-muted xl:hidden">
+        Drag onto the week to place. On a touch screen, double-tap the grid to
+        draw a slot instead.
+      </p>
 
       {tab === "tasks" ? (
         <>

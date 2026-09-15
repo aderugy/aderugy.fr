@@ -35,7 +35,7 @@ export default async function BlocksPage() {
   const error = categoriesRes.error ?? blocksRes.error;
   if (error) {
     return (
-      <main className="mx-auto max-w-lg px-6 py-20 text-sm">
+      <main className="mx-auto max-w-lg px-5 py-16 text-sm sm:px-6 sm:py-20">
         <h1 className="font-medium">Could not load blocks</h1>
         <p className="mt-2 text-muted">{error.message}</p>
       </main>
@@ -43,7 +43,7 @@ export default async function BlocksPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-8">
+    <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <BlockLibrary
         categories={(categoriesRes.data ?? []) as Category[]}
         blocks={(blocksRes.data ?? []) as unknown as Block[]}

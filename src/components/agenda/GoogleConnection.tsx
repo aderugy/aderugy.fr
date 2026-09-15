@@ -63,7 +63,7 @@ export function GoogleConnection({
   return (
     <section className="rounded-lg border border-line bg-surface p-4 text-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1">
+        <div className="flex-1 max-sm:basis-full">
           <h2 className="font-medium">Calendars</h2>
           <p className="mt-0.5 text-xs text-muted">
             Read-only. Events from an enabled calendar appear in your week, labelled
@@ -185,13 +185,13 @@ function CalendarRow({
             else setName(source.display_name);
           }}
           title="The name shown on your week grid"
-          className="w-32 rounded border border-line bg-surface px-2 py-1 font-medium outline-none focus:border-accent"
+          className="w-32 rounded border border-line bg-surface px-2 py-1 font-medium outline-none focus:border-accent max-sm:w-full max-sm:min-w-0 max-sm:flex-1 max-sm:basis-full"
           style={{ borderLeft: `3px solid ${source.color}` }}
         />
 
         <ColorSwatches value={source.color} onPick={(color) => update({ color })} />
 
-        <div className="min-w-40 flex-1">
+        <div className="min-w-40 flex-1 max-sm:min-w-0 max-sm:basis-full">
           <CategoryPicker
             categories={categories}
             value={source.category_id}

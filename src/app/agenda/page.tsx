@@ -136,7 +136,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
 
   if (error) {
     return (
-      <main className="mx-auto max-w-lg px-6 py-20 text-sm">
+      <main className="mx-auto max-w-lg px-5 py-16 text-sm sm:px-6 sm:py-20">
         <h1 className="font-medium">Could not load the week</h1>
         <p className="mt-2 text-muted">{error.message}</p>
         <p className="mt-4 text-muted">

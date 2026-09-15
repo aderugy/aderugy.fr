@@ -64,7 +64,7 @@ export function ExternalDetail({
   }
 
   return (
-    <div className="flex h-full flex-col gap-3 p-3 text-xs">
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-3 text-xs">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 font-medium">
           <span

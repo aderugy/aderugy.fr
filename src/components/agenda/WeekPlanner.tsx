@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { categoryIndex, subtreeIds, DEFAULT_COLOR } from "@/lib/categories";
+import { MD, XL, useHydrated, useMediaQuery } from "@/lib/media";
 import {
   addDays,
+  dayIndexOf,
   fmtDuration,
   fmtWeekRange,
   fromISODate,
@@ -107,6 +109,52 @@ export function WeekPlanner({
     () => new Set(),
   );
   const [, startTransition] = useTransition();
+
+  /**
+   * Below `md` the grid shows one day; below `xl` the two side panels are
+   * drawers rather than columns. Both are CSS decisions everywhere except the
+   * grid, which has to know its column count to lay anything out at all.
+   */
+  const wideGrid = useMediaQuery(MD);
+  const wideLayout = useMediaQuery(XL);
+  const hydrated = useHydrated();
+
+  /**
+   * Which day the one-day grid is showing: whichever you last tapped, and
+   * failing that today — Monday in any week that does not contain today, and
+   * during the server render, which has no business deciding what today is.
+   *
+   * Navigating to another week forgets the tap, the same way the grid re-seeds
+   * itself from a new `scheduled` prop.
+   */
+  const [pickedDay, setPickedDay] = useState<number | null>(null);
+  const [pickedFor, setPickedFor] = useState(weekStart);
+  if (pickedFor !== weekStart) {
+    setPickedFor(weekStart);
+    setPickedDay(null);
+  }
+
+  const todayIndex = hydrated ? dayIndexOf(weekStartDate, new Date()) : -1;
+  const focusDay =
+    pickedDay ?? (todayIndex >= 0 && todayIndex <= 6 ? todayIndex : 0);
+
+  const days = useMemo(
+    () => (wideGrid ? [0, 1, 2, 3, 4, 5, 6] : [focusDay]),
+    [wideGrid, focusDay],
+  );
+
+  /**
+   * Which panel the narrow layout is showing over the grid. Ignored once both
+   * panels have columns of their own to live in — and closed on the way there,
+   * so a sheet left open across a resize does not sit on top of the column that
+   * now holds the same panel.
+   */
+  const [drawer, setDrawer] = useState<"none" | "rail" | "detail">("none");
+  const [drawerFor, setDrawerFor] = useState(wideLayout);
+  if (drawerFor !== wideLayout) {
+    setDrawerFor(wideLayout);
+    if (wideLayout) setDrawer("none");
+  }
 
   const googleConnected = Boolean(googleAccount && !googleAccount.disconnected_at);
 
@@ -305,6 +353,16 @@ export function WeekPlanner({
   }
 
   /**
+   * Selecting something on a narrow screen has to bring its panel with it —
+   * there is no sidebar sitting there to notice the change. Deselecting closes
+   * the drawer again, which is also what its own close button does.
+   */
+  function onSelect(id: string | null) {
+    setSelectedId(id);
+    if (!wideLayout) setDrawer(id ? "detail" : "none");
+  }
+
+  /**
    * Returns an error message instead of throwing it away, so a rejected insert
    * shows up in the popup rather than silently leaving the grid unchanged.
    */
@@ -365,10 +423,33 @@ export function WeekPlanner({
   const prevWeek = toISODate(addDays(weekStartDate, -7));
   const nextWeek = toISODate(addDays(weekStartDate, 7));
 
+  /**
+   * Both side panels are the same element at every size: a column at `xl`, and
+   * below it a sheet that slides in over the grid. One instance rather than two
+   * behind media queries, so the search you typed into the rail is still there
+   * after you rotate the phone.
+   */
+  const panel = (side: "left" | "right", open: boolean) =>
+    [
+      "fixed inset-y-0 z-40 flex w-72 max-w-[85vw] shrink-0 flex-col bg-background shadow-2xl",
+      // Visibility rides along with the transform so a closed sheet is out of
+      // the tab order, but only once it has finished sliding away.
+      "transition-[transform,visibility] duration-200",
+      side === "left"
+        ? "left-0 border-r border-line"
+        : "right-0 border-l border-line",
+      open
+        ? "translate-x-0"
+        : `invisible xl:visible ${side === "left" ? "-translate-x-full" : "translate-x-full"}`,
+      // At full width it stops being a sheet: no shadow, no transform, and back
+      // in the flow beside the grid.
+      "xl:static xl:z-auto xl:max-w-none xl:translate-x-0 xl:shadow-none",
+    ].join(" ");
+
   return (
-    <div className="flex h-[calc(100vh-49px)] flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <CalendarLiveness connected={googleConnected} oldestSyncAt={oldestSyncAt} />
-      <div className="flex items-center gap-3 border-b border-line px-4 py-2 text-sm">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line px-2 py-2 text-sm sm:px-4">
         <div className="flex items-center gap-1">
           <Link
             href={`/agenda?w=${prevWeek}`}
@@ -391,7 +472,7 @@ export function WeekPlanner({
         </div>
         <span className="font-medium">{fmtWeekRange(weekStartDate)}</span>
         {week.theme && (
-          <span className="rounded bg-accent/10 px-2 py-0.5 text-xs text-accent">
+          <span className="max-w-[40vw] truncate rounded bg-accent/10 px-2 py-0.5 text-xs text-accent">
             {week.theme}
           </span>
         )}
@@ -399,17 +480,17 @@ export function WeekPlanner({
           <button
             type="button"
             onClick={() => setGridError(null)}
-            className="rounded bg-red-500/10 px-2 py-0.5 text-xs text-red-500"
+            className="max-w-full truncate rounded bg-red-500/10 px-2 py-0.5 text-xs text-red-500"
             title="Dismiss"
           >
             {gridError}
           </button>
         )}
-        <span className="ml-auto flex items-center gap-3 text-xs text-muted">
+        <span className="ml-auto flex items-center gap-2 text-xs text-muted sm:gap-3">
           {googleConnected && (
             <Link
               href="/agenda/settings"
-              className="tabular-nums hover:text-foreground"
+              className="hidden tabular-nums hover:text-foreground lg:inline"
               title="Google Calendar sync status"
             >
               {googleAccount?.last_error
@@ -418,11 +499,39 @@ export function WeekPlanner({
             </Link>
           )}
           <span className="tabular-nums">{fmtDuration(totalMinutes)} planned</span>
+
+          {/* The two panels have no column below xl, so they need a way in. */}
+          <button
+            type="button"
+            onClick={() => setDrawer("rail")}
+            className="rounded border border-line px-2 py-0.5 hover:border-accent xl:hidden"
+          >
+            Tasks
+          </button>
+          <button
+            type="button"
+            onClick={() => setDrawer("detail")}
+            className="rounded border border-line px-2 py-0.5 hover:border-accent xl:hidden"
+          >
+            {selected || selectedExternal ? "Details" : "Week"}
+          </button>
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
+        {/* Dismisses whichever sheet is open. Never there once they are columns. */}
+        {drawer !== "none" && (
+          <button
+            type="button"
+            aria-label="Close panel"
+            onClick={() => setDrawer("none")}
+            className="fixed inset-0 z-30 bg-black/30 xl:hidden"
+          />
+        )}
+
         <PlannerRail
+          className={panel("left", drawer === "rail")}
+          onClose={() => setDrawer("none")}
           categories={categories}
           tasks={tasks}
           blocks={blocks}
@@ -435,31 +544,33 @@ export function WeekPlanner({
             weekStartDate={weekStartDate}
             items={gridItems}
             allDay={external.allDay}
+            days={days}
             hiddenCategories={hiddenCategories}
             selectedId={selectedId}
             pendingDrag={pendingDrag}
-            onSelect={setSelectedId}
+            onSelect={onSelect}
             onCreateFromDrag={onCreateFromDrag}
             onDraw={onDraw}
             onMove={onMove}
+            onFocusDay={setPickedDay}
           />
         </div>
 
-        <aside className="w-72 shrink-0 border-l border-line">
+        <aside className={panel("right", drawer === "detail")}>
           {selectedExternal ? (
             <ExternalDetail
               key={selectedId}
               event={selectedExternal.event}
               source={selectedExternal.source}
               categories={categories}
-              onClose={() => setSelectedId(null)}
+              onClose={() => onSelect(null)}
             />
           ) : selected ? (
             <BlockDetail
               key={selected.id}
               block={selected}
               categories={categories}
-              onClose={() => setSelectedId(null)}
+              onClose={() => onSelect(null)}
             />
           ) : (
             <WeekIntent
@@ -473,6 +584,7 @@ export function WeekPlanner({
               hiddenCategories={hiddenCategories}
               onToggleCategory={onToggleCategory}
               onShowAllCategories={() => setHiddenCategories(new Set())}
+              onClose={() => setDrawer("none")}
             />
           )}
         </aside>

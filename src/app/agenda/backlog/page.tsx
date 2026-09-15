@@ -40,7 +40,7 @@ export default async function BacklogPage() {
   const error = categoriesRes.error ?? tasksRes.error;
   if (error) {
     return (
-      <main className="mx-auto max-w-lg px-6 py-20 text-sm">
+      <main className="mx-auto max-w-lg px-5 py-16 text-sm sm:px-6 sm:py-20">
         <h1 className="font-medium">Could not load the backlog</h1>
         <p className="mt-2 text-muted">{error.message}</p>
       </main>
@@ -57,7 +57,7 @@ export default async function BacklogPage() {
   }
 
   return (
-    <main className="mx-auto grid w-full max-w-5xl gap-10 px-6 py-8 lg:grid-cols-[260px_1fr]">
+    <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[260px_1fr] lg:gap-10">
       <CategoryTree categories={categories} taskCounts={taskCounts} />
       <TaskTable categories={categories} tasks={tasks} />
     </main>

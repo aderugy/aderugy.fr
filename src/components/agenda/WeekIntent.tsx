@@ -26,6 +26,8 @@ type Props = {
   hiddenCategories: ReadonlySet<string>;
   onToggleCategory: (id: string) => void;
   onShowAllCategories: () => void;
+  /** Only rendered while this panel is a sheet over the grid. */
+  onClose: () => void;
 };
 
 export function WeekIntent({
@@ -38,6 +40,7 @@ export function WeekIntent({
   hiddenCategories,
   onToggleCategory,
   onShowAllCategories,
+  onClose,
 }: Props) {
   const [theme, setTheme] = useState(week.theme ?? "");
   const [guidelines, setGuidelines] = useState(week.guidelines ?? "");
@@ -190,7 +193,17 @@ export function WeekIntent({
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-3 text-xs">
-      <span className="font-medium">This week</span>
+      <div className="flex items-center justify-between">
+        <span className="font-medium">This week</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="-my-1 rounded px-1.5 py-1 text-muted hover:text-foreground xl:hidden"
+        >
+          ✕
+        </button>
+      </div>
 
       <label className="block">
         <span className="text-muted">Theme</span>

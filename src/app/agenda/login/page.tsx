@@ -15,7 +15,7 @@ export default async function LoginPage({
     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-24">
+    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5 py-16 sm:px-6 sm:py-24">
       <h1 className="text-xl font-semibold tracking-tight">Agenda</h1>
       <p className="mt-1 text-sm text-muted">
         Sign in with your Google account.

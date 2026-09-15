@@ -186,6 +186,15 @@ type Props = {
   /** Own blocks and external events, already normalised and merged. */
   items: GridItem[];
   allDay: AllDayItem[];
+  /**
+   * Which days the body draws, in order, as indices into the week.
+   *
+   * A narrow screen cannot give seven columns enough width to drop a block into
+   * one on purpose, so it shows a single day and the header turns into the
+   * picker for it. Everything else — lane widths, the pointer maths, the drop
+   * preview — reads its column count from here rather than assuming seven.
+   */
+  days: number[];
   /** Categories being read past. Their time greys out instead of vanishing. */
   hiddenCategories: ReadonlySet<string>;
   selectedId: string | null;
@@ -194,12 +203,15 @@ type Props = {
   onCreateFromDrag: (payload: DragPayload, startsAt: Date) => void;
   onDraw: (range: DrawnRange) => void;
   onMove: (id: string, startsAt: Date, endsAt: Date) => void;
+  /** Only meaningful while the body is showing fewer than seven days. */
+  onFocusDay: (dayIndex: number) => void;
 };
 
 export function WeekGrid({
   weekStartDate,
   items,
   allDay,
+  days,
   hiddenCategories,
   selectedId,
   pendingDrag,
@@ -207,6 +219,7 @@ export function WeekGrid({
   onCreateFromDrag,
   onDraw,
   onMove,
+  onFocusDay,
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -224,13 +237,22 @@ export function WeekGrid({
 
   const today = new Date();
 
+  /** How many columns the body is drawing, and where a given day sits in them. */
+  const colCount = Math.max(days.length, 1);
+  const isPicker = days.length < 7;
+  const columnOf = (dayIndex: number) => days.indexOf(dayIndex);
+
   // The caret only exists when the current moment is actually on screen: this
-  // week, and inside the hours the grid draws.
+  // week, the day being shown, and inside the hours the grid draws.
   const now = useNow();
   const nowMin = now ? minutesOfDay(now) : 0;
   const nowDayIndex = now ? dayIndexOf(weekStartDate, now) : -1;
+  const nowColumn = columnOf(nowDayIndex);
   const showNow =
-    nowDayIndex >= 0 && nowMin >= DAY_START_MIN && nowMin <= DAY_END_MIN;
+    nowDayIndex >= 0 &&
+    nowColumn >= 0 &&
+    nowMin >= DAY_START_MIN &&
+    nowMin <= DAY_END_MIN;
   // Unsnapped, unlike everything else on the grid — a marker for the time it is
   // would be a lie if it rounded to the nearest quarter hour.
   const nowY = slotToY(nowMin);
@@ -300,8 +322,13 @@ export function WeekGrid({
 
   function slotFromPointer(clientX: number, clientY: number) {
     const rect = colsRef.current!.getBoundingClientRect();
-    const colWidth = rect.width / 7;
-    const dayIndex = clamp(Math.floor((clientX - rect.left) / colWidth), 0, 6);
+    const colWidth = rect.width / colCount;
+    const column = clamp(
+      Math.floor((clientX - rect.left) / colWidth),
+      0,
+      colCount - 1,
+    );
+    const dayIndex = days[column] ?? days[0] ?? 0;
     const startMin = clamp(
       yToMinutes(clientY - rect.top),
       DAY_START_MIN,
@@ -357,7 +384,10 @@ export function WeekGrid({
   /** Hand the drawn range up with viewport coordinates so the popup can anchor. */
   function openDraw(dayIndex: number, startMin: number, endMin: number) {
     const rect = colsRef.current!.getBoundingClientRect();
-    const colWidth = rect.width / 7;
+    const colWidth = rect.width / colCount;
+    // The anchor is where the selection is on screen, so it follows the column
+    // the day is drawn in — not the day's place in the week.
+    const column = Math.max(columnOf(dayIndex), 0);
 
     onDraw({
       startsAt: dateAt(weekStartDate, dayIndex, startMin),
@@ -366,8 +396,8 @@ export function WeekGrid({
       anchor: {
         top: rect.top + slotToY(startMin),
         bottom: rect.top + slotToY(endMin),
-        left: rect.left + dayIndex * colWidth,
-        right: rect.left + (dayIndex + 1) * colWidth,
+        left: rect.left + column * colWidth,
+        right: rect.left + (column + 1) * colWidth,
       },
     });
   }
@@ -407,11 +437,16 @@ export function WeekGrid({
   function onItemPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (!drag) return;
     const rect = colsRef.current!.getBoundingClientRect();
-    const colWidth = rect.width / 7;
+    const colWidth = rect.width / colCount;
     const duration = drag.endMin - drag.startMin;
 
     if (drag.mode === "move") {
-      const dayIndex = clamp(Math.floor((e.clientX - rect.left) / colWidth), 0, 6);
+      const column = clamp(
+        Math.floor((e.clientX - rect.left) / colWidth),
+        0,
+        colCount - 1,
+      );
+      const dayIndex = days[column] ?? drag.dayIndex;
       const startMin = clamp(
         yToMinutes(e.clientY - rect.top - drag.grabY),
         DAY_START_MIN,
@@ -446,26 +481,53 @@ export function WeekGrid({
     setDrag(null);
   }
 
+  /**
+   * A touch that the browser decides to treat as a scroll takes the pointer
+   * away mid-gesture. Without this the grid keeps the half-finished drag in
+   * state and paints the block where the finger last was, for good.
+   */
+  function onItemPointerCancel() {
+    setDrag(null);
+  }
+
+  function onColumnPointerCancel() {
+    setDraw(null);
+  }
+
   return (
     <div className="flex h-full flex-col no-select">
-      {/* Day headers */}
-      <div className="flex border-b border-line pr-3">
-        <div className="w-14 shrink-0" />
+      {/* Day headers. With fewer columns than days these double as the picker
+          for which day the body is showing, so they stay seven wide. */}
+      <div className="flex border-b border-line pr-1 sm:pr-3">
+        <div className="w-10 shrink-0 sm:w-14" />
         <div className="grid flex-1 grid-cols-7">
           {DAY_LABELS.map((label, i) => {
             const date = addDays(weekStartDate, i);
             const isToday = date.toDateString() === today.toDateString();
             const { planned, committed, busy } = dayTotals[i];
             const over = busy > DAILY_CAPACITY_MIN;
+            const focused = isPicker && days.includes(i);
 
-            return (
-              <div key={label} className="px-1 py-2 text-center">
-                <div className="text-xs text-muted">{label}</div>
-                <div className={`text-sm font-medium ${isToday ? "text-accent" : ""}`}>
+            const body = (
+              <>
+                <div
+                  className={`text-[10px] sm:text-xs ${
+                    focused ? "text-white/80" : "text-muted"
+                  }`}
+                >
+                  {label}
+                </div>
+                <div
+                  className={`text-sm font-medium ${
+                    focused ? "" : isToday ? "text-accent" : ""
+                  }`}
+                >
                   {date.getDate()}
                 </div>
                 <div
-                  className={`text-[10px] tabular-nums ${over ? "text-red-500" : "text-muted"}`}
+                  className={`text-[10px] tabular-nums ${
+                    focused ? "opacity-80" : over ? "text-red-500" : "text-muted"
+                  }`}
                   title={
                     committed > 0
                       ? `${fmtDuration(planned)} planned, ${fmtDuration(committed)} already committed`
@@ -477,7 +539,33 @@ export function WeekGrid({
                     <span className="opacity-70"> +{fmtDuration(committed)}</span>
                   )}
                 </div>
-              </div>
+              </>
+            );
+
+            if (!isPicker) {
+              return (
+                <div key={label} className="px-1 py-2 text-center">
+                  {body}
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => onFocusDay(i)}
+                aria-pressed={focused}
+                className={`m-0.5 rounded-md px-0.5 py-1.5 text-center transition-colors ${
+                  focused
+                    ? "bg-accent text-white"
+                    : isToday
+                      ? "text-accent hover:bg-line/50"
+                      : "hover:bg-line/50"
+                }`}
+              >
+                {body}
+              </button>
             );
           })}
         </div>
@@ -485,12 +573,15 @@ export function WeekGrid({
 
       {/* All-day strip. Marks a day without consuming ten hours of it. */}
       {allDay.length > 0 && (
-        <div className="flex border-b border-line pr-3">
-          <div className="flex w-14 shrink-0 items-center justify-end pr-2 text-[10px] text-muted">
+        <div className="flex border-b border-line pr-1 sm:pr-3">
+          <div className="flex w-10 shrink-0 items-center justify-end pr-1 text-[10px] leading-tight text-muted sm:w-14 sm:pr-2">
             all day
           </div>
-          <div className="grid flex-1 grid-cols-7">
-            {Array.from({ length: 7 }, (_, dayIndex) => (
+          <div
+            className="grid flex-1"
+            style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}
+          >
+            {days.map((dayIndex) => (
               <div key={dayIndex} className="min-h-6 border-l border-line p-0.5">
                 {allDay
                   .filter((chip) => chip.dayIndex === dayIndex)
@@ -529,16 +620,19 @@ export function WeekGrid({
       )}
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="flex pr-3">
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="flex pr-1 sm:pr-3">
           {/* Time gutter */}
-          <div className="relative w-14 shrink-0" style={{ height: GRID_HEIGHT }}>
+          <div
+            className="relative w-10 shrink-0 sm:w-14"
+            style={{ height: GRID_HEIGHT }}
+          >
             {Array.from({ length: (DAY_END_MIN - DAY_START_MIN) / 60 + 1 }, (_, i) => {
               const minutes = DAY_START_MIN + i * 60;
               return (
                 <div
                   key={minutes}
-                  className="absolute right-2 -translate-y-1/2 text-[10px] tabular-nums text-muted"
+                  className="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted sm:right-2"
                   style={{ top: slotToY(minutes) }}
                 >
                   {fmtTime(minutes)}
@@ -559,8 +653,11 @@ export function WeekGrid({
           {/* Day columns */}
           <div
             ref={colsRef}
-            className="relative grid flex-1 grid-cols-7"
-            style={{ height: GRID_HEIGHT }}
+            className="relative grid flex-1"
+            style={{
+              height: GRID_HEIGHT,
+              gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+            }}
           >
             <div className="pointer-events-none absolute inset-0">
               {Array.from({ length: (DAY_END_MIN - DAY_START_MIN) / 60 + 1 }, (_, i) => (
@@ -577,8 +674,8 @@ export function WeekGrid({
                   className="absolute z-30 flex -translate-y-1/2 items-center"
                   style={{
                     top: nowY,
-                    left: `${(nowDayIndex / 7) * 100}%`,
-                    width: `${100 / 7}%`,
+                    left: `${(nowColumn / colCount) * 100}%`,
+                    width: `${100 / colCount}%`,
                   }}
                 >
                   <span className="-ml-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
@@ -587,7 +684,8 @@ export function WeekGrid({
               )}
             </div>
 
-            {byDay.map((dayItems, dayIndex) => {
+            {days.map((dayIndex) => {
+              const dayItems = byDay[dayIndex] ?? [];
               const lanes = layoutLanes(
                 dayItems.map((item) => {
                   const { startMin, endMin } = positionOf(item);
@@ -598,10 +696,19 @@ export function WeekGrid({
               return (
                 <div
                   key={dayIndex}
-                  className="relative touch-none border-l border-line"
+                  /**
+                   * `touch-pan-y` rather than `touch-none`: the empty parts of a
+                   * column are most of the grid on a phone, and taking the
+                   * browser's scroll away from them leaves the day unscrollable.
+                   * Drawing a range by finger goes with it — double-tap opens a
+                   * one-hour draft instead — while dragging a block still works,
+                   * because the blocks themselves keep `touch-none`.
+                   */
+                  className="relative touch-pan-y border-l border-line md:touch-none"
                   onPointerDown={(e) => onColumnPointerDown(e, dayIndex)}
                   onPointerMove={onColumnPointerMove}
                   onPointerUp={onColumnPointerUp}
+                  onPointerCancel={onColumnPointerCancel}
                   onDragOver={(e) => {
                     if (!pendingDrag) return;
                     e.preventDefault();
@@ -654,6 +761,7 @@ export function WeekGrid({
                         onPointerDown={(e) => onItemPointerDown(e, item)}
                         onPointerMove={onItemPointerMove}
                         onPointerUp={(e) => onItemPointerUp(e, item)}
+                        onPointerCancel={onItemPointerCancel}
                         title={itemTitle(item, startMin, endMin)}
                         className={`absolute touch-none overflow-hidden rounded-md text-[11px] leading-tight ${
                           external
@@ -792,7 +900,8 @@ export function WeekGrid({
                         {item.movable && (
                           <div
                             data-resize="true"
-                            className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize"
+                            /* Fatter by touch, where there is no hover to aim with. */
+                            className="absolute inset-x-0 bottom-0 h-2.5 cursor-ns-resize md:h-1.5"
                           />
                         )}
                       </div>

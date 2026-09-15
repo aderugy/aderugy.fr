@@ -84,10 +84,15 @@ export function BlockPopup({
   // selection sat low on screen — the form looked like it did nothing because
   // Add was off-screen. Growing upward from the selection instead needs no
   // measurement, and the max-height keeps it inside the viewport regardless.
-  const left = Math.max(
-    GAP,
-    Math.min(draft.anchor.right + GAP, window.innerWidth - POPUP_WIDTH - GAP),
-  );
+  // On a phone the anchor column is most of the screen, so there is no "beside
+  // the selection" to sit in: the form takes the width it can get and is
+  // centred under the finger instead.
+  const width = Math.min(POPUP_WIDTH, window.innerWidth - 2 * GAP);
+  const preferred =
+    draft.anchor.right + GAP + width <= window.innerWidth - GAP
+      ? draft.anchor.right + GAP
+      : draft.anchor.left - GAP - width;
+  const left = Math.max(GAP, Math.min(preferred, window.innerWidth - width - GAP));
   const growUpward = draft.anchor.top > window.innerHeight * 0.55;
   const vertical = growUpward
     ? { bottom: Math.max(GAP, window.innerHeight - draft.anchor.bottom) }
@@ -130,8 +135,8 @@ export function BlockPopup({
       style={{
         position: "fixed",
         left,
-        width: POPUP_WIDTH,
-        maxHeight: "calc(100vh - 16px)",
+        width,
+        maxHeight: "calc(100dvh - 16px)",
         overflowY: "auto",
         ...vertical,
       }}

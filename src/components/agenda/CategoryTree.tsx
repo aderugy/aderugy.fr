@@ -181,7 +181,7 @@ function NewCategoryForm({
 
   return (
     <form
-      className="my-1 flex gap-1"
+      className="my-1 flex flex-wrap gap-1"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;

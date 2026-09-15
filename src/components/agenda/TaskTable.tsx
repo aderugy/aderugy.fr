@@ -76,7 +76,7 @@ function TaskRow({
       className="flex flex-wrap items-center gap-2 rounded border border-line bg-surface px-2 py-1.5"
       style={{ borderLeft: `3px solid ${color}` }}
     >
-      <div className="w-44 shrink-0">
+      <div className="w-44 shrink-0 max-sm:w-full">
         <CategoryPicker
           categories={categories}
           value={task.category_id}
@@ -93,7 +93,7 @@ function TaskRow({
           }
         }}
         placeholder="Description"
-        className="min-w-40 flex-1 bg-transparent outline-none placeholder:text-muted"
+        className="min-w-40 flex-1 bg-transparent outline-none placeholder:text-muted max-sm:min-w-0 max-sm:basis-full"
       />
 
       {task.status === "scheduled" && (
@@ -193,7 +193,7 @@ function NewTaskForm({ categories }: { categories: Category[] }) {
         });
       }}
     >
-      <div className="w-44 shrink-0">
+      <div className="w-44 shrink-0 max-sm:w-full">
         <CategoryPicker
           categories={categories}
           value={categoryId}
@@ -207,7 +207,7 @@ function NewTaskForm({ categories }: { categories: Category[] }) {
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)"
-        className="min-w-40 flex-1 rounded border border-line bg-surface px-2 py-1 text-sm outline-none focus:border-accent"
+        className="min-w-40 flex-1 rounded border border-line bg-surface px-2 py-1 text-sm outline-none focus:border-accent max-sm:min-w-0 max-sm:basis-full"
       />
       <input
         type="number"
