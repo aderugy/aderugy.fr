@@ -28,6 +28,11 @@ const GRID_HEIGHT = SLOTS_PER_DAY * PX_PER_SLOT;
 
 type Span = { id: string; start: number; end: number };
 
+/** Minutes a set of spans actually covers — time shared by two of them counts once. */
+function coveredMinutes(spans: { startMin: number; endMin: number }[]) {
+  return mergeSpans(spans).reduce((sum, s) => sum + (s.endMin - s.startMin), 0);
+}
+
 /**
  * Greedy lane assignment so overlapping items sit side by side instead of on
  * top of each other. Items are grouped into clusters of mutual overlap; every
@@ -229,21 +234,27 @@ export function WeekGrid({
 
   // Planned and committed are reported separately but measured against one
   // capacity: an hour of lecture is an hour you cannot also plan into.
+  //
+  // Every figure here is a union of spans rather than a sum of durations. Two
+  // blocks laid over the same hour are one hour of the day, not two — the day
+  // has no more room for being booked twice over.
   const dayTotals = byDay.map((list) => {
-    let planned = 0;
+    const plannedSpans: { startMin: number; endMin: number }[] = [];
     const committedSpans: { startMin: number; endMin: number }[] = [];
 
     for (const item of list) {
       const { startMin, endMin } = positionOf(item);
       if (item.kind === "external") committedSpans.push({ startMin, endMin });
-      else planned += endMin - startMin;
+      else plannedSpans.push({ startMin, endMin });
     }
 
-    const committed = mergeSpans(committedSpans).reduce(
-      (sum, s) => sum + (s.endMin - s.startMin),
-      0,
-    );
-    return { planned, committed };
+    return {
+      planned: coveredMinutes(plannedSpans),
+      committed: coveredMinutes(committedSpans),
+      // What the day really costs. The two figures above overlap each other as
+      // readily as they overlap themselves, so they cannot just be added.
+      busy: coveredMinutes([...plannedSpans, ...committedSpans]),
+    };
   });
 
   function overlapsCommitted(dayIndex: number, startMin: number, endMin: number) {
@@ -420,8 +431,8 @@ export function WeekGrid({
           {DAY_LABELS.map((label, i) => {
             const date = addDays(weekStartDate, i);
             const isToday = date.toDateString() === today.toDateString();
-            const { planned, committed } = dayTotals[i];
-            const over = planned + committed > DAILY_CAPACITY_MIN;
+            const { planned, committed, busy } = dayTotals[i];
+            const over = busy > DAILY_CAPACITY_MIN;
 
             return (
               <div key={label} className="px-1 py-2 text-center">
