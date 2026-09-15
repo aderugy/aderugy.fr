@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import {
   DAY_END_MIN,
   DAY_LABELS,
@@ -97,6 +97,46 @@ function itemTitle(item: GridItem, startMin: number, endMin: number) {
   return `${head ? `${head} · ` : ""}${when}\n${inside}${kept}`;
 }
 
+const MINUTE_MS = 60_000;
+
+/**
+ * The clock is an external store, so it is subscribed to rather than polled
+ * into state. Ticks are lined up with the minute boundary: a plain interval
+ * started on mount would drift the caret up to a minute behind the clock it
+ * mirrors.
+ */
+function subscribeToMinute(onTick: () => void) {
+  let interval: ReturnType<typeof setInterval> | undefined;
+  const timeout = setTimeout(
+    () => {
+      onTick();
+      interval = setInterval(onTick, MINUTE_MS);
+    },
+    MINUTE_MS - (Date.now() % MINUTE_MS),
+  );
+
+  return () => {
+    clearTimeout(timeout);
+    if (interval) clearInterval(interval);
+  };
+}
+
+/** Minute resolution, so the snapshot only changes when the caret would move. */
+const minuteNow = () => Math.floor(Date.now() / MINUTE_MS);
+
+/** The server has no "now" worth rendering, and hydration must not disagree. */
+const noServerNow = () => null;
+
+/** The current minute, or `null` until the client has taken over. */
+function useNow(): Date | null {
+  const minute = useSyncExternalStore<number | null>(
+    subscribeToMinute,
+    minuteNow,
+    noServerNow,
+  );
+  return minute === null ? null : new Date(minute * MINUTE_MS);
+}
+
 export type DrawnRange = {
   startsAt: Date;
   endsAt: Date;
@@ -154,6 +194,17 @@ export function WeekGrid({
   } | null>(null);
 
   const today = new Date();
+
+  // The caret only exists when the current moment is actually on screen: this
+  // week, and inside the hours the grid draws.
+  const now = useNow();
+  const nowMin = now ? minutesOfDay(now) : 0;
+  const nowDayIndex = now ? dayIndexOf(weekStartDate, now) : -1;
+  const showNow =
+    nowDayIndex >= 0 && nowMin >= DAY_START_MIN && nowMin <= DAY_END_MIN;
+  // Unsnapped, unlike everything else on the grid — a marker for the time it is
+  // would be a lie if it rounded to the nearest quarter hour.
+  const nowY = slotToY(nowMin);
 
   /** Where an item sits right now — mid-drag values win over stored ones. */
   const positionOf = (item: GridItem) => {
@@ -451,6 +502,15 @@ export function WeekGrid({
                 </div>
               );
             })}
+
+            {/* Caret on the ruler, pointing into the week. */}
+            {showNow && (
+              <div
+                className="absolute right-0 z-30 h-0 w-0 -translate-y-1/2 border-y-4 border-y-transparent border-l-[6px] border-l-red-500"
+                style={{ top: nowY }}
+                title={`Now — ${fmtTime(nowMin)}`}
+              />
+            )}
           </div>
 
           {/* Day columns */}
@@ -467,6 +527,21 @@ export function WeekGrid({
                   style={{ top: slotToY(DAY_START_MIN + i * 60) }}
                 />
               ))}
+
+              {/* Today's column gets the line; the rest of the week does not. */}
+              {showNow && (
+                <div
+                  className="absolute z-30 flex -translate-y-1/2 items-center"
+                  style={{
+                    top: nowY,
+                    left: `${(nowDayIndex / 7) * 100}%`,
+                    width: `${100 / 7}%`,
+                  }}
+                >
+                  <span className="-ml-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                  <span className="h-px flex-1 bg-red-500" />
+                </div>
+              )}
             </div>
 
             {byDay.map((dayItems, dayIndex) => {
