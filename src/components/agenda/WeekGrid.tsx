@@ -26,6 +26,27 @@ export const DAILY_CAPACITY_MIN = 10 * 60;
 
 const GRID_HEIGHT = SLOTS_PER_DAY * PX_PER_SLOT;
 
+/**
+ * What a hidden category is drawn in. Hiding is a reading of the week, not an
+ * edit to it: the hours stay exactly where they are, in grey, so the shape of
+ * the day survives and you can still see what you chose to look past.
+ */
+const HIDDEN_COLOR = "#9ca3af";
+
+/**
+ * A block has no category, so it only reads as hidden once everything inside it
+ * is — an outline around nothing but hidden tasks is itself nothing to look at.
+ * An empty block has no category to hide and always stays.
+ */
+function isItemHidden(item: GridItem, hidden: ReadonlySet<string>) {
+  if (hidden.size === 0) return false;
+  if (item.categoryId !== null) return hidden.has(item.categoryId);
+  return (
+    item.children.length > 0 &&
+    item.children.every((c) => c.categoryId !== null && hidden.has(c.categoryId))
+  );
+}
+
 type Span = { id: string; start: number; end: number };
 
 /** Minutes a set of spans actually covers — time shared by two of them counts once. */
@@ -165,6 +186,8 @@ type Props = {
   /** Own blocks and external events, already normalised and merged. */
   items: GridItem[];
   allDay: AllDayItem[];
+  /** Categories being read past. Their time greys out instead of vanishing. */
+  hiddenCategories: ReadonlySet<string>;
   selectedId: string | null;
   pendingDrag: DragPayload | null;
   onSelect: (id: string | null) => void;
@@ -177,6 +200,7 @@ export function WeekGrid({
   weekStartDate,
   items,
   allDay,
+  hiddenCategories,
   selectedId,
   pendingDrag,
   onSelect,
@@ -470,26 +494,34 @@ export function WeekGrid({
               <div key={dayIndex} className="min-h-6 border-l border-line p-0.5">
                 {allDay
                   .filter((chip) => chip.dayIndex === dayIndex)
-                  .map((chip) => (
-                    <div
-                      key={chip.id}
-                      title={`${chip.label}${chip.title ? ` — ${chip.title}` : ""}${
-                        chip.archived
-                          ? "\nArchived — your calendar deleted this once it was over. Kept here."
-                          : ""
-                      }`}
-                      className="mb-0.5 truncate rounded px-1 py-0.5 text-[10px] leading-tight"
-                      style={{
-                        backgroundColor: `${chip.color}22`,
-                        borderLeft: `2px solid ${chip.color}`,
-                        backgroundImage: chip.archived
-                          ? `repeating-linear-gradient(45deg, ${chip.color}1f 0 4px, transparent 4px 9px)`
-                          : undefined,
-                      }}
-                    >
-                      {chip.title ?? chip.label}
-                    </div>
-                  ))}
+                  .map((chip) => {
+                    const dimmed =
+                      chip.categoryId !== null && hiddenCategories.has(chip.categoryId);
+                    const tint = dimmed ? HIDDEN_COLOR : chip.color;
+
+                    return (
+                      <div
+                        key={chip.id}
+                        title={`${chip.label}${chip.title ? ` — ${chip.title}` : ""}${
+                          chip.archived
+                            ? "\nArchived — your calendar deleted this once it was over. Kept here."
+                            : ""
+                        }`}
+                        className={`mb-0.5 truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
+                          dimmed ? "text-muted opacity-60" : ""
+                        }`}
+                        style={{
+                          backgroundColor: `${tint}22`,
+                          borderLeft: `2px solid ${tint}`,
+                          backgroundImage: chip.archived
+                            ? `repeating-linear-gradient(45deg, ${tint}1f 0 4px, transparent 4px 9px)`
+                            : undefined,
+                        }}
+                      >
+                        {chip.title ?? chip.label}
+                      </div>
+                    );
+                  })}
               </div>
             ))}
           </div>
@@ -610,6 +642,12 @@ export function WeekGrid({
 
                     const hasMultipleChildren = item.children.length > 1;
 
+                    // A filled block only greys its outline. Its children fade
+                    // on their own, and stacking both would leave the block
+                    // barely there — hidden time still has to be findable.
+                    const dimmed = isItemHidden(item, hiddenCategories);
+                    const tint = dimmed ? HIDDEN_COLOR : item.color;
+
                     return (
                       <div
                         key={item.id}
@@ -631,7 +669,13 @@ export function WeekGrid({
                               : "cursor-grab border border-dashed px-1.5 py-0.5"
                         } ${isDragging ? "z-20 cursor-grabbing opacity-90" : "z-10"} ${
                           isSelected ? "ring-2 ring-accent" : ""
-                        } ${item.done ? "opacity-60" : ""}`}
+                        } ${
+                          dimmed && !filled
+                            ? "text-muted opacity-55"
+                            : item.done
+                              ? "opacity-60"
+                              : ""
+                        }`}
                         style={{
                           top: slotToY(startMin),
                           height: Math.max(height, PX_PER_SLOT),
@@ -639,27 +683,29 @@ export function WeekGrid({
                           width: `calc(${100 / lane.lanes}% - 3px)`,
                           ...(external
                             ? {
-                                borderLeftColor: item.color,
-                                borderTopColor: `${item.color}55`,
-                                borderRightColor: `${item.color}55`,
-                                borderBottomColor: `${item.color}55`,
+                                borderLeftColor: tint,
+                                borderTopColor: `${tint}55`,
+                                borderRightColor: `${tint}55`,
+                                borderBottomColor: `${tint}55`,
                                 // Flatter fill for time you do not control.
-                                backgroundColor: `${item.color}14`,
+                                backgroundColor: `${tint}14`,
                                 // An archive reads as hatched rather than faded:
                                 // it still counts, so it must not look spent.
                                 backgroundImage: item.archived
-                                  ? `repeating-linear-gradient(45deg, ${item.color}1f 0 4px, transparent 4px 9px)`
+                                  ? `repeating-linear-gradient(45deg, ${tint}1f 0 4px, transparent 4px 9px)`
                                   : undefined,
                               }
                             : {
                                 // Amber says the tasks ask for more time than the
                                 // block holds, so the last of them is clipped.
-                                borderColor: item.overfilled
-                                  ? "#e8590c"
-                                  : `${item.color}66`,
+                                // A hidden block is not worth warning about.
+                                borderColor:
+                                  item.overfilled && !dimmed
+                                    ? "#e8590c"
+                                    : `${tint}66`,
                                 backgroundColor: filled
                                   ? "transparent"
-                                  : `${item.color}12`,
+                                  : `${tint}12`,
                               }),
                         }}
                       >
@@ -670,19 +716,29 @@ export function WeekGrid({
                                 (child.offsetMinutes / SLOT_MIN) * PX_PER_SLOT;
                               const childHeight =
                                 (child.minutes / SLOT_MIN) * PX_PER_SLOT;
+                              const childDimmed =
+                                child.categoryId !== null &&
+                                hiddenCategories.has(child.categoryId);
+                              const childTint = childDimmed
+                                ? HIDDEN_COLOR
+                                : child.color;
 
                               return (
                                 <div
                                   key={child.id}
                                   title={`${child.label}${
                                     child.description ? ` — ${child.description}` : ""
-                                  } · ${fmtDuration(child.minutes)}`}
-                                  className="absolute inset-x-0 overflow-hidden rounded-sm border-l-[3px] px-1 shadow-sm"
+                                  } · ${fmtDuration(child.minutes)}${
+                                    childDimmed ? "\nHidden from the week's totals." : ""
+                                  }`}
+                                  className={`absolute inset-x-0 overflow-hidden rounded-sm border-l-[3px] px-1 shadow-sm ${
+                                    childDimmed ? "text-muted opacity-55" : ""
+                                  }`}
                                   style={{
                                     top: childTop,
                                     height: Math.max(childHeight - 1, 8),
-                                    borderLeftColor: child.color,
-                                    backgroundColor: `${child.color}26`,
+                                    borderLeftColor: childTint,
+                                    backgroundColor: `${childTint}26`,
                                   }}
                                 >
                                   <span className="block truncate font-medium">

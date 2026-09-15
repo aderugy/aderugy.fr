@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { categoryIndex, DEFAULT_COLOR } from "@/lib/categories";
+import { categoryIndex, subtreeIds, DEFAULT_COLOR } from "@/lib/categories";
 import {
   addDays,
   fmtDuration,
@@ -95,6 +95,17 @@ export function WeekPlanner({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftBlock | null>(null);
   const [gridError, setGridError] = useState<string | null>(null);
+  /**
+   * Categories the week is currently being read without. Nothing but a lens:
+   * it is never written anywhere, and it survives no reload — hiding a category
+   * asks "what does the week look like without this", it does not change it.
+   *
+   * Held here rather than in the panel that toggles it, because the panel is
+   * unmounted whenever a block is selected and the grid must keep reading it.
+   */
+  const [hiddenCategories, setHiddenCategories] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [, startTransition] = useTransition();
 
   const googleConnected = Boolean(googleAccount && !googleAccount.disconnected_at);
@@ -164,6 +175,8 @@ export function WeekPlanner({
         return {
           id: block.id,
           kind: "block" as const,
+          // A block has no category of its own; its children carry them.
+          categoryId: null,
           startsAt: block.starts_at,
           endsAt: block.ends_at,
           label: labelFor(block),
@@ -268,6 +281,21 @@ export function WeekPlanner({
         setItems((prev) => prev.filter((b) => b.id !== temp.id));
         setGridError(result.error);
       }
+    });
+  }
+
+  /**
+   * Hiding a category hides everything under it: a parent row stands for its
+   * whole subtree, so clicking it means the subtree. The set stays flat so the
+   * grid can ask about a task's own leaf without walking the tree.
+   */
+  function onToggleCategory(id: string) {
+    setHiddenCategories((prev) => {
+      const next = new Set(prev);
+      const subtree = subtreeIds(categories, id);
+      if (prev.has(id)) for (const c of subtree) next.delete(c);
+      else for (const c of subtree) next.add(c);
+      return next;
     });
   }
 
@@ -407,6 +435,7 @@ export function WeekPlanner({
             weekStartDate={weekStartDate}
             items={gridItems}
             allDay={external.allDay}
+            hiddenCategories={hiddenCategories}
             selectedId={selectedId}
             pendingDrag={pendingDrag}
             onSelect={setSelectedId}
@@ -441,6 +470,9 @@ export function WeekPlanner({
               objectives={objectives}
               scheduled={items}
               externalMinutes={externalMinutes}
+              hiddenCategories={hiddenCategories}
+              onToggleCategory={onToggleCategory}
+              onShowAllCategories={() => setHiddenCategories(new Set())}
             />
           )}
         </aside>

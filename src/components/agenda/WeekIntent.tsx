@@ -22,6 +22,10 @@ type Props = {
   scheduled: ScheduledBlock[];
   /** Minutes per category already committed by a connected calendar. */
   externalMinutes: Map<string, number>;
+  /** Categories being read past: still listed, still greyed, never counted. */
+  hiddenCategories: ReadonlySet<string>;
+  onToggleCategory: (id: string) => void;
+  onShowAllCategories: () => void;
 };
 
 export function WeekIntent({
@@ -31,6 +35,9 @@ export function WeekIntent({
   objectives,
   scheduled,
   externalMinutes,
+  hiddenCategories,
+  onToggleCategory,
+  onShowAllCategories,
 }: Props) {
   const [theme, setTheme] = useState(week.theme ?? "");
   const [guidelines, setGuidelines] = useState(week.guidelines ?? "");
@@ -49,7 +56,11 @@ export function WeekIntent({
    * attributed, and stays out rather than being spread over the categories
    * that happen to be present.
    */
-  const { direct: directMinutes, rolled: minutesByCategory } = useMemo(() => {
+  const {
+    direct: directMinutes,
+    rolled: minutesByCategory,
+    counted: countedByCategory,
+  } = useMemo(() => {
     const direct = plannedMinutesByCategory(scheduled);
     // Hours a calendar already committed count the same as hours you planned:
     // the objective asks where your time goes, not how much of it you typed in.
@@ -57,19 +68,25 @@ export function WeekIntent({
       direct.set(categoryId, (direct.get(categoryId) ?? 0) + minutes);
     }
     const rolled = new Map<string, number>();
+    const counted = new Map<string, number>();
     for (const c of flat) {
       const ids = subtreeIds(categories, c.id);
       let sum = 0;
-      for (const id of ids) sum += direct.get(id) ?? 0;
+      let shown = 0;
+      for (const id of ids) {
+        const minutes = direct.get(id) ?? 0;
+        sum += minutes;
+        if (!hiddenCategories.has(id)) shown += minutes;
+      }
       rolled.set(c.id, sum);
+      counted.set(c.id, shown);
     }
-    return { direct, rolled };
-  }, [scheduled, externalMinutes, categories, flat]);
+    return { direct, rolled, counted };
+  }, [scheduled, externalMinutes, categories, flat, hiddenCategories]);
 
   const totalMinutes = useMemo(
-    () =>
-      tree.reduce((sum, root) => sum + (minutesByCategory.get(root.id) ?? 0), 0),
-    [tree, minutesByCategory],
+    () => tree.reduce((sum, root) => sum + (countedByCategory.get(root.id) ?? 0), 0),
+    [tree, countedByCategory],
   );
 
   /**
@@ -77,6 +94,11 @@ export function WeekIntent({
    * against its parent — against the week's total for a root — so a subtree
    * reads as "how this category splits" rather than as another flat list.
    * Categories with no minutes are dropped, at every depth.
+   *
+   * Clicking a row hides its category. A hidden row keeps its place and its
+   * real duration, in grey and without a share: the question is what the rest
+   * of the week looks like without it, which needs the row still there to
+   * click back on. Rows sort on real minutes so nothing jumps under the cursor.
    */
   const renderShare = (
     nodes: CategoryNode[],
@@ -84,47 +106,74 @@ export function WeekIntent({
     depth: number,
   ): ReactNode[] =>
     nodes
-      .map((node) => ({ node, minutes: minutesByCategory.get(node.id) ?? 0 }))
+      .map((node) => ({
+        node,
+        minutes: minutesByCategory.get(node.id) ?? 0,
+        counted: countedByCategory.get(node.id) ?? 0,
+      }))
       .filter(({ minutes }) => minutes > 0)
       .sort((a, b) => b.minutes - a.minutes)
-      .map(({ node, minutes }) => {
-        const share = parentMinutes > 0 ? (minutes / parentMinutes) * 100 : 0;
+      .map(({ node, minutes, counted }) => {
+        const hidden = hiddenCategories.has(node.id);
+        const share = parentMinutes > 0 ? (counted / parentMinutes) * 100 : 0;
         const own = directMinutes.get(node.id) ?? 0;
-        const children = renderShare(node.children, minutes, depth + 1);
+        const children = renderShare(node.children, counted, depth + 1);
         // Time booked on the category itself only needs a row once children
         // are also shown — otherwise it is the whole of the row above.
         const showOwn = own > 0 && children.length > 0;
 
         return (
           <li key={node.id}>
-            <div
-              className="flex items-center gap-2"
+            <button
+              type="button"
+              onClick={() => onToggleCategory(node.id)}
+              title={
+                hidden
+                  ? `Show ${node.name} again`
+                  : `Hide ${node.name} from the grid and these totals`
+              }
+              className={`flex w-full items-center gap-2 rounded text-left hover:bg-line/50 ${
+                hidden ? "opacity-55" : ""
+              }`}
               style={{ paddingLeft: depth * 12 }}
             >
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: node.effectiveColor }}
+                style={{
+                  backgroundColor: hidden ? "transparent" : node.effectiveColor,
+                  boxShadow: hidden ? `inset 0 0 0 1px ${node.effectiveColor}` : undefined,
+                }}
               />
-              <span className="flex-1 truncate">{node.name}</span>
+              <span className={`flex-1 truncate ${hidden ? "text-muted" : ""}`}>
+                {node.name}
+              </span>
               <span className="w-8 shrink-0 text-right tabular-nums text-[10px] text-muted">
-                {Math.round(share)}%
+                {/* A hidden row shows what it really holds, so a share of a
+                    total it is not part of would not line up with it. */}
+                {!hidden && counted > 0 ? `${Math.round(share)}%` : "—"}
               </span>
               <span className="w-12 shrink-0 text-right tabular-nums text-muted">
-                {fmtDuration(minutes)}
+                {fmtDuration(hidden ? minutes : counted)}
               </span>
-            </div>
+            </button>
             {(children.length > 0 || showOwn) && (
               <ul className="mt-0.5 space-y-0.5">
                 {children}
                 {showOwn && (
                   <li
-                    className="flex items-center gap-2 text-muted"
+                    className={`flex items-center gap-2 text-muted ${
+                      hidden ? "opacity-55" : ""
+                    }`}
                     style={{ paddingLeft: (depth + 1) * 12 }}
                   >
                     <span className="h-2 w-2 shrink-0" />
                     <span className="flex-1 truncate italic">direct</span>
                     <span className="w-8 shrink-0 text-right tabular-nums text-[10px]">
-                      {Math.round((own / minutes) * 100)}%
+                      {/* Same denominator as the sibling rows, so they still
+                          add up to the whole once something is hidden. */}
+                      {!hidden && counted > 0
+                        ? `${Math.round((own / counted) * 100)}%`
+                        : "—"}
                     </span>
                     <span className="w-12 shrink-0 text-right tabular-nums">
                       {fmtDuration(own)}
@@ -230,6 +279,16 @@ export function WeekIntent({
       <div className="mt-2">
         <div className="flex items-baseline gap-2">
           <span className="flex-1 text-muted">Time by category</span>
+          {hiddenCategories.size > 0 && (
+            <button
+              type="button"
+              onClick={onShowAllCategories}
+              className="text-[10px] text-accent hover:underline"
+              title="Count every category again"
+            >
+              show all
+            </button>
+          )}
           {totalMinutes > 0 && (
             <span className="tabular-nums text-muted">{fmtDuration(totalMinutes)}</span>
           )}
