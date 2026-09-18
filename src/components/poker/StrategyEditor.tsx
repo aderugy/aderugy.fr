@@ -12,7 +12,6 @@ import {
   paintHand,
   pureVector,
   remapWeights,
-  vectorTotal,
   zeroVector,
 } from "@/lib/solver/strategy";
 import {
@@ -24,6 +23,7 @@ import {
   type StrategyWeights,
 } from "@/lib/solver/types";
 import { Segmented } from "@/components/poker/ui";
+import { CellBars } from "@/components/poker/StrategyGrid";
 
 type Mode = "paint" | "inspect";
 
@@ -459,28 +459,6 @@ function Grid({
         );
       })}
     </div>
-  );
-}
-
-function CellBars({
-  actions,
-  vector,
-}: {
-  actions: StrategyAction[];
-  vector: number[] | null;
-}) {
-  if (!vector) return <span className="absolute inset-0 bg-background" />;
-  const total = Math.max(vectorTotal(vector), 1);
-  return (
-    <span className="absolute inset-0 flex bg-background">
-      {actions.map((action, i) => {
-        const w = ((vector[i] ?? 0) / total) * 100;
-        if (w <= 0) return null;
-        return (
-          <span key={action.id} style={{ width: `${w}%`, backgroundColor: action.color }} />
-        );
-      })}
-    </span>
   );
 }
 

@@ -21,9 +21,11 @@ import {
   type PokerNode,
   type StrategyWeights,
 } from "@/lib/solver/types";
-import { NodeCard } from "@/components/poker/NodeCard";
+import { NodeCard, type CanvasMode } from "@/components/poker/NodeCard";
 import { NodeInspector } from "@/components/poker/NodeInspector";
 import { StrategyEditor } from "@/components/poker/StrategyEditor";
+import { StrategyReview } from "@/components/poker/StrategyReview";
+import { Segmented } from "@/components/poker/ui";
 
 const NODE_SELECT = "id, spot_id, parent_id, type, position, data, created_at, updated_at";
 
@@ -56,6 +58,17 @@ export function SpotCanvas({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [strategy, setStrategy] = useState<{ nodeId: string; weights: StrategyWeights } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<CanvasMode>("edit");
+  // Cache of strategy grids, loaded on demand for revision-mode previews.
+  const [strategyWeights, setStrategyWeights] = useState<Record<string, StrategyWeights>>({});
+  const [reviewNodeId, setReviewNodeId] = useState<string | null>(null);
+
+  function switchMode(next: CanvasMode) {
+    setMode(next);
+    setSelectedId(null);
+    setReviewNodeId(null);
+    setStrategy(null);
+  }
 
   const loadingRef = useRef<Set<string>>(new Set());
 
@@ -158,6 +171,32 @@ export function SpotCanvas({
 
   const layout = useMemo(() => layoutTree(visible), [visible]);
 
+  // In revision mode, load the grid for every visible strategy node so the
+  // bubbles can preview it. Empties are cached too, so nothing is refetched.
+  useEffect(() => {
+    if (mode !== "revision") return;
+    const need = visible
+      .filter((n) => n.type === "strategy" && strategyWeights[n.id] === undefined)
+      .map((n) => n.id);
+    if (need.length === 0) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("poker_strategies")
+        .select("node_id, weights")
+        .in("node_id", need);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      setStrategyWeights((prev) => {
+        const next = { ...prev };
+        for (const id of need) next[id] = emptyWeights();
+        for (const row of data ?? []) next[row.node_id as string] = normalizeWeights(row.weights);
+        return next;
+      });
+    })();
+  }, [mode, visible, strategyWeights, supabase]);
+
   function nodeHasChildren(id: string): boolean {
     return withChildren.has(id) || (childrenOf.get(id)?.length ?? 0) > 0;
   }
@@ -247,10 +286,20 @@ export function SpotCanvas({
     if (!strategy) return;
     setStrategy((prev) => (prev ? { ...prev, weights } : prev));
     const nodeId = strategy.nodeId;
+    // Keep the revision-mode cache in step with edits.
+    setStrategyWeights((prev) => ({ ...prev, [nodeId]: weights }));
     startTransition(async () => {
       const r = await saveStrategy({ nodeId, weights });
       if (!r.ok) setError(r.error);
     });
+  }
+
+  function handleSelect(node: PokerNode) {
+    if (mode === "revision" && node.type === "strategy") {
+      setReviewNodeId(node.id);
+    } else {
+      setSelectedId(node.id);
+    }
   }
 
   function deadCardsFor(nodeId: string): Set<string> {
@@ -304,6 +353,10 @@ export function SpotCanvas({
 
   const selected = selectedId ? nodesById[selectedId] : null;
   const selectedParent = selected?.parent_id ? nodesById[selected.parent_id] ?? null : null;
+  const reviewNode =
+    reviewNodeId && nodesById[reviewNodeId]?.type === "strategy"
+      ? nodesById[reviewNodeId]
+      : null;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -316,18 +369,33 @@ export function SpotCanvas({
         </div>
       )}
 
-      {/* Root toolbar */}
-      <div className="absolute left-2 top-2 z-20 flex flex-wrap gap-1">
-        {(["flop", "strategy", "text"] as NodeType[]).map((type) => (
-          <button
-            key={type}
-            type="button"
-            onClick={() => void addChild(null, type)}
-            className="rounded border border-line bg-surface px-2 py-1 text-xs text-muted shadow-sm hover:border-accent"
-          >
-            ＋ {NODE_LABELS[type]}
-          </button>
-        ))}
+      {/* Root toolbar (adding nodes only makes sense while editing) */}
+      {mode === "edit" && (
+        <div className="absolute left-2 top-2 z-20 flex flex-wrap gap-1">
+          {(["flop", "strategy", "text"] as NodeType[]).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => void addChild(null, type)}
+              className="rounded border border-line bg-surface px-2 py-1 text-xs text-muted shadow-sm hover:border-accent"
+            >
+              ＋ {NODE_LABELS[type]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Mode toggle */}
+      <div className="absolute right-2 top-2 z-20">
+        <Segmented
+          size="sm"
+          value={mode}
+          onChange={switchMode}
+          options={[
+            { id: "edit", label: "Edit" },
+            { id: "revision", label: "Revision" },
+          ]}
+        />
       </div>
 
       {/* Canvas viewport */}
@@ -380,10 +448,13 @@ export function SpotCanvas({
               >
                 <NodeCard
                   node={node}
-                  selected={node.id === selectedId}
+                  mode={mode}
+                  selected={node.id === selectedId || node.id === reviewNodeId}
                   hasChildren={nodeHasChildren(node.id)}
                   expanded={expanded.has(node.id)}
-                  onSelect={() => setSelectedId(node.id)}
+                  weights={node.type === "strategy" ? strategyWeights[node.id] : undefined}
+                  dead={node.type === "strategy" ? deadCardsFor(node.id) : undefined}
+                  onSelect={() => handleSelect(node)}
                   onToggle={() => toggle(node.id)}
                 />
               </div>
@@ -400,8 +471,8 @@ export function SpotCanvas({
         </div>
       )}
 
-      {/* Inspector */}
-      {selected && (
+      {/* Inspector (edit mode) */}
+      {mode === "edit" && selected && (
         <NodeInspector
           key={selected.id}
           node={selected}
@@ -416,8 +487,20 @@ export function SpotCanvas({
         />
       )}
 
-      {/* Strategy grid editor */}
-      {strategy && selected && strategy.nodeId === selected.id && (
+      {/* Strategy review drawer (revision mode) */}
+      {mode === "revision" && reviewNode && (
+        <StrategyReview
+          key={reviewNode.id}
+          title={`${asStrategy(reviewNode).label || "Strategy"}`}
+          actions={asStrategy(reviewNode).actions}
+          weights={strategyWeights[reviewNode.id] ?? emptyWeights()}
+          dead={deadCardsFor(reviewNode.id)}
+          onClose={() => setReviewNodeId(null)}
+        />
+      )}
+
+      {/* Strategy grid editor (edit mode) */}
+      {mode === "edit" && strategy && selected && strategy.nodeId === selected.id && (
         <StrategyEditor
           key={strategy.nodeId}
           title={`${selected ? NODE_LABELS[selected.type] : "Strategy"} — grid`}
@@ -439,6 +522,11 @@ export function SpotCanvas({
 }
 
 /* -------------------------------------------------------------- defaults */
+
+function normalizeWeights(raw: unknown): StrategyWeights {
+  const w = (raw ?? {}) as Partial<StrategyWeights>;
+  return { hands: w.hands ?? {}, combos: w.combos ?? {} };
+}
 
 function defaultData(type: NodeType, parent: PokerNode | null): NodeData {
   switch (type) {

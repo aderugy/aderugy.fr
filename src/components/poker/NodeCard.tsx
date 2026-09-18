@@ -9,21 +9,31 @@ import {
   asText,
   NODE_LABELS,
   type PokerNode,
+  type StrategyWeights,
 } from "@/lib/solver/types";
 import { NODE_W, NODE_H } from "@/lib/solver/layout";
+import { StrategyGrid } from "@/components/poker/StrategyGrid";
+
+export type CanvasMode = "edit" | "revision";
 
 export function NodeCard({
   node,
+  mode,
   selected,
   hasChildren,
   expanded,
+  weights,
+  dead,
   onSelect,
   onToggle,
 }: {
   node: PokerNode;
+  mode: CanvasMode;
   selected: boolean;
   hasChildren: boolean;
   expanded: boolean;
+  weights?: StrategyWeights | null;
+  dead?: Set<string>;
   onSelect: () => void;
   onToggle: () => void;
 }) {
@@ -40,7 +50,7 @@ export function NodeCard({
         {NODE_LABELS[node.type]}
       </span>
       <div className="mt-1 min-h-0 flex-1 text-sm">
-        <NodeBody node={node} />
+        <NodeBody node={node} mode={mode} weights={weights} dead={dead} />
       </div>
       {hasChildren && (
         <button
@@ -58,7 +68,17 @@ export function NodeCard({
   );
 }
 
-function NodeBody({ node }: { node: PokerNode }) {
+function NodeBody({
+  node,
+  mode,
+  weights,
+  dead,
+}: {
+  node: PokerNode;
+  mode: CanvasMode;
+  weights?: StrategyWeights | null;
+  dead?: Set<string>;
+}) {
   switch (node.type) {
     case "text": {
       const { title, body } = asText(node);
@@ -80,6 +100,28 @@ function NodeBody({ node }: { node: PokerNode }) {
     }
     case "strategy": {
       const { actions, position, label } = asStrategy(node);
+      // Revision mode: show a tiny live grid preview instead of the chips.
+      if (mode === "revision" && weights && actions.length > 0) {
+        return (
+          <div>
+            {(label || position) && (
+              <p className="mb-1 truncate text-xs text-muted">
+                {label}
+                {label && position ? " · " : ""}
+                {position}
+              </p>
+            )}
+            <div className="mx-auto w-28">
+              <StrategyGrid
+                actions={actions}
+                weights={weights}
+                dead={dead ?? new Set()}
+                variant="mini"
+              />
+            </div>
+          </div>
+        );
+      }
       return (
         <div>
           {(label || position) && (
