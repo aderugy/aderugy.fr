@@ -14,8 +14,8 @@
  * Pure functions only.
  */
 
-import { PALETTE } from "@/lib/categories";
 import { RANKS, SUITS, comboToHand, handCombos } from "./cards";
+import { actionColors } from "./colors";
 import type { ActionKind, StrategyAction, StrategyWeights } from "./types";
 
 export type CsvStrategy = {
@@ -70,35 +70,13 @@ function formatNumber(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
 }
 
-/** Aggressive sizes get warm colours (biggest = reddest), passive ones cool. */
-function colorsFor(headers: ParsedHeader[]): string[] {
-  const warm = [PALETTE[6], PALETTE[2], PALETTE[7], PALETTE[3], PALETTE[0], PALETTE[8]];
-  const aggressive = headers
-    .map((h, i) => ({ h, i }))
-    .filter(({ h }) => h.kind === "bet" || h.kind === "raise")
-    .sort((a, b) => sizeRank(b.h) - sizeRank(a.h));
-  const out = new Array<string>(headers.length);
-  aggressive.forEach(({ i }, rank) => (out[i] = warm[rank % warm.length]));
-  headers.forEach((h, i) => {
-    if (out[i]) return;
-    if (h.kind === "call") out[i] = PALETTE[5];
-    else if (h.kind === "check") out[i] = PALETTE[1];
-    else out[i] = PALETTE[4]; // fold
-  });
-  return out;
-}
-
-function sizeRank(h: ParsedHeader): number {
-  return h.allIn ? Number.POSITIVE_INFINITY : (h.sizePct ?? 0);
-}
-
 /**
  * Build the action set from the CSV headers. An existing action with the same
- * kind + size keeps its id (and colour), so action nodes already linked to it
- * stay linked after a re-import.
+ * kind + size keeps its id, so action nodes already linked to it stay linked
+ * after a re-import. Colours always come from the action palette.
  */
 function buildActions(headers: ParsedHeader[], existing: StrategyAction[]): StrategyAction[] {
-  const colors = colorsFor(headers);
+  const colors = actionColors(headers);
   const taken = new Set<string>();
   return headers.map((h, i) => {
     const match = existing.find(
@@ -114,7 +92,7 @@ function buildActions(headers: ParsedHeader[], existing: StrategyAction[]): Stra
       kind: h.kind,
       sizePct: h.sizePct,
       label: h.label,
-      color: match?.color ?? colors[i],
+      color: colors[i],
     };
   });
 }

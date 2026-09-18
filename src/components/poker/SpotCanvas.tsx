@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { PALETTE } from "@/lib/categories";
+import { colorForKind, recolorActions } from "@/lib/solver/colors";
 import { layoutTree, NODE_H, NODE_W } from "@/lib/solver/layout";
 import {
   createNode,
@@ -425,23 +425,55 @@ export function SpotCanvas({
   /* ------------------------------------------------------------------ pan/zoom */
 
   const [view, setView] = useState({ tx: 0, ty: 0, scale: 1 });
-  const panning = useRef<{ x: number; y: number } | null>(null);
+  const panning = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  function onLayerPointerDown(e: React.PointerEvent) {
-    if (e.target !== e.currentTarget) return; // only empty canvas pans
+  function closeDrawers() {
     setSelectedId(null);
-    panning.current = { x: e.clientX - view.tx, y: e.clientY - view.ty };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setReviewNodeId(null);
   }
-  function onLayerPointerMove(e: React.PointerEvent) {
-    if (!panning.current) return;
-    setView((v) => ({ ...v, tx: e.clientX - panning.current!.x, ty: e.clientY - panning.current!.y }));
+
+  // Pan/deselect live on the viewport, not the transformed layer: once the
+  // layer is panned or zoomed out its box no longer covers the screen, so
+  // clicks on the uncovered area never reached it and the drawer stayed open.
+  // Node cards stop propagation, so anything arriving here is empty canvas.
+  function onViewportPointerDown(e: React.PointerEvent) {
+    if (e.button !== 0) return;
+    panning.current = {
+      x: e.clientX - view.tx,
+      y: e.clientY - view.ty,
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
   }
-  function onLayerPointerUp(e: React.PointerEvent) {
+  function onViewportPointerMove(e: React.PointerEvent) {
+    const p = panning.current;
+    if (!p) return;
+    setView((v) => ({ ...v, tx: e.clientX - p.x, ty: e.clientY - p.y }));
+  }
+  function onViewportPointerUp(e: React.PointerEvent) {
+    const p = panning.current;
     panning.current = null;
-    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    // A click (not a drag) on empty canvas closes the drawer.
+    if (p && Math.hypot(e.clientX - p.startX, e.clientY - p.startY) < 4) closeDrawers();
   }
+
+  // Escape closes the drawer (the grid editor handles its own Escape).
+  useEffect(() => {
+    if (strategy) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+      closeDrawers();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [strategy]);
   function onWheel(e: React.WheelEvent) {
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -503,16 +535,21 @@ export function SpotCanvas({
       </div>
 
       {/* Canvas viewport */}
-      <div ref={viewportRef} className="h-full w-full" onWheel={onWheel}>
+      <div
+        ref={viewportRef}
+        className="h-full w-full touch-none"
+        onWheel={onWheel}
+        onPointerDown={onViewportPointerDown}
+        onPointerMove={onViewportPointerMove}
+        onPointerUp={onViewportPointerUp}
+        onPointerCancel={() => (panning.current = null)}
+      >
         <div
-          className="relative h-full w-full touch-none"
+          className="relative h-full w-full"
           style={{
             transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
             transformOrigin: "0 0",
           }}
-          onPointerDown={onLayerPointerDown}
-          onPointerMove={onLayerPointerMove}
-          onPointerUp={onLayerPointerUp}
         >
           <svg
             width={layout.width}
@@ -645,10 +682,10 @@ function defaultData(type: NodeType, parent: PokerNode | null): NodeData {
     case "strategy":
       return {
         position: null,
-        actions: [
-          { id: crypto.randomUUID(), kind: "check", label: "Check", color: PALETTE[9] },
-          { id: crypto.randomUUID(), kind: "bet", sizePct: 75, label: "Bet 75%", color: PALETTE[0] },
-        ],
+        actions: recolorActions([
+          { id: crypto.randomUUID(), kind: "check", label: "Check", color: "" },
+          { id: crypto.randomUUID(), kind: "bet", sizePct: 75, label: "Bet 75%", color: "" },
+        ]),
       };
     case "action": {
       if (parent && parent.type === "strategy") {
@@ -663,7 +700,7 @@ function defaultData(type: NodeType, parent: PokerNode | null): NodeData {
           };
         }
       }
-      return { kind: "check", label: "Check", color: PALETTE[9] };
+      return { kind: "check", label: "Check", color: colorForKind("check") };
     }
     default:
       return {};

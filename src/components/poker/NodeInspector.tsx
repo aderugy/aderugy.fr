@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PALETTE } from "@/lib/categories";
+import { ACTION_SWATCHES, colorForKind } from "@/lib/solver/colors";
 import { CardPicker } from "@/components/poker/CardPicker";
 import { Segmented } from "@/components/poker/ui";
 import {
@@ -426,7 +426,10 @@ function ActionEditor({
         Kind
         <select
           value={data.kind}
-          onChange={(e) => onPatch({ ...data, kind: e.target.value as ActionKind })}
+          onChange={(e) => {
+            const kind = e.target.value as ActionKind;
+            onPatch({ ...data, kind, color: colorForKind(kind) });
+          }}
           className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
         >
           {ACTION_KINDS.map((k) => (
@@ -453,7 +456,7 @@ function ActionEditor({
       <div>
         <span className="text-xs text-muted">Colour</span>
         <div className="mt-1 flex flex-wrap gap-1">
-          {PALETTE.map((color) => (
+          {ACTION_SWATCHES.map((color) => (
             <button
               key={color}
               type="button"

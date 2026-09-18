@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PALETTE } from "@/lib/categories";
+import { ACTION_SWATCHES, recolorActions } from "@/lib/solver/colors";
 import { eventHitsElement } from "@/lib/dom";
 import { GRID_HANDS, RANKS, comboBlocked, handCombos } from "@/lib/solver/cards";
 import {
@@ -135,21 +135,25 @@ export function StrategyEditor({
   }
 
   function updateAction(index: number, patch: Partial<StrategyAction>) {
-    commitActions(actions.map((a, i) => (i === index ? { ...a, ...patch } : a)));
+    const next = actions.map((a, i) => (i === index ? { ...a, ...patch } : a));
+    // A kind or sizing change re-ranks the bets, so re-apply the palette.
+    const reorders = patch.kind !== undefined || patch.sizePct !== undefined;
+    commitActions(reorders ? recolorActions(next) : next);
   }
 
   function addAction() {
-    const color = PALETTE[actions.length % PALETTE.length];
-    commitActions([
-      ...actions,
-      { id: crypto.randomUUID(), kind: "bet", sizePct: 75, label: "Bet 75%", color },
-    ]);
+    commitActions(
+      recolorActions([
+        ...actions,
+        { id: crypto.randomUUID(), kind: "bet", sizePct: 75, label: "Bet 75%", color: "" },
+      ]),
+    );
     editWeights((prev) => remapWeights(prev, len, len + 1, null));
   }
 
   function removeAction(index: number) {
     if (actions.length <= 1) return;
-    commitActions(actions.filter((_, i) => i !== index));
+    commitActions(recolorActions(actions.filter((_, i) => i !== index)));
     editWeights((prev) => remapWeights(prev, len, len - 1, index));
     if (activeIndex >= actions.length - 1) setActiveIndex(Math.max(0, actions.length - 2));
   }
@@ -377,7 +381,7 @@ function ActionEditor({
       <div>
         <span className="text-xs text-muted">Colour</span>
         <div className="mt-1 flex flex-wrap gap-1">
-          {PALETTE.map((color) => (
+          {ACTION_SWATCHES.map((color) => (
             <button
               key={color}
               type="button"
