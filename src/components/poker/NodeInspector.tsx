@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PALETTE } from "@/lib/categories";
 import { CardPicker } from "@/components/poker/CardPicker";
 import { Segmented } from "@/components/poker/ui";
@@ -20,6 +20,10 @@ import {
   type PokerNode,
 } from "@/lib/solver/types";
 
+export type ImportResult =
+  | { ok: true; message: string; warnings: string[] }
+  | { ok: false; error: string };
+
 export function NodeInspector({
   node,
   parent,
@@ -29,6 +33,7 @@ export function NodeInspector({
   onAddChild,
   onDelete,
   onOpenStrategy,
+  onImportCsv,
   onClose,
 }: {
   node: PokerNode;
@@ -39,6 +44,7 @@ export function NodeInspector({
   onAddChild: (type: NodeType) => void;
   onDelete: () => void;
   onOpenStrategy: () => void;
+  onImportCsv: (text: string) => Promise<ImportResult>;
   onClose: () => void;
 }) {
   return (
@@ -57,7 +63,14 @@ export function NodeInspector({
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-        <Editor node={node} parent={parent} dead={dead} onPatch={onPatch} onOpenStrategy={onOpenStrategy} />
+        <Editor
+          node={node}
+          parent={parent}
+          dead={dead}
+          onPatch={onPatch}
+          onOpenStrategy={onOpenStrategy}
+          onImportCsv={onImportCsv}
+        />
 
         <div>
           <p className="mb-1 text-xs font-medium text-muted">Add child</p>
@@ -97,12 +110,14 @@ function Editor({
   dead,
   onPatch,
   onOpenStrategy,
+  onImportCsv,
 }: {
   node: PokerNode;
   parent: PokerNode | null;
   dead: Set<string>;
   onPatch: (data: NodeData) => void;
   onOpenStrategy: () => void;
+  onImportCsv: (text: string) => Promise<ImportResult>;
 }) {
   switch (node.type) {
     case "text":
@@ -133,7 +148,15 @@ function Editor({
         </div>
       );
     case "strategy":
-      return <StrategyMeta key={node.id} node={node} onPatch={onPatch} onOpenStrategy={onOpenStrategy} />;
+      return (
+        <StrategyMeta
+          key={node.id}
+          node={node}
+          onPatch={onPatch}
+          onOpenStrategy={onOpenStrategy}
+          onImportCsv={onImportCsv}
+        />
+      );
     case "action":
       return <ActionEditor key={node.id} node={node} parent={parent} onPatch={onPatch} />;
     default:
@@ -175,13 +198,28 @@ function StrategyMeta({
   node,
   onPatch,
   onOpenStrategy,
+  onImportCsv,
 }: {
   node: PokerNode;
   onPatch: (data: NodeData) => void;
   onOpenStrategy: () => void;
+  onImportCsv: (text: string) => Promise<ImportResult>;
 }) {
   const data = asStrategy(node);
   const [label, setLabel] = useState(data.label ?? "");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  async function handleFile(file: File) {
+    setImporting(true);
+    setImportResult(null);
+    try {
+      setImportResult(await onImportCsv(await file.text()));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -230,6 +268,49 @@ function StrategyMeta({
       >
         Edit strategy grid
       </button>
+      <div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,.tsv,.txt,text/csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = ""; // allow re-importing the same file
+            if (file) void handleFile(file);
+          }}
+        />
+        <button
+          type="button"
+          disabled={importing}
+          onClick={() => fileRef.current?.click()}
+          className="w-full rounded border border-line px-3 py-1.5 text-xs hover:border-accent disabled:opacity-50"
+        >
+          {importing ? "Importing…" : "Import CSV…"}
+        </button>
+        <p className="mt-1 text-[11px] text-muted">
+          Header row <code>Hand,RAISE 180,CALL,FOLD…</code> sets the actions and creates one
+          action node each; rows are combos (<code>4c3c</code>) or hands (<code>AKs</code>).
+        </p>
+        {importResult && (
+          <div
+            className={[
+              "mt-2 rounded border px-2 py-1.5 text-[11px]",
+              importResult.ok
+                ? "border-line text-muted"
+                : "border-red-500/40 bg-red-500/10 text-red-500",
+            ].join(" ")}
+          >
+            {importResult.ok ? importResult.message : importResult.error}
+            {importResult.ok &&
+              importResult.warnings.map((w) => (
+                <div key={w} className="text-amber-600">
+                  {w}
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

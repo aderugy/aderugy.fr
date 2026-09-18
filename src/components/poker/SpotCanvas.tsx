@@ -10,7 +10,9 @@ import {
   saveStrategy,
   updateNode,
 } from "@/server/actions/solver";
+import { CsvImportError, parseStrategyCsv } from "@/lib/solver/csvImport";
 import {
+  asAction,
   asFlop,
   asStrategy,
   asStreet,
@@ -21,6 +23,7 @@ import {
   type PokerNode,
   type StrategyWeights,
 } from "@/lib/solver/types";
+import type { ImportResult } from "@/components/poker/NodeInspector";
 import { NodeCard, type CanvasMode } from "@/components/poker/NodeCard";
 import { NodeInspector } from "@/components/poker/NodeInspector";
 import { StrategyEditor } from "@/components/poker/StrategyEditor";
@@ -294,6 +297,107 @@ export function SpotCanvas({
     });
   }
 
+  /**
+   * Import a solver CSV into a strategy node: the headers become the node's
+   * action set, the rows its grid, and one linked action child is generated
+   * per action that does not already have one.
+   */
+  async function importStrategyCsv(node: PokerNode, text: string): Promise<ImportResult> {
+    const current = asStrategy(node);
+    let parsed;
+    try {
+      parsed = parseStrategyCsv(text, current.actions);
+    } catch (e) {
+      return { ok: false, error: e instanceof CsvImportError ? e.message : "Could not read the file" };
+    }
+
+    // Replacing an existing grid is destructive; ask first.
+    const { data: existing, error: existingError } = await supabase
+      .from("poker_strategies")
+      .select("weights")
+      .eq("node_id", node.id)
+      .maybeSingle();
+    if (existingError) return { ok: false, error: existingError.message };
+    const prevWeights = normalizeWeights(existing?.weights);
+    const hasGrid =
+      Object.keys(prevWeights.hands).length > 0 || Object.keys(prevWeights.combos).length > 0;
+    if (hasGrid && !confirm("Replace this strategy's actions and grid with the CSV?")) {
+      return { ok: false, error: "Import cancelled" };
+    }
+
+    persistData(node.id, { ...current, actions: parsed.actions });
+    setStrategyWeights((prev) => ({ ...prev, [node.id]: parsed.weights }));
+    const saved = await saveStrategy({ nodeId: node.id, weights: parsed.weights });
+    if (!saved.ok) return { ok: false, error: saved.error };
+
+    // Current children (fetched if the node was never expanded).
+    let kids = childrenOf.get(node.id) ?? [];
+    if (!loaded.has(node.id)) {
+      kids = await fetchChildren(node.id);
+      setNodesById((prev) => ({ ...prev, ...Object.fromEntries(kids.map((k) => [k.id, k])) }));
+      setLoaded((prev) => new Set(prev).add(node.id));
+    }
+    const actionKids = kids.filter((k) => k.type === "action");
+    const byId = new Map(parsed.actions.map((a) => [a.id, a]));
+
+    // Keep already-linked action nodes in step with the (re)generated actions.
+    const linked = new Set<string>();
+    let orphaned = 0;
+    for (const kid of actionKids) {
+      const d = asAction(kid);
+      const a = d.strategyActionId ? byId.get(d.strategyActionId) : undefined;
+      if (!a) {
+        if (d.strategyActionId) orphaned++;
+        continue;
+      }
+      linked.add(a.id);
+      if (d.label !== a.label || d.color !== a.color || d.kind !== a.kind || (d.sizePct ?? null) !== (a.sizePct ?? null)) {
+        persistData(kid.id, { ...d, kind: a.kind, sizePct: a.sizePct ?? null, label: a.label, color: a.color });
+      }
+    }
+
+    // One new action node per unlinked action, in header order. Sequential so
+    // the server assigns increasing positions.
+    let created = 0;
+    for (const a of parsed.actions) {
+      if (linked.has(a.id)) continue;
+      const data: NodeData = {
+        strategyActionId: a.id,
+        kind: a.kind,
+        sizePct: a.sizePct ?? null,
+        label: a.label,
+        color: a.color,
+      };
+      const r = await createNode({ spotId, parentId: node.id, type: "action", data });
+      if (!r.ok) return { ok: false, error: r.error };
+      const now = new Date().toISOString();
+      const child: PokerNode = {
+        id: r.id,
+        spot_id: spotId,
+        parent_id: node.id,
+        type: "action",
+        position: kids.length + created,
+        data,
+        created_at: now,
+        updated_at: now,
+      };
+      setNodesById((prev) => ({ ...prev, [child.id]: child }));
+      created++;
+    }
+    if (created > 0 || kids.length > 0) {
+      setWithChildren((prev) => new Set(prev).add(node.id));
+      setExpanded((prev) => new Set(prev).add(node.id));
+    }
+
+    const parts = [
+      `${parsed.rows} row${parsed.rows === 1 ? "" : "s"}`,
+      `${parsed.actions.length} actions`,
+      `${created} action node${created === 1 ? "" : "s"} created`,
+    ];
+    if (orphaned > 0) parts.push(`${orphaned} existing action node${orphaned === 1 ? "" : "s"} no longer match an action`);
+    return { ok: true, message: `Imported ${parts.join(" · ")}`, warnings: parsed.warnings };
+  }
+
   function handleSelect(node: PokerNode) {
     if (mode === "revision" && node.type === "strategy") {
       setReviewNodeId(node.id);
@@ -483,6 +587,7 @@ export function SpotCanvas({
           onAddChild={(type) => void addChild(selected, type)}
           onDelete={() => removeNode(selected.id)}
           onOpenStrategy={() => void openStrategy(selected)}
+          onImportCsv={(text) => importStrategyCsv(selected, text)}
           onClose={() => setSelectedId(null)}
         />
       )}
