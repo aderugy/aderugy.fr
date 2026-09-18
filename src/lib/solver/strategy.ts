@@ -119,9 +119,9 @@ export function remapWeights(
 
 /**
  * How often each action is taken across the whole range, in percent — the
- * solver's "global strategy". Every live combo (not blocked by the board) that
- * has a distribution counts once; each combo's vector is normalised so a
- * partially-assigned cell does not skew the totals. Null when nothing is set.
+ * solver's "global strategy". Every live combo (not blocked by the board)
+ * counts in proportion to how much of it is in range (its vector's total, so a
+ * combo at 40% total weighs 0.4 of a full one). Null when nothing is set.
  */
 export function globalFrequencies(
   weights: StrategyWeights,
@@ -129,7 +129,7 @@ export function globalFrequencies(
   dead: Set<string>,
 ): number[] | null {
   const sum = zeroVector(len);
-  let count = 0;
+  let weight = 0;
   for (const hand of GRID_HANDS) {
     const handVec = fit(weights.hands[hand], len);
     for (const combo of handCombos(hand)) {
@@ -138,9 +138,9 @@ export function globalFrequencies(
       if (!vec) continue;
       const total = vectorTotal(vec);
       if (total <= 0) continue;
-      for (let i = 0; i < len; i++) sum[i] += (vec[i] / total) * 100;
-      count++;
+      for (let i = 0; i < len; i++) sum[i] += vec[i];
+      weight += total;
     }
   }
-  return count > 0 ? sum.map((x) => x / count) : null;
+  return weight > 0 ? sum.map((x) => (x / weight) * 100) : null;
 }

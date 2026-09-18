@@ -4,7 +4,12 @@ import { GRID_HANDS, RANKS, comboBlocked, handCombos } from "@/lib/solver/cards"
 import { handDisplayVector, vectorTotal } from "@/lib/solver/strategy";
 import type { StrategyAction, StrategyWeights } from "@/lib/solver/types";
 
-/** The stacked colour bars that fill one hand cell, proportional to its vector. */
+/**
+ * The colour bars that fill one hand cell. Actions sit side by side in
+ * proportion to each other; when the frequencies sum to less than 100% (the
+ * hand is only partly in range) the bars fill that share of the cell's height,
+ * from the bottom up, and the rest stays background grey.
+ */
 export function CellBars({
   actions,
   vector,
@@ -12,17 +17,20 @@ export function CellBars({
   actions: StrategyAction[];
   vector: number[] | null;
 }) {
-  if (!vector) return <span className="absolute inset-0 bg-background" />;
-  const total = Math.max(vectorTotal(vector), 1);
+  const total = vector ? vectorTotal(vector) : 0;
+  if (!vector || total <= 0) return <span className="absolute inset-0 bg-background" />;
+  const height = Math.min(100, total);
   return (
-    <span className="absolute inset-0 flex bg-background">
-      {actions.map((action, i) => {
-        const w = ((vector[i] ?? 0) / total) * 100;
-        if (w <= 0) return null;
-        return (
-          <span key={action.id} style={{ width: `${w}%`, backgroundColor: action.color }} />
-        );
-      })}
+    <span className="absolute inset-0 flex flex-col justify-end bg-background">
+      <span className="flex w-full" style={{ height: `${height}%` }}>
+        {actions.map((action, i) => {
+          const w = ((vector[i] ?? 0) / total) * 100;
+          if (w <= 0) return null;
+          return (
+            <span key={action.id} style={{ width: `${w}%`, backgroundColor: action.color }} />
+          );
+        })}
+      </span>
     </span>
   );
 }

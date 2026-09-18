@@ -39,6 +39,7 @@ export function StrategyEditor({
   initialActions,
   initialWeights,
   dead,
+  linkedActionIds,
   onActionsChange,
   onWeightsChange,
   onClose,
@@ -47,6 +48,8 @@ export function StrategyEditor({
   initialActions: StrategyAction[];
   initialWeights: StrategyWeights;
   dead: Set<string>;
+  /** Actions that have an action node in the tree (removing one deletes it). */
+  linkedActionIds: Set<string>;
   onActionsChange: (actions: StrategyAction[]) => void;
   onWeightsChange: (weights: StrategyWeights) => void;
   onClose: () => void;
@@ -153,6 +156,12 @@ export function StrategyEditor({
 
   function removeAction(index: number) {
     if (actions.length <= 1) return;
+    if (
+      linkedActionIds.has(actions[index].id) &&
+      !confirm(`Removing "${actions[index].label}" also deletes its action node and everything under it. Continue?`)
+    ) {
+      return;
+    }
     commitActions(recolorActions(actions.filter((_, i) => i !== index)));
     editWeights((prev) => remapWeights(prev, len, len - 1, index));
     if (activeIndex >= actions.length - 1) setActiveIndex(Math.max(0, actions.length - 2));

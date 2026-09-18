@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { createClient } from "@/lib/supabase/client";
 import { colorForKind, recolorActions } from "@/lib/solver/colors";
 import { layoutTree, type Size } from "@/lib/solver/layout";
-import { globalFrequencies } from "@/lib/solver/strategy";
+import { globalFrequencies, remapWeights } from "@/lib/solver/strategy";
 import {
   createNode,
   deleteNode as deleteNodeAction,
@@ -22,6 +22,7 @@ import {
   type NodeData,
   type NodeType,
   type PokerNode,
+  type StrategyAction,
   type StrategyWeights,
 } from "@/lib/solver/types";
 import type { ImportResult } from "@/components/poker/NodeInspector";
@@ -300,6 +301,7 @@ export function SpotCanvas({
   }
 
   function removeNode(id: string) {
+    const node = nodesById[id];
     // Gather the node and every loaded descendant.
     const doomed = new Set<string>([id]);
     const stack = [id];
@@ -320,11 +322,116 @@ export function SpotCanvas({
       const r = await deleteNodeAction(id);
       if (!r.ok) setError(r.error);
     });
+
+    // A linked action under a strategy *is* that strategy action: deleting the
+    // node removes the action (and its column of the grid) from the strategy.
+    const parent = node?.parent_id ? nodesById[node.parent_id] : null;
+    const actionId = node?.type === "action" ? asAction(node).strategyActionId : null;
+    if (parent?.type === "strategy" && actionId) {
+      void removeStrategyAction(parent, actionId, doomed);
+    }
+  }
+
+  /** Drop one action from a strategy node, its grid column, and its siblings' colours. */
+  async function removeStrategyAction(parent: PokerNode, actionId: string, skip: Set<string>) {
+    const data = asStrategy(parent);
+    const index = data.actions.findIndex((a) => a.id === actionId);
+    if (index < 0) return;
+    const len = data.actions.length;
+    const actions = recolorActions(data.actions.filter((a) => a.id !== actionId));
+    persistData(parent.id, { ...data, actions });
+    syncLinkedChildren(parent.id, actions, skip);
+
+    let weights = strategyWeights[parent.id];
+    if (!weights) {
+      const { data: row, error } = await supabase
+        .from("poker_strategies")
+        .select("weights")
+        .eq("node_id", parent.id)
+        .maybeSingle();
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      if (!row) return; // no grid stored yet: nothing to remap
+      weights = normalizeWeights(row.weights);
+    }
+    const next = remapWeights(weights, len, len - 1, index);
+    setStrategyWeights((prev) => ({ ...prev, [parent.id]: next }));
+    const r = await saveStrategy({ nodeId: parent.id, weights: next });
+    if (!r.ok) setError(r.error);
+  }
+
+  /**
+   * Keep a strategy's linked action children in step with its action set:
+   * relabel / recolour the ones whose action changed, delete the ones whose
+   * action is gone (with their subtree). `skip` holds nodes already deleted.
+   */
+  function syncLinkedChildren(
+    strategyId: string,
+    actions: StrategyAction[],
+    skip: Set<string> = new Set(),
+  ) {
+    const byId = new Map(actions.map((a) => [a.id, a]));
+    for (const kid of childrenOf.get(strategyId) ?? []) {
+      if (kid.type !== "action" || skip.has(kid.id)) continue;
+      const d = asAction(kid);
+      if (!d.strategyActionId) continue;
+      const a = byId.get(d.strategyActionId);
+      if (!a) {
+        removeSubtree(kid.id);
+        continue;
+      }
+      if (
+        d.label !== a.label ||
+        d.color !== a.color ||
+        d.kind !== a.kind ||
+        (d.sizePct ?? null) !== (a.sizePct ?? null)
+      ) {
+        persistData(kid.id, { ...d, kind: a.kind, sizePct: a.sizePct ?? null, label: a.label, color: a.color });
+      }
+    }
+  }
+
+  /** Delete a node and its loaded descendants, without touching its parent. */
+  function removeSubtree(id: string) {
+    const doomed = new Set<string>([id]);
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const child of childrenOf.get(cur) ?? []) {
+        doomed.add(child.id);
+        stack.push(child.id);
+      }
+    }
+    setNodesById((prev) => {
+      const next = { ...prev };
+      for (const d of doomed) delete next[d];
+      return next;
+    });
+    if (selectedId && doomed.has(selectedId)) setSelectedId(null);
+    startTransition(async () => {
+      const r = await deleteNodeAction(id);
+      if (!r.ok) setError(r.error);
+    });
+  }
+
+  /** Strategy action ids that have a linked action node under `strategyId`. */
+  function linkedActionIds(strategyId: string): Set<string> {
+    const out = new Set<string>();
+    for (const kid of childrenOf.get(strategyId) ?? []) {
+      if (kid.type !== "action") continue;
+      const id = asAction(kid).strategyActionId;
+      if (id) out.add(id);
+    }
+    return out;
   }
 
   /* --------------------------------------------------------------- strategy */
 
   async function openStrategy(node: PokerNode) {
+    // Linked action children must be known to keep them in sync with edits.
+    void ensureChildren(node.id);
     const { data, error } = await supabase
       .from("poker_strategies")
       .select("weights")
@@ -703,12 +810,14 @@ export function SpotCanvas({
           initialActions={asStrategy(nodesById[strategy.nodeId]).actions}
           initialWeights={strategy.weights}
           dead={deadCardsFor(strategy.nodeId)}
-          onActionsChange={(actions) =>
+          linkedActionIds={linkedActionIds(strategy.nodeId)}
+          onActionsChange={(actions) => {
             persistData(strategy.nodeId, {
               ...asStrategy(nodesById[strategy.nodeId]),
               actions,
-            })
-          }
+            });
+            syncLinkedChildren(strategy.nodeId, actions);
+          }}
           onWeightsChange={saveStrategyWeights}
           onClose={() => setStrategy(null)}
         />
