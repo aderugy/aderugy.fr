@@ -6,7 +6,7 @@
  * per-combo detail on top of a hand-level default. Pure functions only.
  */
 
-import { handCombos } from "./cards";
+import { GRID_HANDS, comboBlocked, handCombos } from "./cards";
 import type { StrategyWeights } from "./types";
 
 /** A zeroed vector of the given length. */
@@ -115,4 +115,32 @@ export function remapWeights(
   const mapAll = (rec: Record<string, number[]>) =>
     Object.fromEntries(Object.entries(rec).map(([k, v]) => [k, remap(v)]));
   return { hands: mapAll(weights.hands), combos: mapAll(weights.combos) };
+}
+
+/**
+ * How often each action is taken across the whole range, in percent — the
+ * solver's "global strategy". Every live combo (not blocked by the board) that
+ * has a distribution counts once; each combo's vector is normalised so a
+ * partially-assigned cell does not skew the totals. Null when nothing is set.
+ */
+export function globalFrequencies(
+  weights: StrategyWeights,
+  len: number,
+  dead: Set<string>,
+): number[] | null {
+  const sum = zeroVector(len);
+  let count = 0;
+  for (const hand of GRID_HANDS) {
+    const handVec = fit(weights.hands[hand], len);
+    for (const combo of handCombos(hand)) {
+      if (comboBlocked(combo, dead)) continue;
+      const vec = fit(weights.combos[combo], len) ?? handVec;
+      if (!vec) continue;
+      const total = vectorTotal(vec);
+      if (total <= 0) continue;
+      for (let i = 0; i < len; i++) sum[i] += (vec[i] / total) * 100;
+      count++;
+    }
+  }
+  return count > 0 ? sum.map((x) => x / count) : null;
 }

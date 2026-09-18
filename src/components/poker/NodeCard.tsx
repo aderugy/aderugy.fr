@@ -24,6 +24,7 @@ export function NodeCard({
   expanded,
   weights,
   dead,
+  frequency,
   onSelect,
   onToggle,
 }: {
@@ -34,6 +35,8 @@ export function NodeCard({
   expanded: boolean;
   weights?: StrategyWeights | null;
   dead?: Set<string>;
+  /** Action nodes: global frequency (%) of the action in its parent strategy. */
+  frequency?: number | null;
   onSelect: () => void;
   onToggle: () => void;
 }) {
@@ -50,7 +53,7 @@ export function NodeCard({
         {NODE_LABELS[node.type]}
       </span>
       <div className="mt-1 min-h-0 flex-1 text-sm">
-        <NodeBody node={node} mode={mode} weights={weights} dead={dead} />
+        <NodeBody node={node} mode={mode} weights={weights} dead={dead} frequency={frequency} />
       </div>
       {hasChildren && (
         <button
@@ -73,11 +76,13 @@ function NodeBody({
   mode,
   weights,
   dead,
+  frequency,
 }: {
   node: PokerNode;
   mode: CanvasMode;
   weights?: StrategyWeights | null;
   dead?: Set<string>;
+  frequency?: number | null;
 }) {
   switch (node.type) {
     case "text": {
@@ -156,12 +161,21 @@ function NodeBody({
           style={{ backgroundColor: a.color }}
         >
           {a.label}
+          {frequency != null && (
+            <span className="tabular-nums opacity-90">· {formatFrequency(frequency)}</span>
+          )}
         </span>
       );
     }
     default:
       return null;
   }
+}
+
+/** 51.25 → "51.3%", 0.4 → "0.40%": keep two significant-ish digits for small values. */
+function formatFrequency(pct: number): string {
+  if (pct <= 0) return "0%";
+  return `${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}%`;
 }
 
 function Cards({ cards, placeholder }: { cards: string[]; placeholder: string }) {

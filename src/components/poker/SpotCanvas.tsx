@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { colorForKind, recolorActions } from "@/lib/solver/colors";
-import { layoutTree, NODE_H, NODE_W } from "@/lib/solver/layout";
+import { layoutTree, type Size } from "@/lib/solver/layout";
+import { globalFrequencies } from "@/lib/solver/strategy";
 import {
   createNode,
   deleteNode as deleteNodeAction,
@@ -172,12 +173,41 @@ export function SpotCanvas({
     return out;
   }, [childrenOf, expanded]);
 
-  const layout = useMemo(() => layoutTree(visible), [visible]);
+  // Rendered node sizes, fed back into the layout so boxes of any size (a
+  // revision-mode strategy bubble is far taller than the default) never
+  // overlap. One observer watches every card; it reports layout sizes, which
+  // the canvas zoom transform does not affect.
+  const [sizes, setSizes] = useState<Record<string, Size>>({});
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const getObserver = useCallback((): ResizeObserver => {
+    if (!observerRef.current) {
+      observerRef.current = new ResizeObserver((entries) => {
+        setSizes((prev) => {
+          let next = prev;
+          for (const entry of entries) {
+            const el = entry.target as HTMLElement;
+            const id = el.dataset.nodeId;
+            if (!id) continue;
+            const w = el.offsetWidth;
+            const h = el.offsetHeight;
+            if (prev[id]?.w === w && prev[id]?.h === h) continue;
+            if (next === prev) next = { ...prev };
+            next[id] = { w, h };
+          }
+          return next;
+        });
+      });
+    }
+    return observerRef.current;
+  }, []);
+  useEffect(() => () => observerRef.current?.disconnect(), []);
 
-  // In revision mode, load the grid for every visible strategy node so the
-  // bubbles can preview it. Empties are cached too, so nothing is refetched.
+  const layout = useMemo(() => layoutTree(visible, sizes), [visible, sizes]);
+
+  // Load the grid of every visible strategy node: revision-mode bubbles
+  // preview it and action nodes show their global frequency from it. Empties
+  // are cached too, so nothing is refetched.
   useEffect(() => {
-    if (mode !== "revision") return;
     const need = visible
       .filter((n) => n.type === "strategy" && strategyWeights[n.id] === undefined)
       .map((n) => n.id);
@@ -198,7 +228,33 @@ export function SpotCanvas({
         return next;
       });
     })();
-  }, [mode, visible, strategyWeights, supabase]);
+  }, [visible, strategyWeights, supabase]);
+
+  // Global frequency of every action of every visible strategy, by node id.
+  const frequencies = useMemo(() => {
+    const out: Record<string, number[] | null> = {};
+    for (const n of visible) {
+      if (n.type !== "strategy" || !strategyWeights[n.id]) continue;
+      out[n.id] = globalFrequencies(
+        strategyWeights[n.id],
+        asStrategy(n).actions.length,
+        deadCardsIn(nodesById, n.id),
+      );
+    }
+    return out;
+  }, [visible, strategyWeights, nodesById]);
+
+  /** The global frequency of the strategy action an action node represents. */
+  function actionFrequency(node: PokerNode): number | null {
+    if (node.type !== "action" || !node.parent_id) return null;
+    const parent = nodesById[node.parent_id];
+    if (!parent || parent.type !== "strategy") return null;
+    const freqs = frequencies[parent.id];
+    const index = asStrategy(parent).actions.findIndex(
+      (a) => a.id === asAction(node).strategyActionId,
+    );
+    return freqs && index >= 0 ? freqs[index] : null;
+  }
 
   function nodeHasChildren(id: string): boolean {
     return withChildren.has(id) || (childrenOf.get(id)?.length ?? 0) > 0;
@@ -356,11 +412,18 @@ export function SpotCanvas({
       }
     }
 
-    // One new action node per unlinked action, in header order. Sequential so
-    // the server assigns increasing positions.
+    // One new action node per unlinked action that is actually played, in
+    // header order (a 0% sizing needs no node). Sequential so the server
+    // assigns increasing positions.
+    const freqs = globalFrequencies(parsed.weights, parsed.actions.length, deadCardsFor(node.id));
     let created = 0;
-    for (const a of parsed.actions) {
+    let unused = 0;
+    for (const [i, a] of parsed.actions.entries()) {
       if (linked.has(a.id)) continue;
+      if (!freqs || freqs[i] <= 0) {
+        unused++;
+        continue;
+      }
       const data: NodeData = {
         strategyActionId: a.id,
         kind: a.kind,
@@ -394,6 +457,7 @@ export function SpotCanvas({
       `${parsed.actions.length} actions`,
       `${created} action node${created === 1 ? "" : "s"} created`,
     ];
+    if (unused > 0) parts.push(`${unused} at 0% skipped`);
     if (orphaned > 0) parts.push(`${orphaned} existing action node${orphaned === 1 ? "" : "s"} no longer match an action`);
     return { ok: true, message: `Imported ${parts.join(" · ")}`, warnings: parsed.warnings };
   }
@@ -407,19 +471,7 @@ export function SpotCanvas({
   }
 
   function deadCardsFor(nodeId: string): Set<string> {
-    const dead = new Set<string>();
-    let cur = nodesById[nodeId]?.parent_id ?? null;
-    while (cur) {
-      const n = nodesById[cur];
-      if (!n) break;
-      if (n.type === "flop") for (const c of asFlop(n).cards) dead.add(c);
-      if (n.type === "turn" || n.type === "river") {
-        const c = asStreet(n).card;
-        if (c) dead.add(c);
-      }
-      cur = n.parent_id;
-    }
-    return dead;
+    return deadCardsIn(nodesById, nodeId);
   }
 
   /* ------------------------------------------------------------------ pan/zoom */
@@ -560,9 +612,9 @@ export function SpotCanvas({
               const a = layout.positions.get(from);
               const b = layout.positions.get(to);
               if (!a || !b) return null;
-              const x1 = a.x + NODE_W / 2;
-              const y1 = a.y + NODE_H;
-              const x2 = b.x + NODE_W / 2;
+              const x1 = a.x + a.w / 2;
+              const y1 = a.y + a.h;
+              const x2 = b.x + b.w / 2;
               const y2 = b.y;
               const mid = (y1 + y2) / 2;
               return (
@@ -581,11 +633,12 @@ export function SpotCanvas({
             const pos = layout.positions.get(node.id);
             if (!pos) return null;
             return (
-              <div
+              <MeasuredNode
                 key={node.id}
-                className="absolute"
-                style={{ left: pos.x, top: pos.y }}
-                onPointerDown={(e) => e.stopPropagation()}
+                nodeId={node.id}
+                x={pos.x}
+                y={pos.y}
+                observer={getObserver}
               >
                 <NodeCard
                   node={node}
@@ -595,10 +648,11 @@ export function SpotCanvas({
                   expanded={expanded.has(node.id)}
                   weights={node.type === "strategy" ? strategyWeights[node.id] : undefined}
                   dead={node.type === "strategy" ? deadCardsFor(node.id) : undefined}
+                  frequency={actionFrequency(node)}
                   onSelect={() => handleSelect(node)}
                   onToggle={() => toggle(node.id)}
                 />
-              </div>
+              </MeasuredNode>
             );
           })}
         </div>
@@ -661,6 +715,64 @@ export function SpotCanvas({
       )}
     </div>
   );
+}
+
+/* ------------------------------------------------------------ measuring */
+
+/**
+ * A positioned node wrapper that reports its rendered size to the shared
+ * ResizeObserver, so the layout re-flows whenever a card grows or shrinks.
+ */
+function MeasuredNode({
+  nodeId,
+  x,
+  y,
+  observer,
+  children,
+}: {
+  nodeId: string;
+  x: number;
+  y: number;
+  observer: () => ResizeObserver;
+  children: React.ReactNode;
+}) {
+  const ref = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (!el) return;
+      const ro = observer();
+      ro.observe(el);
+      return () => ro.unobserve(el);
+    },
+    [observer],
+  );
+  return (
+    <div
+      ref={ref}
+      data-node-id={nodeId}
+      className="absolute"
+      style={{ left: x, top: y }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Board cards dealt above a node (its flop / turn / river ancestors). */
+function deadCardsIn(nodesById: Record<string, PokerNode>, nodeId: string): Set<string> {
+  const dead = new Set<string>();
+  let cur = nodesById[nodeId]?.parent_id ?? null;
+  while (cur) {
+    const n = nodesById[cur];
+    if (!n) break;
+    if (n.type === "flop") for (const c of asFlop(n).cards) dead.add(c);
+    if (n.type === "turn" || n.type === "river") {
+      const c = asStreet(n).card;
+      if (c) dead.add(c);
+    }
+    cur = n.parent_id;
+  }
+  return dead;
 }
 
 /* -------------------------------------------------------------- defaults */
