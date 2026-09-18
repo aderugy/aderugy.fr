@@ -17,9 +17,14 @@ export default async function PokerPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
-      <Link href="/" className="text-xs text-muted hover:text-foreground">
-        ← aderugy.fr
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/" className="text-xs text-muted hover:text-foreground">
+          ← aderugy.fr
+        </Link>
+        <Link href="/poker/spots" className="text-xs text-muted hover:text-foreground">
+          Solver notes →
+        </Link>
+      </div>
       <h1 className="mt-3 text-lg font-semibold tracking-tight">Poker odds</h1>
       <p className="mt-1 text-sm text-muted">
         What a call needs, what a draw is worth, and how often a semi-bluff has to get
