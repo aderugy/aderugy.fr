@@ -4,20 +4,27 @@ import { NextResponse, type NextRequest } from "next/server";
 export const LOGIN_PATH = "/agenda/login";
 export const HOME_PATH = "/agenda";
 
+// Segment roots a `next` may point at. Both feature areas share the one Google
+// sign-in, so a redirect target is legitimate for either.
+const ALLOWED_ROOTS = [HOME_PATH, "/poker/spots"];
+
 /**
  * The only function allowed to turn a `next` parameter into a redirect target.
  *
- * Accepts same-origin agenda paths and nothing else. `/agenda` must be a whole
- * segment: a bare prefix test would also pass `/agendafoo`, and `//evil.com`
- * is protocol-relative, so the browser would leave the origin entirely.
+ * Accepts same-origin paths under an allow-listed segment root and nothing
+ * else. A root must match as a whole segment: a bare prefix test would also
+ * pass `/agendafoo`, and `//evil.com` is protocol-relative, so the browser
+ * would leave the origin entirely.
  */
 export function safeNext(value: string | null | undefined): string {
   if (!value) return HOME_PATH;
-  if (value !== HOME_PATH && !value.startsWith(`${HOME_PATH}/`)) return HOME_PATH;
   if (value.startsWith("//")) return HOME_PATH;
   if (value === LOGIN_PATH || value.startsWith(`${LOGIN_PATH}?`)) return HOME_PATH;
   if (value.startsWith(`${LOGIN_PATH}/`)) return HOME_PATH;
-  return value;
+  const allowed = ALLOWED_ROOTS.some(
+    (root) => value === root || value.startsWith(`${root}/`),
+  );
+  return allowed ? value : HOME_PATH;
 }
 
 export async function updateSession(request: NextRequest) {
