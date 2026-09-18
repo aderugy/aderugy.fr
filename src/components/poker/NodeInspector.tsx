@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PALETTE } from "@/lib/categories";
 import { CardPicker } from "@/components/poker/CardPicker";
 import { Segmented } from "@/components/poker/ui";
@@ -211,15 +211,49 @@ function StrategyMeta({
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
-  async function handleFile(file: File) {
+  async function runImport(text: string) {
     setImporting(true);
     setImportResult(null);
     try {
-      setImportResult(await onImportCsv(await file.text()));
+      setImportResult(await onImportCsv(text));
     } finally {
       setImporting(false);
     }
   }
+
+  async function handleFile(file: File) {
+    await runImport(await file.text());
+  }
+
+  async function pasteFromClipboard() {
+    let text: string;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      setImportResult({ ok: false, error: "Clipboard access blocked — press Ctrl+V instead" });
+      return;
+    }
+    await runImport(text);
+  }
+
+  // Ctrl+V anywhere (outside a text field) while this strategy is selected
+  // imports the clipboard as CSV.
+  const runImportRef = useRef(runImport);
+  useEffect(() => {
+    runImportRef.current = runImport;
+  });
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!text.trim()) return;
+      e.preventDefault();
+      void runImportRef.current(text);
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -280,16 +314,26 @@ function StrategyMeta({
             if (file) void handleFile(file);
           }}
         />
-        <button
-          type="button"
-          disabled={importing}
-          onClick={() => fileRef.current?.click()}
-          className="w-full rounded border border-line px-3 py-1.5 text-xs hover:border-accent disabled:opacity-50"
-        >
-          {importing ? "Importing…" : "Import CSV…"}
-        </button>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            disabled={importing}
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 rounded border border-line px-3 py-1.5 text-xs hover:border-accent disabled:opacity-50"
+          >
+            {importing ? "Importing…" : "Import CSV…"}
+          </button>
+          <button
+            type="button"
+            disabled={importing}
+            onClick={() => void pasteFromClipboard()}
+            className="flex-1 rounded border border-line px-3 py-1.5 text-xs hover:border-accent disabled:opacity-50"
+          >
+            Paste CSV
+          </button>
+        </div>
         <p className="mt-1 text-[11px] text-muted">
-          Header row <code>Hand,RAISE 180,CALL,FOLD…</code> sets the actions and creates one
+          Or press <kbd>Ctrl</kbd>+<kbd>V</kbd> with this strategy selected. Header row <code>Hand,RAISE 180,CALL,FOLD…</code> sets the actions and creates one
           action node each; rows are combos (<code>4c3c</code>) or hands (<code>AKs</code>).
         </p>
         {importResult && (
