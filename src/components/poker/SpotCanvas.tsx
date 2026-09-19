@@ -23,8 +23,10 @@ import {
   type NodeType,
   type PokerNode,
   type StrategyAction,
+  type StrategyData,
   type StrategyWeights,
 } from "@/lib/solver/types";
+import { derivedPosition, isInPosition } from "@/lib/solver/seats";
 import type { ImportResult } from "@/components/poker/NodeInspector";
 import { MiniNodeCard, NodeCard, type CanvasMode } from "@/components/poker/NodeCard";
 import { NotesView } from "@/components/poker/NodeNotes";
@@ -48,9 +50,12 @@ const CHILD_SUGGESTIONS: Record<NodeType, NodeType[]> = {
 export function SpotCanvas({
   spotId,
   initialNodes,
+  focusPath,
 }: {
   spotId: string;
   initialNodes: PokerNode[];
+  /** Ids root → node to open on load (links from a trainer). */
+  focusPath?: string[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [, startTransition] = useTransition();
@@ -137,6 +142,37 @@ export function SpotCanvas({
     await ensureChildren(id);
     setExpanded((prev) => new Set(prev).add(id));
   }
+
+  // How many trainers drill each node of this spot (badge on strategy cards).
+  const [trainerCounts, setTrainerCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let cancelled = false;
+    void supabase
+      .from("poker_trainer_nodes")
+      .select("node_id")
+      .eq("spot_id", spotId)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const counts: Record<string, number> = {};
+        for (const r of data) counts[r.node_id as string] = (counts[r.node_id as string] ?? 0) + 1;
+        setTrainerCounts(counts);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, spotId]);
+
+  // Open the tree down to a linked node and select it, once.
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    if (focusedRef.current || !focusPath || focusPath.length === 0) return;
+    focusedRef.current = true;
+    void (async () => {
+      for (const id of focusPath.slice(0, -1)) await expand(id);
+      setSelectedId(focusPath[focusPath.length - 1]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPath]);
 
   function toggle(id: string) {
     if (expanded.has(id)) {
@@ -308,6 +344,9 @@ export function SpotCanvas({
 
   async function addChild(parent: PokerNode | null, type: NodeType) {
     const data = defaultData(type, parent);
+    if (type === "strategy" && parent) {
+      Object.assign(data, prefillSeats(pathTo(nodesById, parent.id)));
+    }
     const parentId = parent?.id ?? null;
     const r = await createNode({ spotId, parentId, type, data });
     if (!r.ok) {
@@ -796,6 +835,7 @@ export function SpotCanvas({
                   weights={node.type === "strategy" ? strategyWeights[node.id] : undefined}
                   dead={node.type === "strategy" ? deadCardsFor(node.id) : undefined}
                   frequency={actionFrequency(node)}
+                  trainerCount={trainerCounts[node.id] ?? 0}
                   onSelect={() => handleSelect(node)}
                   onToggle={() => toggle(node.id)}
                 />
@@ -819,6 +859,7 @@ export function SpotCanvas({
         <NodeInspector
           key={selected.id}
           node={selected}
+          path={pathTo(nodesById, selected.id)}
           parent={selectedParent}
           dead={deadCardsFor(selected.id)}
           childSuggestions={CHILD_SUGGESTIONS[selected.type]}
@@ -928,6 +969,41 @@ function MeasuredNode({
       {children}
     </div>
   );
+}
+
+/** Root → node, following parent_id through the loaded nodes. */
+function pathTo(nodesById: Record<string, PokerNode>, nodeId: string): PokerNode[] {
+  const out: PokerNode[] = [];
+  let cur: string | null = nodeId;
+  const seen = new Set<string>();
+  while (cur && nodesById[cur] && !seen.has(cur)) {
+    seen.add(cur);
+    out.push(nodesById[cur]);
+    cur = nodesById[cur].parent_id;
+  }
+  return out.reverse();
+}
+
+/**
+ * Seats for a new strategy node under `path` (root → its parent). The next
+ * decision is usually the opponent's, so the nearest seated strategy above is
+ * swapped — unless a new street was dealt since, where the out-of-position
+ * player acts first whoever acted last.
+ */
+function prefillSeats(path: PokerNode[]): Partial<StrategyData> {
+  let newStreet = false;
+  for (let i = path.length - 1; i >= 0; i--) {
+    const n = path[i];
+    if (n.type === "flop" || n.type === "turn" || n.type === "river") newStreet = true;
+    if (n.type !== "strategy") continue;
+    const { seat, vsSeat } = asStrategy(n);
+    if (!seat || !vsSeat) continue;
+    const [next, other] = newStreet
+      ? isInPosition(seat, vsSeat) ? [vsSeat, seat] : [seat, vsSeat]
+      : [vsSeat, seat];
+    return { seat: next, vsSeat: other, position: derivedPosition(next, other) };
+  }
+  return {};
 }
 
 /** Board cards dealt above a node (its flop / turn / river ancestors). */

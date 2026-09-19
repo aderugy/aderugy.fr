@@ -6,6 +6,7 @@ import {
   asMeta,
   asFlop,
   asStrategy,
+  strategyPositionText,
   asStreet,
   asText,
   NODE_LABELS,
@@ -28,6 +29,7 @@ export function NodeCard({
   frequency,
   onSelect,
   onToggle,
+  trainerCount = 0,
 }: {
   node: PokerNode;
   mode: CanvasMode;
@@ -38,6 +40,8 @@ export function NodeCard({
   dead?: Set<string>;
   /** Action nodes: global frequency (%) of the action in its parent strategy. */
   frequency?: number | null;
+  /** Strategy nodes: how many trainers drill this node. */
+  trainerCount?: number;
   onSelect: () => void;
   onToggle: () => void;
 }) {
@@ -58,6 +62,14 @@ export function NodeCard({
         {notes.trim() && (
           <span title="Has notes" className="text-muted">
             <NotesIcon />
+          </span>
+        )}
+        {trainerCount > 0 && (
+          <span
+            title={`In ${trainerCount} trainer${trainerCount > 1 ? "s" : ""}`}
+            className="rounded bg-accent/10 px-1 text-[10px] font-medium text-accent"
+          >
+            ▶ {trainerCount}
           </span>
         )}
         {hasChildren && (
@@ -117,7 +129,9 @@ function NodeBody({
       return <Cards cards={card ? [card] : []} placeholder="Pick a card" />;
     }
     case "strategy": {
-      const { actions, position, label } = asStrategy(node);
+      const data = asStrategy(node);
+      const { actions, label } = data;
+      const position = strategyPositionText(data);
       // Revision mode: show a tiny live grid preview instead of the chips.
       if (mode === "revision" && weights && actions.length > 0) {
         return (
@@ -220,8 +234,9 @@ function MiniBody({ node }: { node: PokerNode }) {
       );
     }
     case "strategy": {
-      const { position, label } = asStrategy(node);
-      const text = [position, label].filter(Boolean).join(" · ");
+      const data = asStrategy(node);
+      const position = strategyPositionText(data);
+      const text = [position, data.label].filter(Boolean).join(" · ");
       return <span className="truncate font-medium">{text || "Strategy"}</span>;
     }
     case "flop": {
