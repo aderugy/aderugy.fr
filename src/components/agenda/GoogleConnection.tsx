@@ -2,9 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { PALETTE } from "@/lib/categories";
-import type { CalendarSource, Category, GoogleAccount, GoogleSyncState } from "@/lib/types";
+import type {
+  CalendarSource,
+  Category,
+  GoogleAccount,
+  GoogleSyncState,
+  PushStatus,
+} from "@/lib/types";
 import {
+  disableGooglePush,
   disconnectGoogle,
+  enableGooglePush,
   googleConsentUrl,
   syncGoogleNow,
   updateCalendarSource,
@@ -25,14 +33,18 @@ type Props = {
   sources: CalendarSource[];
   syncState: GoogleSyncState[];
   categories: Category[];
+  pushStatus: PushStatus | null;
   notice: { error?: string };
 };
+
+const WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
 
 export function GoogleConnection({
   account,
   sources,
   syncState,
   categories,
+  pushStatus,
   notice,
 }: Props) {
   const [pending, startTransition] = useTransition();
@@ -66,8 +78,8 @@ export function GoogleConnection({
         <div className="flex-1 max-sm:basis-full">
           <h2 className="font-medium">Calendars</h2>
           <p className="mt-0.5 text-xs text-muted">
-            Read-only. Events from an enabled calendar appear in your week, labelled
-            with the name you give it here. Nothing is ever written back.
+            Events from an enabled calendar appear in your week, labelled with the
+            name you give it here. Your calendars are only ever read.
           </p>
         </div>
 
@@ -138,9 +150,121 @@ export function GoogleConnection({
               />
             ))}
           </ul>
+
+          <PushSection
+            account={account!}
+            status={pushStatus}
+            pending={pending}
+            onRun={run}
+            onReconnect={connect}
+          />
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Pushing blocks out to Google.
+ *
+ * Kept visibly separate from the calendars above: those are read, this one is
+ * written, and it is the only calendar the app can write to at all.
+ */
+function PushSection({
+  account,
+  status,
+  pending,
+  onRun,
+  onReconnect,
+}: {
+  account: GoogleAccount;
+  status: PushStatus | null;
+  pending: boolean;
+  onRun: (fn: () => Promise<{ ok: boolean; error?: string }>) => void;
+  onReconnect: () => void;
+}) {
+  const granted = (account.scopes ?? []).includes(WRITE_SCOPE);
+  const enabled = Boolean(account.push_enabled);
+
+  const waiting = status?.pending ?? 0;
+  const failing = status?.failed ?? 0;
+
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 max-sm:basis-full">
+          <h3 className="font-medium">Push blocks to Google</h3>
+          <p className="mt-0.5 text-xs text-muted">
+            Every block you plan appears in an <strong>Agenda</strong> calendar the app
+            creates in your Google account — on your phone, and to anyone you share it
+            with. One-way: edit blocks here; changes made in Google are overwritten.
+          </p>
+        </div>
+
+        {!granted ? (
+          <button
+            onClick={onReconnect}
+            disabled={pending}
+            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+            title="Google has to grant access to the calendar the app will create"
+          >
+            Allow in Google
+          </button>
+        ) : enabled ? (
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  "Stop pushing blocks?\n\nThe Agenda calendar is deleted from Google. Your blocks here are untouched.",
+                )
+              ) {
+                onRun(disableGooglePush);
+              }
+            }}
+            disabled={pending}
+            className="rounded border border-line px-2 py-1 text-xs text-red-500 hover:border-red-500 disabled:opacity-50"
+          >
+            Stop pushing
+          </button>
+        ) : (
+          <button
+            onClick={() => onRun(enableGooglePush)}
+            disabled={pending}
+            className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+          >
+            Start pushing
+          </button>
+        )}
+      </div>
+
+      {!granted && (
+        <p className="mt-2 text-[11px] text-muted">
+          Your current connection is read-only. Google will ask once more, for access
+          limited to calendars this app creates — it still cannot change any of yours.
+        </p>
+      )}
+
+      {enabled && (
+        <p className="mt-2 text-xs">
+          {account.push_error ? (
+            <span className="text-red-500">{account.push_error}</span>
+          ) : failing > 0 ? (
+            <span className="text-red-500" title={status?.last_block_error ?? undefined}>
+              {failing} block{failing === 1 ? "" : "s"} could not be pushed
+              {status?.last_block_error ? ` — ${status.last_block_error}` : ""}
+            </span>
+          ) : waiting > 0 ? (
+            <span className="text-muted">
+              {waiting} block{waiting === 1 ? "" : "s"} on the way…
+            </span>
+          ) : (
+            <span className="text-muted">
+              Up to date · last push {relativeTime(account.last_pushed_at ?? null)}
+            </span>
+          )}
+        </p>
+      )}
+    </div>
   );
 }
 

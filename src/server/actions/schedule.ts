@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 import { ensureWeek, syncTaskStatus } from "@/server/weeks";
+import { queuePush } from "@/server/push";
 
 type PlacedResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -145,6 +146,7 @@ export async function placeTask(input: {
     if (linkError) throw linkError;
 
     await syncTaskStatus(supabase, user.id, [task.id]);
+    await queuePush(supabase);
     refresh();
     return { ok: true, id: block.id };
   } catch (e) {
@@ -228,6 +230,7 @@ export async function placeBlock(input: {
 
     await insertAdHocTasks(supabase, user.id, created.id, steps);
 
+    await queuePush(supabase);
     refresh();
     return { ok: true, id: created.id };
   } catch (e) {
@@ -282,6 +285,7 @@ export async function createScheduledBlock(input: {
       },
     ]);
 
+    await queuePush(supabase);
     refresh();
     return { ok: true, id: data.id };
   } catch (e) {
@@ -319,6 +323,7 @@ export async function moveScheduled(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
+    await queuePush(supabase);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -347,6 +352,7 @@ export async function updateScheduled(input: {
       .eq("user_id", user.id);
     if (error) throw error;
 
+    await queuePush(supabase);
     refresh();
     return { ok: true };
   } catch (e) {
@@ -379,6 +385,7 @@ export async function deleteScheduled(id: string): Promise<ActionResult> {
       (links ?? []).map((l) => l.task_id as string),
     );
     await syncTaskStatus(supabase, user.id, survivors);
+    await queuePush(supabase);
     refresh();
     return { ok: true };
   } catch (e) {
@@ -413,6 +420,7 @@ export async function attachTask(input: {
     if (error) throw error;
 
     await syncTaskStatus(supabase, user.id, [input.taskId]);
+    await queuePush(supabase);
     refresh();
     return { ok: true };
   } catch (e) {
@@ -469,6 +477,7 @@ export async function addTaskToBlock(input: {
       (last?.[0]?.position ?? -1) + 1,
     );
 
+    await queuePush(supabase);
     refresh();
     return { ok: true };
   } catch (e) {
@@ -496,6 +505,7 @@ export async function updateBlockTask(input: {
       .eq("task_id", input.taskId);
     if (error) throw error;
 
+    await queuePush(supabase);
     refresh();
     return { ok: true };
   } catch (e) {
@@ -521,6 +531,7 @@ export async function detachTask(input: {
     // block goes away with it.
     const survivors = await dropAdHocTasks(supabase, user.id, [input.taskId]);
     await syncTaskStatus(supabase, user.id, survivors);
+    await queuePush(supabase);
     refresh();
     return { ok: true };
   } catch (e) {

@@ -1,5 +1,17 @@
-import { adminClient, callerFromRequest, json, storeRefreshToken } from "../_shared/db.ts";
-import { exchangeCode, listCalendars } from "../_shared/google.ts";
+import {
+  adminClient,
+  callerFromRequest,
+  json,
+  readRefreshToken,
+  storeRefreshToken,
+} from "../_shared/db.ts";
+import {
+  accessTokenFrom,
+  deletePushCalendar,
+  exchangeCode,
+  listCalendars,
+} from "../_shared/google.ts";
+import { WRITE_SCOPE } from "../_shared/push.ts";
 import { syncAllCalendars } from "../_shared/sync.ts";
 
 /** Same palette the category tree uses, so a week reads as one system. */
@@ -35,9 +47,23 @@ Deno.serve(async (request) => {
     // role, so disconnect cannot be a plain SQL call from the app.
     const { data: account } = await admin
       .from("google_accounts")
-      .select("refresh_token_secret")
+      .select("refresh_token_secret, scopes, push_calendar_id")
       .eq("user_id", user.id)
       .maybeSingle();
+
+    // The Agenda calendar is the app's own; leaving it behind would leave a
+    // frozen copy of the plan in Google that nothing updates any more. Best
+    // effort — a revoked grant cannot delete it, and must not block leaving.
+    if (account?.push_calendar_id && (account.scopes ?? []).includes(WRITE_SCOPE)) {
+      try {
+        const token = await accessTokenFrom(
+          await readRefreshToken(admin, account.refresh_token_secret),
+        );
+        await deletePushCalendar(token, account.push_calendar_id);
+      } catch {
+        // Nothing useful to do with it; the user can delete it in Google.
+      }
+    }
 
     // calendar_sources cascades to external_events, so the mirror goes with it.
     await admin.from("calendar_sources").delete().eq("user_id", user.id);
@@ -58,7 +84,17 @@ Deno.serve(async (request) => {
   try {
     const token = await exchangeCode(body.code, body.redirectUri);
     const secretId = await storeRefreshToken(admin, user.id, token.refresh_token!);
-    const calendars = await listCalendars(token.access_token);
+
+    // The calendar the app writes blocks into shows up in Google's list like
+    // any other. It is never a source: mirroring it would draw every block twice.
+    const { data: existing } = await admin
+      .from("google_accounts")
+      .select("push_calendar_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const calendars = (await listCalendars(token.access_token)).filter(
+      (c) => c.id !== existing?.push_calendar_id,
+    );
 
     const { error: accountError } = await admin.from("google_accounts").upsert({
       user_id: user.id,

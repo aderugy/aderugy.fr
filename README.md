@@ -62,11 +62,12 @@ run into.
 Login requests identity scopes only. Google Calendar will be a separate consent
 later, so a planning feature can never silently widen what sign-in can reach.
 
-## Google Calendar (read-only)
+## Google Calendar
 
-Your commitments block time in the planner. Nothing is ever written back to
-Google, and no Google credential reaches Vercel: the whole sync engine runs as
-Supabase Edge Functions.
+Your commitments appear in the planner, and — once you turn it on — your
+planned blocks appear in Google, in a calendar of their own. Your existing
+calendars are only ever read. No Google credential reaches Vercel: the whole
+engine, both directions, runs as Supabase Edge Functions.
 
 ### 1. Google Cloud Console
 
@@ -80,7 +81,10 @@ https://www.aderugy.fr/agenda/settings/google/callback
 http://localhost:3000/agenda/settings/google/callback
 ```
 
-Add `.../auth/calendar.readonly` to the consent screen's scopes.
+Add `.../auth/calendar.readonly` and `.../auth/calendar.app.created` to the
+consent screen's scopes. The second is what pushing blocks needs: it lets the
+app create calendars and write to *those only* — it grants nothing over the
+calendars you already have.
 
 **The publishing status matters more than anything else here.** While it is
 *Testing*, Google expires refresh tokens after 7 days and background sync dies
@@ -97,11 +101,16 @@ projects.
 ### 3. Edge Functions
 
 ```bash
-supabase functions deploy google-oauth google-sync google-channels google-webhook
+supabase functions deploy google-oauth google-sync google-channels google-webhook google-push
 
 supabase secrets set GOOGLE_CLIENT_ID=...
 supabase secrets set GOOGLE_CLIENT_SECRET=...
 supabase secrets set GOOGLE_WEBHOOK_URL=https://<project-ref>.supabase.co/functions/v1/google-webhook
+
+# Optional, for pushing blocks: the Agenda calendar's time zone (default
+# Europe/Paris), and the site URL linked from each event.
+supabase secrets set APP_TIMEZONE=Europe/Paris
+supabase secrets set APP_URL=https://www.aderugy.fr
 ```
 
 `google-webhook` is deployed with `verify_jwt = false` (see `config.toml`):
@@ -111,7 +120,8 @@ what authenticates a ping.
 ### 4. Scheduled jobs
 
 Run `supabase/cron.sql` in the SQL editor after filling in the two placeholders.
-It schedules the 5-minute sync sweep, daily channel renewal, and pruning.
+It schedules the 5-minute sync sweep, daily channel renewal, pruning, and the
+one-minute push sweep (which only invokes the function when there is work).
 
 The cron lives here rather than on Vercel because **Vercel's Hobby plan caps
 cron at once per day** — a `*/5` expression fails at deployment. `pg_cron` has a
@@ -153,6 +163,35 @@ anyway.
 
 All-day events go to a slim strip above the grid rather than filling a column —
 they mark a day, they do not consume ten hours of it.
+
+### 6. Pushing your blocks to Google
+
+**Settings → Push blocks to Google → Start pushing.** A connection made before
+this feature existed is read-only, so the button first says **Allow in Google**
+and goes through consent once more.
+
+- The app creates an **Agenda** calendar in your Google account and writes every
+  block there: create, move, resize, rename, mark done, delete. It never writes
+  anywhere else — the scope does not allow it.
+- **One-way.** The plan is the source of truth; an edit made to an Agenda event
+  in Google is overwritten by the next push of that block. The Agenda calendar
+  is never mirrored back into the planner (that would draw every block twice).
+- The title is what the grid shows — template name, else the block's
+  description, else its task categories (`grind · reading`) — with `✓` for done
+  and `✕` for skipped. The event body lists the tasks and their minutes.
+  Skipped blocks are marked *free*, so they do not make you look busy.
+- **Stop pushing** deletes the Agenda calendar from Google. Your blocks here are
+  untouched; starting again recreates it from scratch. Disconnecting Google
+  deletes it too.
+
+How it stays current: triggers mark a block `pending` on any change that
+affects its event — including edits to its tasks, a category rename or a
+template rename — so no write path can forget. Every schedule action then nudges
+`google-push` after its response, so a move on the grid reaches your phone in
+seconds; a `pg_cron` job sweeps once a minute for anything that missed, and
+retries failures up to 8 times. Deleted blocks leave a tombstone so the event
+can still be removed after the row is gone. Event ids are derived from block
+ids, so a retried insert can never create a duplicate.
 
 Every table is protected by row-level security (`user_id = auth.uid()`), so the
 database is the security boundary, not the UI. The Next app holds no

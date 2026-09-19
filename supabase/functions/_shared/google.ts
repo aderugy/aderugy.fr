@@ -1,4 +1,9 @@
-/** Thin wrappers over the Google APIs this integration touches. Read-only. */
+/**
+ * Thin wrappers over the Google APIs this integration touches.
+ *
+ * Reads go through `calendarFetch`. The only writes — at the bottom — target the
+ * one calendar the app created for itself, under `calendar.app.created`.
+ */
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
@@ -189,4 +194,126 @@ export async function stopChannel(
   if (!res.ok && res.status !== 404) {
     throw new GoogleApiError("channels.stop failed", res.status, await res.text());
   }
+}
+
+// ------------------------------------------------------------------- push
+
+/** The app's own calendar is gone — deleted by hand in Google, most likely. */
+export class PushCalendarGoneError extends Error {}
+
+async function pushFetch(accessToken: string, path: string, init: RequestInit) {
+  return await fetch(`${CALENDAR_API}${path}`, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+async function fail(res: Response, what: string): Promise<never> {
+  throw new GoogleApiError(`${what} failed`, res.status, await res.text());
+}
+
+export async function createPushCalendar(
+  accessToken: string,
+  summary: string,
+  timeZone: string,
+): Promise<string> {
+  const res = await pushFetch(accessToken, "/calendars", {
+    method: "POST",
+    body: JSON.stringify({
+      summary,
+      description: "Blocks planned on aderugy.fr/agenda. Managed by the app — edits here are overwritten.",
+      timeZone,
+    }),
+  });
+  if (!res.ok) await fail(res, "calendars.insert");
+  return ((await res.json()) as { id: string }).id;
+}
+
+/** Deleting a calendar that is already gone is the outcome we wanted anyway. */
+export async function deletePushCalendar(accessToken: string, calendarId: string) {
+  const res = await pushFetch(
+    accessToken,
+    `/calendars/${encodeURIComponent(calendarId)}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    await fail(res, "calendars.delete");
+  }
+}
+
+/**
+ * Create or overwrite one event, idempotently.
+ *
+ * The event id is ours (derived from the block id), so this is an update first:
+ * the common case is a block that already exists upstream. A 404 means it does
+ * not yet, and it is inserted with that same id. A 409 on insert means a
+ * previous insert landed but was never recorded — update it instead.
+ */
+export async function putPushEvent(
+  accessToken: string,
+  calendarId: string,
+  event: { id: string } & Record<string, unknown>,
+): Promise<"updated" | "inserted"> {
+  const base = `/calendars/${encodeURIComponent(calendarId)}/events`;
+  const path = `${base}/${encodeURIComponent(event.id)}`;
+
+  const updated = await pushFetch(accessToken, path, {
+    method: "PUT",
+    body: JSON.stringify(event),
+  });
+  if (updated.ok) {
+    await updated.body?.cancel();
+    return "updated";
+  }
+  if (updated.status !== 404 && updated.status !== 410) await fail(updated, "events.update");
+  await updated.body?.cancel();
+
+  const inserted = await pushFetch(accessToken, base, {
+    method: "POST",
+    body: JSON.stringify(event),
+  });
+  if (inserted.ok) {
+    await inserted.body?.cancel();
+    return "inserted";
+  }
+
+  if (inserted.status === 409) {
+    const retried = await pushFetch(accessToken, path, {
+      method: "PUT",
+      body: JSON.stringify(event),
+    });
+    if (retried.ok) {
+    await retried.body?.cancel();
+    return "updated";
+  }
+    await fail(retried, "events.update after conflict");
+  }
+
+  // Insert 404s only when the calendar itself does not exist.
+  if (inserted.status === 404) {
+    await inserted.body?.cancel();
+    throw new PushCalendarGoneError("The Agenda calendar no longer exists in Google");
+  }
+  return await fail(inserted, "events.insert");
+}
+
+export async function deletePushEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+) {
+  const res = await pushFetch(
+    accessToken,
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=none`,
+    { method: "DELETE" },
+  );
+  // Already deleted (410) or never inserted (404): nothing left to do.
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    await fail(res, "events.delete");
+  }
+  await res.body?.cancel();
 }
