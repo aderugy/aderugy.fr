@@ -175,6 +175,21 @@ export type GoogleAccount = {
   disconnected_at: string | null;
   last_error: string | null;
   last_error_at: string | null;
+  /** What Google granted. Pushing needs `calendar.app.created` among them. */
+  scopes?: string[];
+  /** Blocks are written to the app's own "Agenda" calendar. */
+  push_enabled?: boolean;
+  push_calendar_id?: string | null;
+  last_pushed_at?: string | null;
+  push_error?: string | null;
+};
+
+/** Where the push to Google stands, in counts. See the `push_status` view. */
+export type PushStatus = {
+  pending: number;
+  failed: number;
+  synced: number;
+  last_block_error: string | null;
 };
 
 export type GoogleSyncState = {

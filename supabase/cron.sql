@@ -65,5 +65,18 @@ select cron.schedule(
         and archived_at is null $$
 );
 
+-- Push planned blocks to the Agenda calendar. The app already pushes right after
+-- each edit; this catches whatever that missed — a kick lost to a cold start, a
+-- rate limit, an edit made outside the app's actions (a rename, a SQL fix) —
+-- and retries failed blocks. Once a minute, since it is what makes a move on
+-- the grid show up on your phone.
+select cron.schedule(
+  'google-push-due',
+  '* * * * *',
+  -- Checked in SQL first, so an idle minute costs a query, not an invocation.
+  $$ select public.invoke_edge('google-push', '{"due": true}'::jsonb)
+      where exists (select 1 from public.users_due_for_push()) $$
+);
+
 -- Inspect with:  select * from cron.job;
 --                select * from cron.job_run_details order by start_time desc limit 20;

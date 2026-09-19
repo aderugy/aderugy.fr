@@ -15,3 +15,8 @@ verify_jwt = true
 # Google cannot present a Supabase JWT. The X-Goog-Channel-Token secret, matched
 # against google_sync_channels, is what authenticates a ping.
 verify_jwt = false
+
+[functions.google-push]
+# User JWT for enable/disable and "push mine now"; the service-role key for the
+# cron sweep. The function decides which path applies.
+verify_jwt = true

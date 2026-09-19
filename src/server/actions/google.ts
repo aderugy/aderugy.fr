@@ -3,7 +3,17 @@
 import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 
-const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+/**
+ * Read every calendar; write only to calendars this app created itself.
+ *
+ * `calendar.app.created` is what makes pushing blocks safe to offer: it grants
+ * nothing over your existing calendars, so the one the app creates ("Agenda")
+ * is the only thing it can ever modify.
+ */
+const CALENDAR_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.app.created",
+];
 
 /**
  * Calls a Supabase Edge Function as the signed-in user.
@@ -59,7 +69,7 @@ export async function googleConsentUrl(origin: string): Promise<string> {
     client_id: clientId,
     redirect_uri: `${origin}/agenda/settings/google/callback`,
     response_type: "code",
-    scope: CALENDAR_SCOPE,
+    scope: CALENDAR_SCOPES.join(" "),
     // Both are required for a refresh token: offline asks for one, and Google
     // omits it on a repeat consent unless the prompt is forced.
     access_type: "offline",
@@ -101,6 +111,33 @@ export async function disconnectGoogle(): Promise<ActionResult> {
 export async function syncGoogleNow(): Promise<ActionResult> {
   try {
     await callEdge("google-sync", await accessTokenOf(), {});
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Start writing your blocks to an "Agenda" calendar in Google.
+ *
+ * The Edge Function creates the calendar and pushes the first batch before
+ * answering, so the settings page can report real numbers straight away.
+ */
+export async function enableGooglePush(): Promise<ActionResult> {
+  try {
+    await callEdge("google-push", await accessTokenOf(), { action: "enable" });
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Stop pushing, and delete the Agenda calendar from Google. */
+export async function disableGooglePush(): Promise<ActionResult> {
+  try {
+    await callEdge("google-push", await accessTokenOf(), { action: "disable" });
     refresh();
     return { ok: true };
   } catch (e) {

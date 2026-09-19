@@ -7,6 +7,7 @@ import type {
   Category,
   GoogleAccount,
   GoogleSyncState,
+  PushStatus,
 } from "@/lib/types";
 
 export const metadata = { title: "Settings — Agenda" };
@@ -22,10 +23,12 @@ export default async function SettingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(LOGIN_PATH);
 
-  const [accountRes, sourcesRes, syncRes, categoriesRes] = await Promise.all([
+  const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes] = await Promise.all([
     supabase
       .from("google_accounts")
-      .select("google_email, connected_at, disconnected_at, last_error, last_error_at")
+      .select(
+        "google_email, connected_at, disconnected_at, last_error, last_error_at, scopes, push_enabled, push_calendar_id, last_pushed_at, push_error",
+      )
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase
@@ -45,6 +48,11 @@ export default async function SettingsPage({
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("position"),
+    supabase
+      .from("push_status")
+      .select("pending, failed, synced, last_block_error")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
 
   return (
@@ -56,6 +64,7 @@ export default async function SettingsPage({
         sources={(sourcesRes.data ?? []) as CalendarSource[]}
         syncState={(syncRes.data ?? []) as GoogleSyncState[]}
         categories={(categoriesRes.data ?? []) as Category[]}
+        pushStatus={(pushRes.data ?? null) as PushStatus | null}
         notice={{ error: typeof params.error === "string" ? params.error : undefined }}
       />
     </main>
