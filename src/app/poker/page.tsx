@@ -21,9 +21,14 @@ export default async function PokerPage() {
         <Link href="/" className="text-xs text-muted hover:text-foreground">
           ← aderugy.fr
         </Link>
-        <Link href="/poker/spots" className="text-xs text-muted hover:text-foreground">
-          Solver notes →
-        </Link>
+        <span className="flex gap-4">
+          <Link href="/poker/spots" className="text-xs text-muted hover:text-foreground">
+            Solver notes →
+          </Link>
+          <Link href="/poker/trainers" className="text-xs text-muted hover:text-foreground">
+            Trainers →
+          </Link>
+        </span>
       </div>
       <h1 className="mt-3 text-lg font-semibold tracking-tight">Poker odds</h1>
       <p className="mt-1 text-sm text-muted">

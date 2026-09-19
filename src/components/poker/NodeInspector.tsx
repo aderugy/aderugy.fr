@@ -5,6 +5,8 @@ import { ACTION_SWATCHES, colorForKind } from "@/lib/solver/colors";
 import { CardPicker } from "@/components/poker/CardPicker";
 import { NodeNotes } from "@/components/poker/NodeNotes";
 import { Segmented } from "@/components/poker/ui";
+import { AddToTrainer } from "@/components/poker/trainer/AddToTrainer";
+import { SEATS, derivedPosition, isSeat, type Seat } from "@/lib/solver/seats";
 import {
   ACTION_KIND_LABELS,
   ACTION_KINDS,
@@ -19,6 +21,7 @@ import {
   type NodeData,
   type NodeType,
   type PokerNode,
+  type StrategyData,
 } from "@/lib/solver/types";
 
 export type ImportResult =
@@ -27,6 +30,7 @@ export type ImportResult =
 
 export function NodeInspector({
   node,
+  path,
   parent,
   dead,
   childSuggestions,
@@ -38,6 +42,8 @@ export function NodeInspector({
   onClose,
 }: {
   node: PokerNode;
+  /** Root → this node, every ancestor included. */
+  path: PokerNode[];
   parent: PokerNode | null;
   dead: Set<string>;
   childSuggestions: NodeType[];
@@ -66,6 +72,7 @@ export function NodeInspector({
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
         <Editor
           node={node}
+          path={path}
           parent={parent}
           dead={dead}
           onPatch={onPatch}
@@ -109,6 +116,7 @@ export function NodeInspector({
 
 function Editor({
   node,
+  path,
   parent,
   dead,
   onPatch,
@@ -116,6 +124,7 @@ function Editor({
   onImportCsv,
 }: {
   node: PokerNode;
+  path: PokerNode[];
   parent: PokerNode | null;
   dead: Set<string>;
   onPatch: (data: NodeData) => void;
@@ -155,6 +164,7 @@ function Editor({
         <StrategyMeta
           key={node.id}
           node={node}
+          path={path}
           onPatch={onPatch}
           onOpenStrategy={onOpenStrategy}
           onImportCsv={onImportCsv}
@@ -199,11 +209,13 @@ function TextEditor({ node, onPatch }: { node: PokerNode; onPatch: (data: NodeDa
 
 function StrategyMeta({
   node,
+  path,
   onPatch,
   onOpenStrategy,
   onImportCsv,
 }: {
   node: PokerNode;
+  path: PokerNode[];
   onPatch: (data: NodeData) => void;
   onOpenStrategy: () => void;
   onImportCsv: (text: string) => Promise<ImportResult>;
@@ -270,19 +282,8 @@ function StrategyMeta({
           className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
         />
       </label>
-      <div>
-        <p className="mb-1 text-xs text-muted">Position</p>
-        <Segmented
-          size="sm"
-          value={data.position ?? "none"}
-          onChange={(v) => onPatch({ ...data, position: v === "none" ? null : (v as "OOP" | "IP") })}
-          options={[
-            { id: "none", label: "—" },
-            { id: "OOP", label: "OOP" },
-            { id: "IP", label: "IP" },
-          ]}
-        />
-      </div>
+      <SeatFields data={data} onPatch={onPatch} />
+      <AddToTrainer node={node} path={path} />
       <div>
         <p className="mb-1 text-xs text-muted">Actions</p>
         <div className="flex flex-wrap gap-1">
@@ -474,5 +475,93 @@ function ActionEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Who plays this strategy and against whom. Once both seats are set, IP / OOP
+ * is derived and the manual toggle becomes a read-out; without them the old
+ * toggle still works, so existing nodes keep their meaning.
+ */
+function SeatFields({
+  data,
+  onPatch,
+}: {
+  data: StrategyData;
+  onPatch: (data: NodeData) => void;
+}) {
+  function setSeats(seat: Seat | null, vsSeat: Seat | null) {
+    const derived = derivedPosition(seat, vsSeat);
+    onPatch({ ...data, seat, vsSeat, position: derived ?? data.position ?? null });
+  }
+  const derived = derivedPosition(data.seat, data.vsSeat);
+  const sameSeat = !!data.seat && data.seat === data.vsSeat;
+
+  return (
+    <div>
+      <p className="mb-1 text-xs text-muted">Positions</p>
+      <div className="flex items-center gap-1.5 text-xs">
+        <SeatSelect
+          label="Plays"
+          value={data.seat ?? null}
+          onChange={(seat) => setSeats(seat, data.vsSeat ?? null)}
+        />
+        <span className="text-muted">vs</span>
+        <SeatSelect
+          label="Against"
+          value={data.vsSeat ?? null}
+          onChange={(vs) => setSeats(data.seat ?? null, vs)}
+        />
+        {derived && (
+          <span className="ml-auto rounded border border-line px-1.5 py-0.5 text-[11px] font-medium">
+            {derived}
+          </span>
+        )}
+      </div>
+      {sameSeat && <p className="mt-1 text-[11px] text-red-500">Pick two different seats.</p>}
+      {!derived && !sameSeat && (
+        <div className="mt-1.5">
+          <Segmented
+            size="sm"
+            value={data.position ?? "none"}
+            onChange={(v) => onPatch({ ...data, position: v === "none" ? null : (v as "OOP" | "IP") })}
+            options={[
+              { id: "none", label: "—" },
+              { id: "OOP", label: "OOP" },
+              { id: "IP", label: "IP" },
+            ]}
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            Set both seats to use this node in a trainer; IP / OOP then follows from them.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeatSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: Seat | null;
+  onChange: (seat: Seat | null) => void;
+}) {
+  return (
+    <select
+      aria-label={label}
+      value={value ?? ""}
+      onChange={(e) => onChange(isSeat(e.target.value) ? e.target.value : null)}
+      className="rounded border border-line bg-background px-1.5 py-1 text-xs text-foreground outline-none focus:border-accent"
+    >
+      <option value="">—</option>
+      {SEATS.map((seat) => (
+        <option key={seat} value={seat}>
+          {seat}
+        </option>
+      ))}
+    </select>
   );
 }

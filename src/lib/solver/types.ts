@@ -7,6 +7,8 @@
  * arrives as `unknown` and is narrowed per node type by the helpers below.
  */
 
+import { derivedPosition, isSeat, type Seat } from "./seats";
+
 export type NodeType = "text" | "flop" | "turn" | "river" | "strategy" | "action";
 
 export const NODE_TYPES: NodeType[] = [
@@ -70,7 +72,15 @@ export type FlopData = { cards: string[] }; // up to 3 cards like "Ah"
 export type StreetData = { card: string | null }; // turn / river
 export type StrategyData = {
   label?: string;
+  /**
+   * IP / OOP. Set by hand on older nodes; derived from `seat` / `vsSeat` as
+   * soon as both are set, and kept in sync by the inspector.
+   */
   position?: "OOP" | "IP" | null;
+  /** Who plays this node (hero when it is trained). */
+  seat?: Seat | null;
+  /** The opponent. */
+  vsSeat?: Seat | null;
   actions: StrategyAction[];
 };
 export type ActionData = {
@@ -147,11 +157,21 @@ export function asStreet(node: PokerNode): StreetData {
 
 export function asStrategy(node: PokerNode): StrategyData {
   const d = node.data as Partial<StrategyData>;
+  const seat = isSeat(d.seat) ? d.seat : null;
+  const vsSeat = isSeat(d.vsSeat) ? d.vsSeat : null;
   return {
     label: d.label,
-    position: d.position ?? null,
+    position: derivedPosition(seat, vsSeat) ?? d.position ?? null,
+    seat,
+    vsSeat,
     actions: Array.isArray(d.actions) ? d.actions : [],
   };
+}
+
+/** What a card shows for a strategy's position: "BTN vs BB" once seated, else IP / OOP. */
+export function strategyPositionText(data: StrategyData): string | null {
+  if (data.seat && data.vsSeat) return `${data.seat} vs ${data.vsSeat}`;
+  return data.position ?? null;
 }
 
 export function asAction(node: PokerNode): ActionData {

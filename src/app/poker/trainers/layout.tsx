@@ -4,9 +4,9 @@ import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
 import { PokerNav } from "@/components/poker/PokerNav";
 
-export default async function SpotsLayout({
+export default async function TrainersLayout({
   children,
-}: LayoutProps<"/poker/spots">) {
+}: LayoutProps<"/poker/trainers">) {
   const supabase = await createClient();
   const {
     data: { user },

@@ -6,7 +6,7 @@ export const HOME_PATH = "/agenda";
 
 // Segment roots a `next` may point at. Both feature areas share the one Google
 // sign-in, so a redirect target is legitimate for either.
-const ALLOWED_ROOTS = [HOME_PATH, "/poker/spots"];
+const ALLOWED_ROOTS = [HOME_PATH, "/poker/spots", "/poker/trainers"];
 
 /**
  * The only function allowed to turn a `next` parameter into a redirect target.

@@ -7,8 +7,10 @@ import type { PokerNode, PokerSpot } from "@/lib/solver/types";
 
 export default async function SpotPage({
   params,
+  searchParams,
 }: PageProps<"/poker/spots/[spotId]">) {
   const { spotId } = await params;
+  const { node: focusNode } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -43,6 +45,26 @@ export default async function SpotPage({
   if (!spotRes.data) notFound();
 
   const spot = spotRes.data as PokerSpot;
+
+  // ?node=<id> (from a trainer): the ids from the root down to that node.
+  let focusPath: string[] | undefined;
+  if (typeof focusNode === "string") {
+    const { data: links } = await supabase
+      .from("poker_nodes")
+      .select("id, parent_id")
+      .eq("user_id", user.id)
+      .eq("spot_id", spotId);
+    const parentOf = new Map((links ?? []).map((l) => [l.id as string, l.parent_id as string | null]));
+    if (parentOf.has(focusNode)) {
+      const path: string[] = [];
+      let cur: string | null = focusNode;
+      while (cur && path.length <= parentOf.size) {
+        path.push(cur);
+        cur = parentOf.get(cur) ?? null;
+      }
+      focusPath = path.reverse();
+    }
+  }
   const roots = (rootsRes.data ?? []) as PokerNode[];
 
   return (
@@ -54,7 +76,7 @@ export default async function SpotPage({
         <h1 className="truncate text-sm font-medium">{spot.name}</h1>
       </div>
       <div className="min-h-0 flex-1">
-        <SpotCanvas spotId={spot.id} initialNodes={roots} />
+        <SpotCanvas spotId={spot.id} initialNodes={roots} focusPath={focusPath} />
       </div>
     </div>
   );
