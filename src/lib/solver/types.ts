@@ -54,7 +54,16 @@ export type NodeData =
   | StreetData
   | StrategyData
   | ActionData
+  | NodeMeta
   | Record<string, never>;
+
+/**
+ * Free-form notes every node type can carry alongside its own payload: a short
+ * summary shown on the canvas card and extensive Markdown notes. They live in
+ * the same `data` jsonb; the canvas merges patches into it, so type-specific
+ * edits never drop them.
+ */
+export type NodeMeta = { summary?: string; notes?: string };
 
 export type TextData = { title: string; body: string };
 export type FlopData = { cards: string[] }; // up to 3 cards like "Ah"
@@ -153,5 +162,13 @@ export function asAction(node: PokerNode): ActionData {
     sizePct: d.sizePct ?? null,
     label: d.label ?? "Action",
     color: d.color ?? "#64748b",
+  };
+}
+
+export function asMeta(node: PokerNode): { summary: string; notes: string } {
+  const d = node.data as NodeMeta;
+  return {
+    summary: typeof d.summary === "string" ? d.summary : "",
+    notes: typeof d.notes === "string" ? d.notes : "",
   };
 }

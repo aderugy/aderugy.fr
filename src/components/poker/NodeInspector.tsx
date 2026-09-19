@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ACTION_SWATCHES, colorForKind } from "@/lib/solver/colors";
 import { CardPicker } from "@/components/poker/CardPicker";
+import { NodeNotes } from "@/components/poker/NodeNotes";
 import { Segmented } from "@/components/poker/ui";
 import {
   ACTION_KIND_LABELS,
@@ -71,6 +72,8 @@ export function NodeInspector({
           onOpenStrategy={onOpenStrategy}
           onImportCsv={onImportCsv}
         />
+
+        <NodeNotes key={`notes-${node.id}`} node={node} onPatch={onPatch} />
 
         <div>
           <p className="mb-1 text-xs font-medium text-muted">Add child</p>

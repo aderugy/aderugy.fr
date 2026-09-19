@@ -16,12 +16,15 @@ export function StrategyReview({
   actions,
   weights,
   dead,
+  footer,
   onClose,
 }: {
   title: string;
   actions: StrategyAction[];
   weights: StrategyWeights;
   dead: Set<string>;
+  /** Extra content under the grid (the node's notes). */
+  footer?: React.ReactNode;
   onClose: () => void;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
@@ -66,6 +69,7 @@ export function StrategyReview({
             <HoverDetail hand={hovered} actions={actions} weights={weights} dead={dead} />
           </>
         )}
+        {footer && <div className="mt-4 border-t border-line pt-3">{footer}</div>}
       </div>
     </aside>
   );

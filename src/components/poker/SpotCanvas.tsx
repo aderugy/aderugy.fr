@@ -26,7 +26,8 @@ import {
   type StrategyWeights,
 } from "@/lib/solver/types";
 import type { ImportResult } from "@/components/poker/NodeInspector";
-import { NodeCard, type CanvasMode } from "@/components/poker/NodeCard";
+import { MiniNodeCard, NodeCard, type CanvasMode } from "@/components/poker/NodeCard";
+import { NotesView } from "@/components/poker/NodeNotes";
 import { NodeInspector } from "@/components/poker/NodeInspector";
 import { StrategyEditor } from "@/components/poker/StrategyEditor";
 import { StrategyReview } from "@/components/poker/StrategyReview";
@@ -162,17 +163,37 @@ export function SpotCanvas({
 
   /* -------------------------------------------------------- visible + layout */
 
-  const visible = useMemo(() => {
+  // Expanded nodes show their children as full cards; a collapsed node shows
+  // its (loaded) children as tiny chips, which expand it when clicked.
+  const { visible, minis } = useMemo(() => {
     const out: PokerNode[] = [];
+    const minis = new Set<string>();
     const walk = (node: PokerNode) => {
       out.push(node);
+      const kids = childrenOf.get(node.id) ?? [];
       if (expanded.has(node.id)) {
-        for (const child of childrenOf.get(node.id) ?? []) walk(child);
+        for (const child of kids) walk(child);
+      } else {
+        for (const child of kids) {
+          out.push(child);
+          minis.add(child.id);
+        }
       }
     };
     for (const root of childrenOf.get(null) ?? []) walk(root);
-    return out;
+    return { visible: out, minis };
   }, [childrenOf, expanded]);
+
+  // Collapsed nodes need their children loaded to show them as chips.
+  useEffect(() => {
+    const need = visible
+      .filter((n) => !minis.has(n.id) && !expanded.has(n.id) && withChildren.has(n.id) && !loaded.has(n.id))
+      .map((n) => n.id);
+    if (need.length === 0) return;
+    // Fetches resolve asynchronously; state is only set once data arrives.
+    void Promise.all(need.map((id) => ensureChildren(id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, minis, expanded, withChildren, loaded]);
 
   // Rendered node sizes, fed back into the layout so boxes of any size (a
   // revision-mode strategy bubble is far taller than the default) never
@@ -263,8 +284,22 @@ export function SpotCanvas({
 
   /* --------------------------------------------------------------- mutations */
 
-  function persistData(id: string, data: NodeData) {
-    setNodesById((prev) => ({ ...prev, [id]: { ...prev[id], data } }));
+  // Latest nodes, so back-to-back patches in one tick merge onto each other.
+  const nodesRef = useRef(nodesById);
+  useEffect(() => {
+    nodesRef.current = nodesById;
+  }, [nodesById]);
+
+  /**
+   * Patch a node's data. Patches are merged into the stored data, so an editor
+   * that only knows its own fields (cards, actions…) never drops the others
+   * (summary, notes).
+   */
+  function persistData(id: string, patch: NodeData) {
+    const current = nodesRef.current[id];
+    const data = { ...((current?.data ?? {}) as object), ...(patch as object) } as NodeData;
+    if (current) nodesRef.current = { ...nodesRef.current, [id]: { ...current, data } };
+    setNodesById((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], data } } : prev));
     startTransition(async () => {
       const r = await updateNode({ id, data });
       if (!r.ok) setError(r.error);
@@ -570,7 +605,7 @@ export function SpotCanvas({
   }
 
   function handleSelect(node: PokerNode) {
-    if (mode === "revision" && node.type === "strategy") {
+    if (mode === "revision") {
       setReviewNodeId(node.id);
     } else {
       setSelectedId(node.id);
@@ -648,10 +683,7 @@ export function SpotCanvas({
 
   const selected = selectedId ? nodesById[selectedId] : null;
   const selectedParent = selected?.parent_id ? nodesById[selected.parent_id] ?? null : null;
-  const reviewNode =
-    reviewNodeId && nodesById[reviewNodeId]?.type === "strategy"
-      ? nodesById[reviewNodeId]
-      : null;
+  const reviewNode = reviewNodeId ? (nodesById[reviewNodeId] ?? null) : null;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -724,13 +756,15 @@ export function SpotCanvas({
               const x2 = b.x + b.w / 2;
               const y2 = b.y;
               const mid = (y1 + y2) / 2;
+              const toMini = minis.has(to);
               return (
                 <path
                   key={`${from}-${to}`}
                   d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
                   className="stroke-line"
                   fill="none"
-                  strokeWidth={1.5}
+                  strokeWidth={toMini ? 1 : 1.5}
+                  strokeDasharray={toMini ? "3 3" : undefined}
                 />
               );
             })}
@@ -747,6 +781,12 @@ export function SpotCanvas({
                 y={pos.y}
                 observer={getObserver}
               >
+                {minis.has(node.id) ? (
+                  <MiniNodeCard
+                    node={node}
+                    onClick={() => node.parent_id && void expand(node.parent_id)}
+                  />
+                ) : (
                 <NodeCard
                   node={node}
                   mode={mode}
@@ -759,6 +799,7 @@ export function SpotCanvas({
                   onSelect={() => handleSelect(node)}
                   onToggle={() => toggle(node.id)}
                 />
+                )}
               </MeasuredNode>
             );
           })}
@@ -791,15 +832,37 @@ export function SpotCanvas({
       )}
 
       {/* Strategy review drawer (revision mode) */}
-      {mode === "revision" && reviewNode && (
+      {mode === "revision" && reviewNode?.type === "strategy" && (
         <StrategyReview
           key={reviewNode.id}
           title={`${asStrategy(reviewNode).label || "Strategy"}`}
           actions={asStrategy(reviewNode).actions}
           weights={strategyWeights[reviewNode.id] ?? emptyWeights()}
           dead={deadCardsFor(reviewNode.id)}
+          footer={<NotesView node={reviewNode} />}
           onClose={() => setReviewNodeId(null)}
         />
+      )}
+
+      {/* Notes drawer for any other node (revision mode) */}
+      {mode === "revision" && reviewNode && reviewNode.type !== "strategy" && (
+        <aside className="absolute right-0 top-0 z-20 flex h-full w-[26rem] max-w-full flex-col border-l border-line bg-surface shadow-xl">
+          <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+              {NODE_LABELS[reviewNode.type]}
+            </span>
+            <button
+              type="button"
+              onClick={() => setReviewNodeId(null)}
+              className="ml-auto text-xs text-muted hover:text-foreground"
+            >
+              Close
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <NotesView node={reviewNode} />
+          </div>
+        </aside>
       )}
 
       {/* Strategy grid editor (edit mode) */}

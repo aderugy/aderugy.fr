@@ -3,6 +3,7 @@
 import { cardSuit, SUIT_COLORS, SUIT_SYMBOLS, type Suit } from "@/lib/solver/cards";
 import {
   asAction,
+  asMeta,
   asFlop,
   asStrategy,
   asStreet,
@@ -40,6 +41,7 @@ export function NodeCard({
   onSelect: () => void;
   onToggle: () => void;
 }) {
+  const { summary, notes } = asMeta(node);
   return (
     <div
       style={{ width: NODE_W, minHeight: NODE_H }}
@@ -49,23 +51,34 @@ export function NodeCard({
         selected ? "border-accent ring-1 ring-accent" : "border-line hover:border-accent",
       ].join(" ")}
     >
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-        {NODE_LABELS[node.type]}
-      </span>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+          {NODE_LABELS[node.type]}
+        </span>
+        {notes.trim() && (
+          <span title="Has notes" className="text-muted">
+            <NotesIcon />
+          </span>
+        )}
+        {hasChildren && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            title={expanded ? "Collapse children" : "Expand children"}
+            className="-m-1 ml-auto rounded p-1 text-muted hover:bg-background hover:text-accent"
+          >
+            <EyeIcon open={expanded} />
+          </button>
+        )}
+      </div>
       <div className="mt-1 min-h-0 flex-1 text-sm">
         <NodeBody node={node} mode={mode} weights={weights} dead={dead} frequency={frequency} />
       </div>
-      {hasChildren && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className="mt-1 self-start text-[11px] text-muted hover:text-accent"
-        >
-          {expanded ? "▾ collapse" : "▸ expand"}
-        </button>
+      {summary && (
+        <p className="mt-1.5 line-clamp-3 whitespace-pre-line text-xs text-muted">{summary}</p>
       )}
     </div>
   );
@@ -176,6 +189,94 @@ function NodeBody({
 function formatFrequency(pct: number): string {
   if (pct <= 0) return "0%";
   return `${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}%`;
+}
+
+/**
+ * A collapsed child, shrunk to its essentials: the action for an action node,
+ * position + name for a strategy, the card(s) for a street, the title for a
+ * note. Clicking it expands the parent.
+ */
+export function MiniNodeCard({ node, onClick }: { node: PokerNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Expand"
+      className="flex max-w-[150px] items-center gap-1 rounded-md border border-line bg-surface px-1.5 py-1 text-[10px] leading-none shadow-sm hover:border-accent"
+    >
+      <MiniBody node={node} />
+    </button>
+  );
+}
+
+function MiniBody({ node }: { node: PokerNode }) {
+  switch (node.type) {
+    case "action": {
+      const a = asAction(node);
+      return (
+        <span className="truncate rounded-sm px-1 py-0.5 text-white" style={{ backgroundColor: a.color }}>
+          {a.label}
+        </span>
+      );
+    }
+    case "strategy": {
+      const { position, label } = asStrategy(node);
+      const text = [position, label].filter(Boolean).join(" · ");
+      return <span className="truncate font-medium">{text || "Strategy"}</span>;
+    }
+    case "flop": {
+      const { cards } = asFlop(node);
+      return cards.length ? <MiniCards cards={cards} /> : <span className="text-muted">Flop</span>;
+    }
+    case "turn":
+    case "river": {
+      const { card } = asStreet(node);
+      return card ? <MiniCards cards={[card]} /> : <span className="text-muted">{NODE_LABELS[node.type]}</span>;
+    }
+    case "text":
+      return <span className="truncate">{asText(node).title || "Note"}</span>;
+    default:
+      return <span className="text-muted">{NODE_LABELS[node.type]}</span>;
+  }
+}
+
+function MiniCards({ cards }: { cards: string[] }) {
+  return (
+    <span className="flex gap-0.5">
+      {cards.map((card) => {
+        const suit = cardSuit(card) as Suit;
+        return (
+          <span
+            key={card}
+            className="rounded-sm border border-line bg-background px-0.5 py-px font-semibold"
+            style={{ color: SUIT_COLORS[suit] }}
+          >
+            {card[0]}
+            {SUIT_SYMBOLS[suit]}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function EyeIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+      {!open && <path d="M3 3l18 18" />}
+    </svg>
+  );
+}
+
+function NotesIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+      <path d="M14 3v6h6M8 13h8M8 17h5" />
+    </svg>
+  );
 }
 
 function Cards({ cards, placeholder }: { cards: string[]; placeholder: string }) {
