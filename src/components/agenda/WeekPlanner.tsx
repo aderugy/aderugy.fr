@@ -256,7 +256,23 @@ export function WeekPlanner({
     [externalEvents, calendarSources, weekStartDate, googleConnected],
   );
 
-  const totalMinutes = items.reduce(
+  /**
+   * The blocks that belong to the week on screen. The page fetches a day either
+   * side as timezone padding, so `items` also holds the Sunday before and the
+   * Monday after — fine for the grid, which only lays out days 0–6, but every
+   * total must stick to the displayed week or the neighbours leak into it.
+   * A block belongs to the day it starts on, the same rule the grid uses.
+   */
+  const weekItems = useMemo(
+    () =>
+      items.filter((b) => {
+        const day = dayIndexOf(weekStartDate, new Date(b.starts_at));
+        return day >= 0 && day <= 6;
+      }),
+    [items, weekStartDate],
+  );
+
+  const totalMinutes = weekItems.reduce(
     (sum, b) =>
       sum +
       Math.round(
@@ -579,7 +595,7 @@ export function WeekPlanner({
               week={week}
               categories={categories}
               objectives={objectives}
-              scheduled={items}
+              scheduled={weekItems}
               externalMinutes={externalMinutes}
               hiddenCategories={hiddenCategories}
               onToggleCategory={onToggleCategory}
