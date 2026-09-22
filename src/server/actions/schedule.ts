@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 import { ensureWeek, syncTaskStatus } from "@/server/weeks";
 import { queuePush } from "@/server/push";
+import { resizedChildMinutes } from "@/lib/blocks";
 
 type PlacedResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -312,6 +313,17 @@ export async function moveScheduled(input: {
     const ends = new Date(input.endsAt);
     if (ends <= starts) return { ok: false, error: "End must be after start" };
 
+    // Read the span and the tasks before writing: a resize carries a single
+    // task along with the block, and that rule needs the old span.
+    const { data: before, error: readError } = await supabase
+      .from("scheduled_blocks")
+      .select("starts_at, ends_at, scheduled_block_tasks(task_id, planned_minutes, position)")
+      .eq("id", input.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!before) return { ok: false, error: "Block not found" };
+
     const { error } = await supabase
       .from("scheduled_blocks")
       .update({
@@ -322,6 +334,29 @@ export async function moveScheduled(input: {
       .eq("id", input.id)
       .eq("user_id", user.id);
     if (error) throw error;
+
+    const links = [...(before.scheduled_block_tasks ?? [])].sort(
+      (a, b) => a.position - b.position || a.task_id.localeCompare(b.task_id),
+    );
+    const fromMinutes = Math.round(
+      (new Date(before.ends_at).getTime() - new Date(before.starts_at).getTime()) / 60_000,
+    );
+    const toMinutes = Math.round((ends.getTime() - starts.getTime()) / 60_000);
+    const resized = resizedChildMinutes(
+      links.map((l) => l.planned_minutes),
+      fromMinutes,
+      toMinutes,
+    );
+    for (const [i, link] of links.entries()) {
+      if (resized[i] === link.planned_minutes) continue;
+      const { error: linkError } = await supabase
+        .from("scheduled_block_tasks")
+        .update({ planned_minutes: resized[i] })
+        .eq("user_id", user.id)
+        .eq("scheduled_block_id", input.id)
+        .eq("task_id", link.task_id);
+      if (linkError) throw linkError;
+    }
 
     await queuePush(supabase);
     return { ok: true };

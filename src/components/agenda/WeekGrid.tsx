@@ -20,6 +20,7 @@ import {
 } from "@/lib/time";
 import type { AllDayItem, DragPayload, GridItem } from "@/lib/types";
 import { mergeSpans } from "@/lib/external";
+import { resizedChildMinutes } from "@/lib/blocks";
 
 /** Soft cap per day. Planned and committed time are measured against it together. */
 export const DAILY_CAPACITY_MIN = 10 * 60;
@@ -747,6 +748,22 @@ export function WeekGrid({
                     // outline drawn around them.
                     const filled = item.children.length > 0;
 
+                    // Mid-resize, a single task stretches with its block, as it
+                    // will once the move lands (resizedChildMinutes).
+                    const storedMinutes = Math.round(
+                      (new Date(item.endsAt).getTime() -
+                        new Date(item.startsAt).getTime()) /
+                        60_000,
+                    );
+                    const childSpans =
+                      drag?.id === item.id && drag.mode === "resize"
+                        ? resizedChildMinutes(
+                            item.children.map((c) => c.minutes),
+                            storedMinutes,
+                            endMin - startMin,
+                          )
+                        : item.children.map((c) => c.minutes);
+
                     const hasMultipleChildren = item.children.length > 1;
 
                     // A filled block only greys its outline. Its children fade
@@ -819,11 +836,11 @@ export function WeekGrid({
                       >
                         {filled ? (
                           <div className="relative h-full">
-                            {item.children.map((child) => {
+                            {item.children.map((child, i) => {
                               const childTop =
                                 (child.offsetMinutes / SLOT_MIN) * PX_PER_SLOT;
                               const childHeight =
-                                (child.minutes / SLOT_MIN) * PX_PER_SLOT;
+                                (childSpans[i] / SLOT_MIN) * PX_PER_SLOT;
                               const childDimmed =
                                 child.categoryId !== null &&
                                 hiddenCategories.has(child.categoryId);
@@ -836,7 +853,7 @@ export function WeekGrid({
                                   key={child.id}
                                   title={`${child.label}${
                                     child.description ? ` — ${child.description}` : ""
-                                  } · ${fmtDuration(child.minutes)}${
+                                  } · ${fmtDuration(childSpans[i])}${
                                     childDimmed ? "\nHidden from the week's totals." : ""
                                   }`}
                                   className={`absolute inset-x-0 overflow-hidden rounded-sm border-l-[3px] px-1 shadow-sm ${

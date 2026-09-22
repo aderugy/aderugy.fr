@@ -66,3 +66,26 @@ export function plannedMinutesByCategory(
 
   return out;
 }
+
+/**
+ * What the tasks of a block become when the block is resized from `fromMinutes`
+ * to `toMinutes`, aligned with `minutes` (the tasks in stacking order).
+ *
+ * One task: it follows the block when it filled it (or overfilled it) — the
+ * usual case, a block drawn on the grid or a single backlog task dropped in.
+ * A task deliberately shorter than its block keeps its minutes, and is only
+ * clipped if the block shrinks under it.
+ *
+ * Several tasks: unchanged. Which of them should absorb the difference is a
+ * choice, not arithmetic, so the block grows unclaimed time instead.
+ */
+export function resizedChildMinutes(
+  minutes: number[],
+  fromMinutes: number,
+  toMinutes: number,
+): number[] {
+  if (minutes.length !== 1 || fromMinutes === toMinutes) return minutes;
+  const [only] = minutes;
+  if (only >= fromMinutes) return [toMinutes];
+  return [Math.min(only, toMinutes)];
+}

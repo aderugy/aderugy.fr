@@ -27,7 +27,7 @@ import type {
   Week,
 } from "@/lib/types";
 import { externalItems, externalMinutesByCategory } from "@/lib/external";
-import { blockChildren, blockMinutes, childMinutes } from "@/lib/blocks";
+import { blockChildren, blockMinutes, childMinutes, resizedChildMinutes } from "@/lib/blocks";
 import { CalendarLiveness } from "./CalendarLiveness";
 import { ExternalDetail } from "./ExternalDetail";
 import {
@@ -414,10 +414,26 @@ export function WeekPlanner({
     if (!previous) return;
 
     setGridError(null);
+    // A resize carries a single task along with it (see resizedChildMinutes);
+    // the server applies the same rule, so the refresh agrees with this paint.
+    const toMinutes = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
+    const resized = resizedChildMinutes(
+      previous.scheduled_block_tasks.map((l) => l.planned_minutes),
+      blockMinutes(previous),
+      toMinutes,
+    );
     setItems((prev) =>
       prev.map((b) =>
         b.id === id
-          ? { ...b, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() }
+          ? {
+              ...b,
+              starts_at: startsAt.toISOString(),
+              ends_at: endsAt.toISOString(),
+              scheduled_block_tasks: b.scheduled_block_tasks.map((l, i) => ({
+                ...l,
+                planned_minutes: resized[i] ?? l.planned_minutes,
+              })),
+            }
           : b,
       ),
     );
