@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { comboToHand } from "@/lib/solver/cards";
+import { comboCards, comboToHand } from "@/lib/solver/cards";
 import { StrategyGrid } from "@/components/poker/StrategyGrid";
 import { comboPool, pickWeighted, type ComboEntry } from "@/lib/trainer/deal";
 import { buildScene, type Scene } from "@/lib/trainer/scene";
@@ -12,6 +12,7 @@ import { bands, normalize, playableFreqs, rollRng, scoreAnswer, sessionScore, ty
 import { GRADE_LABELS, type DrillNode, type Grade, type Trainer } from "@/lib/trainer/types";
 import { endSession, startSession } from "@/server/actions/trainers";
 import { PokerTable } from "@/components/poker/trainer/PokerTable";
+import { BoardCards } from "@/components/poker/trainer/Cards";
 
 type Hand = {
   drill: DrillNode;
@@ -246,9 +247,12 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
   }
 
   return (
-    <div className="space-y-3">
+    // Phones: the drill takes the whole screen (over the site header) and never
+    // scrolls — bar, table sized to what is left, actions. From `sm` it stays
+    // inline in the page.
+    <div className="flex flex-col gap-2 max-sm:fixed max-sm:inset-0 max-sm:z-50 max-sm:overscroll-none max-sm:bg-background max-sm:px-3 max-sm:pt-[max(0.5rem,env(safe-area-inset-top))] max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:gap-3">
       {/* Session bar */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs">
+      <div className="flex shrink-0 items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs sm:gap-x-4 sm:py-2">
         <span>
           <span className="text-muted">Hands</span> <b className="tabular-nums">{stats.hands}</b>
         </span>
@@ -257,7 +261,11 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
           <b className="tabular-nums">{score === null ? "—" : `${Math.round(score)}%`}</b>
         </span>
         <span>
-          <span className="text-muted">Blunders</span> <b className="tabular-nums">{stats.counts.blunder}</b>
+          <span className="text-muted">
+            <span className="sm:hidden">Blund.</span>
+            <span className="hidden sm:inline">Blunders</span>
+          </span>{" "}
+          <b className="tabular-nums">{stats.counts.blunder}</b>
         </span>
         {stats.hands > 0 && (
           <span className="hidden sm:inline">
@@ -265,33 +273,41 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
             <b className="tabular-nums">{(stats.ms / stats.hands / 1000).toFixed(1)}s</b>
           </span>
         )}
-        {unsynced > 0 && <span className="text-amber-600">saving…</span>}
+        {unsynced > 0 && <span className="hidden text-amber-600 sm:inline">saving…</span>}
         <button
           type="button"
           onClick={() => void end()}
-          className="ml-auto rounded border border-line px-3 py-1 hover:border-red-500 hover:text-red-500"
+          className="ml-auto shrink-0 rounded border border-line px-3 py-1 hover:border-red-500 hover:text-red-500"
         >
-          End session
+          End
+          <span className="hidden sm:inline"> session</span>
         </button>
       </div>
 
       {notices.length > 0 && (
-        <div className="rounded border border-line px-3 py-2 text-[11px] text-muted">
+        <button
+          type="button"
+          onClick={() => setNotices([])}
+          className="shrink-0 rounded border border-line px-3 py-1.5 text-left text-[11px] text-muted"
+          title="Dismiss"
+        >
           {notices.map((n) => (
-            <p key={n}>{n}</p>
+            <span key={n} className="block truncate">
+              {n}
+            </span>
           ))}
-        </div>
+        </button>
       )}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="shrink-0 text-xs text-red-500">{error}</p>}
 
       {hand && (
         <>
-          <div className="flex items-center justify-between gap-2 text-xs text-muted">
-            <span className="truncate">
+          <div className="flex shrink-0 flex-col gap-x-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0 truncate">
               {hand.drill.spotName}
               {hand.drill.label ? ` · ${hand.drill.label}` : ""}
             </span>
-            <span className="shrink-0">
+            <span className="min-w-0 truncate sm:shrink-0">
               {hand.scene.line.length > 0
                 ? hand.scene.line
                     .map((a) => `${a.seat} ${a.label.toLowerCase()}${a.amountBb != null ? ` (${fmt(a.amountBb)})` : ""}`)
@@ -300,48 +316,57 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
             </span>
           </div>
 
-          <PokerTable scene={hand.scene} combo={hand.entry.combo} />
+          <div className="flex items-center justify-center max-sm:min-h-0 max-sm:flex-1 max-sm:[container-type:size]">
+            <PokerTable scene={hand.scene} combo={hand.entry.combo} fit />
+          </div>
 
           {/* RNG + actions */}
-          <div className="flex gap-2">
-          <RngBadge value={hand.rng} />
-          <div
-            className="grid flex-1 gap-2"
-            style={{ gridTemplateColumns: `repeat(${Math.min(hand.scene.actions.length, 4)}, minmax(0, 1fr))` }}
-          >
-            {hand.scene.actions.map((a, i) => {
-              const picked = answer?.chosenIndex === i;
-              const expected = answer?.scored.expectedIndex === i;
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  disabled={!!answer}
-                  onClick={() => choose(i)}
-                  className={[
-                    "relative rounded-lg px-2 py-3 text-sm font-semibold text-white shadow transition",
-                    answer && !picked && !expected ? "opacity-40" : "",
-                    expected ? "ring-4 ring-emerald-400" : "",
-                    picked && !expected ? "ring-4 ring-red-500" : "",
-                  ].join(" ")}
-                  style={{ backgroundColor: a.color }}
-                >
-                  <span className="absolute left-1.5 top-1 text-[10px] font-normal opacity-70">{i + 1}</span>
-                  {a.label}
-                  {a.amountBb != null && (
-                    <span className="block text-[11px] font-normal opacity-90">
-                      {a.allIn ? "all-in " : ""}
-                      {fmt(a.amountBb)} bb
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <div className="flex shrink-0 gap-2">
+            <RngBadge value={hand.rng} />
+            <div
+              className="grid flex-1 gap-2"
+              style={{ gridTemplateColumns: `repeat(${Math.min(hand.scene.actions.length, 4)}, minmax(0, 1fr))` }}
+            >
+              {hand.scene.actions.map((a, i) => {
+                const picked = answer?.chosenIndex === i;
+                const expected = answer?.scored.expectedIndex === i;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    disabled={!!answer}
+                    onClick={() => choose(i)}
+                    className={[
+                      "relative touch-manipulation rounded-lg px-2 py-3 text-sm font-semibold text-white shadow transition",
+                      answer && !picked && !expected ? "opacity-40" : "",
+                      expected ? "ring-4 ring-emerald-400" : "",
+                      picked && !expected ? "ring-4 ring-red-500" : "",
+                    ].join(" ")}
+                    style={{ backgroundColor: a.color }}
+                  >
+                    <span className="absolute left-1.5 top-1 hidden text-[10px] font-normal opacity-70 sm:inline">{i + 1}</span>
+                    {a.label}
+                    {a.amountBb != null && (
+                      <span className="block text-[11px] font-normal opacity-90">
+                        {a.allIn ? "all-in " : ""}
+                        {fmt(a.amountBb)} bb
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {answer && (
-            <Feedback hand={hand} answer={answer} onNext={() => session && deal(session.drill, pools)} />
+            <ResultModal
+              hand={hand}
+              answer={answer}
+              stats={stats}
+              saving={unsynced > 0}
+              onNext={() => session && deal(session.drill, pools)}
+              onQuit={() => void end()}
+            />
           )}
         </>
       )}
@@ -421,7 +446,26 @@ export function BandBar({
   );
 }
 
-function Feedback({ hand, answer, onNext }: { hand: Hand; answer: Answer; onNext: () => void }) {
+/**
+ * The one popup after an answer: grade, the combo's bands with the roll, the
+ * frequencies, the node's range, and Next hand / Quit. A bottom sheet on
+ * phones, a centred dialog from `sm`.
+ */
+function ResultModal({
+  hand,
+  answer,
+  stats,
+  saving,
+  onNext,
+  onQuit,
+}: {
+  hand: Hand;
+  answer: Answer;
+  stats: Stats;
+  saving: boolean;
+  onNext: () => void;
+  onQuit: () => void;
+}) {
   const { actions, weights, context } = hand.drill;
   const norm = normalize(hand.entry.vector) ?? [];
   const play = playableFreqs(hand.entry.vector) ?? [];
@@ -429,53 +473,97 @@ function Feedback({ hand, answer, onNext }: { hand: Hand; answer: Answer; onNext
   const grade = answer.scored.grade;
   const expected = actions[answer.scored.expectedIndex];
   const hand169 = comboToHand(hand.entry.combo);
+  const cards = [...comboCards(hand.entry.combo)];
+  const score = sessionScore(stats.hands, stats.correct);
 
   return (
-    <div className="grid gap-4 rounded-lg border border-line bg-surface p-3 sm:grid-cols-[1fr_20rem]">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className={`rounded px-2 py-0.5 text-xs font-semibold ${GRADE_STYLES[grade]}`}>{GRADE_LABELS[grade]}</span>
-          <span className="text-xs text-muted">
-            {grade === "correct"
-              ? `Roll ${hand.rng} → ${expected?.label}.`
-              : `Roll ${hand.rng} → ${expected?.label}. You played ${actions[answer.chosenIndex].label} (${fmt(Math.round(answer.scored.chosenFreq * 10) / 10)}%).`}
-          </span>
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={GRADE_LABELS[grade]}
+    >
+      <div className="flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:max-h-[90dvh] sm:max-w-2xl sm:rounded-2xl">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="grid gap-4 sm:grid-cols-[1fr_15rem]">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className={`rounded-md px-2.5 py-1 text-sm font-semibold ${GRADE_STYLES[grade]}`}>
+                  {GRADE_LABELS[grade]}
+                </span>
+                <BoardCards cards={cards} size="xs" />
+                <span className="text-xs text-muted">{hand169}</span>
+              </div>
+              <p className="text-sm">
+                Roll <b className="tabular-nums">{hand.rng}</b> → <b>{expected?.label}</b>.
+                {grade !== "correct" && (
+                  <span className="text-muted">
+                    {" "}
+                    You played {actions[answer.chosenIndex].label} (
+                    {fmt(Math.round(answer.scored.chosenFreq * 10) / 10)}%).
+                  </span>
+                )}
+              </p>
+              <BandBar
+                vector={hand.entry.vector}
+                colors={actions.map((a) => a.color)}
+                labels={actions.map((a) => a.label)}
+                rng={hand.rng}
+              />
+              <table className="w-full text-xs">
+                <tbody>
+                  {actions.map((a, i) => (
+                    <tr key={a.id} className={i === answer.scored.expectedIndex ? "font-semibold" : ""}>
+                      <td className="py-0.5">
+                        <span
+                          className="mr-1.5 inline-block size-2.5 rounded-sm align-middle"
+                          style={{ backgroundColor: a.color }}
+                        />
+                        {a.label}
+                        {i === answer.chosenIndex && i !== answer.scored.expectedIndex && (
+                          <span className="ml-1 font-normal text-red-500">· you</span>
+                        )}
+                      </td>
+                      <td className="py-0.5 text-right tabular-nums">{fmt(Math.round((norm[i] ?? 0) * 10) / 10)}%</td>
+                      <td className="py-0.5 pl-3 text-right tabular-nums text-muted">
+                        {b[i] && b[i].end > b[i].start ? `${b[i].start}–${b[i].end - 1}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Capped by the screen height on phones so the sheet fits without scrolling. */}
+            <div className="mx-auto w-full max-w-[min(100%,32dvh)] sm:max-w-none">
+              <p className="mb-1 text-[11px] text-muted">{hand169} in the node&apos;s range</p>
+              <StrategyGrid actions={actions} weights={weights} dead={new Set(context.board)} hovered={hand169} />
+            </div>
+          </div>
         </div>
-        <BandBar
-          vector={hand.entry.vector}
-          colors={actions.map((a) => a.color)}
-          labels={actions.map((a) => a.label)}
-          rng={hand.rng}
-        />
-        <table className="w-full text-xs">
-          <tbody>
-            {actions.map((a, i) => (
-              <tr key={a.id} className={i === answer.scored.expectedIndex ? "font-semibold" : ""}>
-                <td className="py-0.5">
-                  <span className="mr-1.5 inline-block size-2.5 rounded-sm align-middle" style={{ backgroundColor: a.color }} />
-                  {a.label}
-                </td>
-                <td className="py-0.5 text-right tabular-nums">{fmt(Math.round((norm[i] ?? 0) * 10) / 10)}%</td>
-                <td className="py-0.5 pl-3 text-right tabular-nums text-muted">
-                  {b[i] && b[i].end > b[i].start ? `${b[i].start}–${b[i].end - 1}` : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button
-          type="button"
-          onClick={onNext}
-          className="w-full rounded bg-accent py-2 text-sm font-medium text-white"
-        >
-          Next hand <span className="opacity-70">(space)</span>
-        </button>
-      </div>
-      <div>
-        <p className="mb-1 text-[11px] text-muted">
-          {hand169} in the node&apos;s range
-        </p>
-        <StrategyGrid actions={actions} weights={weights} dead={new Set(context.board)} hovered={hand169} />
+
+        <div className="shrink-0 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <p className="mb-2 text-center text-[11px] text-muted tabular-nums">
+            Session: {stats.correct} / {stats.hands} correct
+            {score !== null ? ` · ${Math.round(score)}%` : ""}
+            {saving ? " · saving…" : ""}
+          </p>
+          <div className="grid grid-cols-[auto_1fr] gap-2">
+            <button
+              type="button"
+              onClick={onQuit}
+              className="rounded-lg border border-line px-4 py-2.5 text-sm hover:border-red-500 hover:text-red-500"
+            >
+              Quit
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              className="rounded-lg bg-accent py-2.5 text-sm font-medium text-white"
+            >
+              Next hand <span className="hidden opacity-70 sm:inline">(space)</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

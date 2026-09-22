@@ -53,14 +53,24 @@ function anchor(i: number, bet = false): CSSProperties {
 
 const POS = "absolute -translate-x-1/2 -translate-y-1/2 left-(--tx) top-(--ty) sm:left-(--wx) sm:top-(--wy)";
 
-export function PokerTable({ scene, combo }: { scene: Scene; combo: string | null }) {
+/**
+ * `fit` sizes the table to its container on phones instead of to the width:
+ * the parent must be a size container (`container-type: size`), and the table
+ * takes the largest 3:4 box that fits in it, so the drill never scrolls.
+ */
+export function PokerTable({ scene, combo, fit = false }: { scene: Scene; combo: string | null; fit?: boolean }) {
   const hero = scene.seats.find((s) => s.role === "hero");
   const order = hero ? seatsFromHero(hero.seat) : scene.seats.map((s) => s.seat);
   const bySeat = new Map(scene.seats.map((s) => [s.seat, s]));
   const heroCards = combo ? comboCards(combo) : null;
 
   return (
-    <div className="relative mx-auto aspect-[3/4] w-full max-w-md select-none sm:aspect-[16/9] sm:max-w-3xl">
+    <div
+      className={[
+        "relative mx-auto aspect-[3/4] w-full max-w-md select-none sm:aspect-[16/9] sm:max-w-3xl",
+        fit ? "max-sm:w-[min(100cqw,75cqh)] max-sm:max-w-none" : "",
+      ].join(" ")}
+    >
       {/* Felt */}
       <div
         className="absolute inset-[9%] rounded-[50%] border-[6px] border-[#5b3a1e] shadow-inner sm:inset-x-[7%] sm:inset-y-[13%]"
