@@ -9,11 +9,15 @@ const LINKS = [
   { href: "/poker", label: "Calculator" },
 ];
 
-/** The signed-in poker tools' shared nav: Solver notes · Trainers · Calculator. */
+/**
+ * The poker tools' shared nav: Solver notes · Trainers · Calculator. Scrolls
+ * rather than wraps, like the other sections' navs, so the header keeps one
+ * height on a phone.
+ */
 export function PokerNav() {
   const path = usePathname();
   return (
-    <nav className="flex min-w-0 items-center gap-3 sm:gap-5">
+    <nav className="-mx-1 flex min-w-0 items-center gap-3 overflow-x-auto px-1 sm:gap-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {LINKS.map((l) => {
         const active = l.href === "/poker" ? path === "/poker" : path === l.href || path.startsWith(`${l.href}/`);
         return (

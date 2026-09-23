@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
-import { SignOutButton } from "@/components/agenda/SignOutButton";
-import { PokerNav } from "@/components/poker/PokerNav";
+import { PokerHeader } from "@/components/poker/PokerHeader";
 
 export default async function TrainersLayout({
   children,
@@ -17,13 +16,7 @@ export default async function TrainersLayout({
 
   return (
     <div className="flex h-[100dvh] flex-col">
-      <header className="flex shrink-0 items-center gap-3 border-b border-line px-3 py-2 sm:gap-6 sm:px-5 sm:py-3">
-        <PokerNav />
-        <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-muted">
-          <span className="hidden lg:inline">{user.email}</span>
-          <SignOutButton />
-        </div>
-      </header>
+      <PokerHeader email={user.email ?? null} />
       <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>
   );
