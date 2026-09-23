@@ -1,0 +1,45 @@
+---
+kind: preuve
+difficulty: 3
+---
+Deux suites $(u_n)$ et $(v_n)$ sont dites **adjacentes** si $(u_n)$ est
+croissante, $(v_n)$ décroissante, et $v_n - u_n \to 0$.
+
+1. Montrer que $u_n \le v_n$ pour tout $n$.
+2. Montrer que les deux suites convergent vers une même limite $\ell$, et que
+   $u_n \le \ell \le v_n$ pour tout $n$.
+3. Application : montrer que la suite $S_n = \sum_{k=1}^{n} \dfrac{(-1)^{k+1}}{k}$
+   converge, en considérant $(S_{2n})$ et $(S_{2n+1})$.
+
+<!-- indice -->
+Pour 1, étudier la monotonie de la suite $w_n = v_n - u_n$.
+
+<!-- indice -->
+Pour 2, chaque suite est monotone et bornée par un terme de l'autre. Appliquer
+le théorème de la limite monotone à chacune, puis passer à la limite dans
+$v_n - u_n \to 0$.
+
+<!-- indice -->
+Pour 3, calculer $S_{2n+2} - S_{2n}$ et $S_{2n+1} - S_{2n-1}$, puis
+$S_{2n+1} - S_{2n}$.
+
+<!-- solution -->
+1. $w_n = v_n - u_n$ vérifie $w_{n+1} - w_n = (v_{n+1} - v_n) - (u_{n+1} - u_n)
+   \le 0$ : $(w_n)$ est décroissante. Comme $w_n \to 0$, si l'on avait
+   $w_{n_0} < 0$ pour un rang $n_0$, la décroissance donnerait $w_n \le w_{n_0}
+   < 0$ pour $n \ge n_0$, donc $\lim w_n \le w_{n_0} < 0$, contradiction. Donc
+   $w_n \ge 0$, c'est-à-dire $u_n \le v_n$.
+
+2. Par 1, $(u_n)$ est croissante et majorée par $v_0$ : elle converge vers un
+   réel $\ell$. De même $(v_n)$ est décroissante et minorée par $u_0$ : elle
+   converge vers $\ell'$. Alors $\ell' - \ell = \lim (v_n - u_n) = 0$, donc
+   $\ell = \ell'$. Enfin $(u_n)$ croissante de limite $\ell$ donne $u_n \le
+   \ell$, et $(v_n)$ décroissante donne $\ell \le v_n$.
+
+3. $S_{2n+2} - S_{2n} = \dfrac{1}{2n+1} - \dfrac{1}{2n+2} > 0$ : $(S_{2n})$ est
+   croissante. $S_{2n+1} - S_{2n-1} = -\dfrac{1}{2n} + \dfrac{1}{2n+1} < 0$ :
+   $(S_{2n+1})$ est décroissante. Et $S_{2n+1} - S_{2n} = \dfrac{1}{2n+1} \to
+   0$. Les deux suites sont adjacentes, donc convergent vers une même limite
+   $\ell$, et $(S_n)$ converge vers $\ell$ puisque ses sous-suites de rangs
+   pairs et impairs ont la même limite. (On sait par ailleurs que
+   $\ell = \ln 2$, ce qui ne se voit pas ici.)

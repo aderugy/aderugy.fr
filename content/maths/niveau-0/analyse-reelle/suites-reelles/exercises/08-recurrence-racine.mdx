@@ -1,0 +1,41 @@
+---
+kind: calcul
+difficulty: 3
+---
+Soit $(u_n)$ définie par $u_0 = 0$ et $u_{n+1} = \sqrt{2 + u_n}$.
+
+1. Montrer par récurrence que $0 \le u_n \le 2$ pour tout $n$.
+2. Montrer que $(u_n)$ est croissante.
+3. En déduire qu'elle converge et déterminer sa limite.
+4. Où l'axiome de la borne supérieure a-t-il été utilisé ?
+
+<!-- indice -->
+Pour 2, comparer $u_{n+1}^2 = 2 + u_n$ à $u_n^2$, ou étudier le signe de
+$u_{n+1} - u_n$ après multiplication par la quantité conjuguée.
+
+<!-- indice -->
+Pour 3, la limite $\ell$ vérifie nécessairement $\ell = \sqrt{2 + \ell}$, par
+continuité de $x \mapsto \sqrt{2 + x}$. Résoudre, puis écarter la racine
+incompatible avec 1.
+
+<!-- solution -->
+1. $u_0 = 0 \in [0,2]$. Si $0 \le u_n \le 2$, alors $2 \le 2 + u_n \le 4$, donc
+   $\sqrt 2 \le u_{n+1} \le 2$, et en particulier $0 \le u_{n+1} \le 2$.
+
+2. $u_{n+1}^2 - u_n^2 = 2 + u_n - u_n^2 = -(u_n - 2)(u_n + 1)$. Comme
+   $0 \le u_n \le 2$, ce produit est $\ge 0$, donc $u_{n+1}^2 \ge u_n^2$ ;
+   les deux termes étant positifs, $u_{n+1} \ge u_n$.
+
+3. $(u_n)$ est croissante et majorée par $2$, donc elle converge vers un réel
+   $\ell$. En passant à la limite dans $u_{n+1} = \sqrt{2 + u_n}$ — licite car
+   $x \mapsto \sqrt{2+x}$ est continue sur $[0,2]$ — on obtient
+   $\ell = \sqrt{2 + \ell}$, soit $\ell^2 - \ell - 2 = 0$, dont les racines
+   sont $2$ et $-1$. Comme $\ell \ge u_0 = 0$, on a $\ell = 2$.
+
+4. Dans l'étape 3, et nulle part ailleurs : le théorème de la limite monotone
+   est la seule chose qui garantisse l'existence de $\ell$. Sans lui, les
+   questions 1 et 2 ne donnent qu'une suite croissante majorée, ce qui dans
+   $\mathbb{Q}$ ne suffirait pas à conclure. Le passage à la limite de l'étape
+   3 suppose l'existence de $\ell$ : écrire « $\ell = \sqrt{2+\ell}$ » avant
+   d'avoir prouvé la convergence est l'erreur classique de cet exercice, et
+   elle donne la bonne réponse pour une mauvaise raison.

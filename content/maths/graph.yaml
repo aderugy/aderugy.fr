@@ -1,0 +1,342 @@
+# graph.yaml — source de vérité du DAG du parcours.
+# Version 1 — 2026-09-09. À relire avant toute génération de code.
+#
+# Conventions
+#   id             slug stable, jamais renommé (contenu, base et liens y font référence).
+#   kind           domain | topic | concept. Seuls les `concept` portent contenu et progression.
+#   parentId       vue hiérarchique de lecture. Aucun effet sur le déblocage.
+#   requires       arêtes du DAG : prérequis réels, uniquement de concept à concept.
+#                  Un topic est « disponible » dès qu'un de ses concepts l'est ;
+#                  un domaine dès qu'un de ses topics l'est. Rien de tout cela n'est stocké.
+#   estimatedHours renseigné sur les concepts uniquement. 0 sur domain/topic, où la valeur
+#                  affichée est la somme des descendants (dérivée au chargement).
+#   contentStatus  ABSENT de ce fichier (decision D2) : derive du systeme de fichiers
+#                  au chargement. Pas de course.mdx -> `empty` ; sinon la valeur du
+#                  frontmatter `status`. Chemin attendu pour un concept :
+#                  content/<domain>/<topic>/<concept>/course.mdx
+#
+# Vocabulaire de tags (fermé — ne pas inventer de nouveau tag sans l'ajouter ici) :
+#   analyse algebre combinatoire calculatoire mesure asymptotique inference
+#   bayesien processus ml causal simulation donnees preuve
+#
+# Les arêtes traversent délibérément les niveaux : `mcmc` (niveau 4) dépend de
+# `chaines-markov-ergodicite` (niveau 5), `rdd` (niveau 6) de `estimation-noyau`
+# (niveau 6, autre topic). La numérotation des niveaux est une vue de lecture,
+# l'ordre d'apprentissage réel est celui du DAG.
+
+version: 1
+
+nodes:
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NIVEAU 0 — Prérequis mathématiques
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: niveau-0, kind: domain, title: "Niveau 0 — Prérequis mathématiques", parentId: null, requires: [], estimatedHours: 0, tags: []}
+
+  - {id: analyse-reelle, kind: topic, title: "Analyse réelle", parentId: niveau-0, requires: [], estimatedHours: 0, tags: [analyse]}
+  - {id: suites-reelles, kind: concept, title: "Suites réelles, bornes et convergence", parentId: analyse-reelle, requires: [], estimatedHours: 10, tags: [analyse]}
+  - {id: limites-continuite, kind: concept, title: "Limites et continuité", parentId: analyse-reelle, requires: [suites-reelles], estimatedHours: 8, tags: [analyse]}
+  - {id: derivation-taylor, kind: concept, title: "Dérivation, accroissements finis et développements limités", parentId: analyse-reelle, requires: [limites-continuite], estimatedHours: 12, tags: [analyse, calculatoire]}
+  - {id: integration-riemann, kind: concept, title: "Intégration de Riemann", parentId: analyse-reelle, requires: [derivation-taylor], estimatedHours: 12, tags: [analyse, calculatoire]}
+  - {id: series-numeriques, kind: concept, title: "Séries numériques", parentId: analyse-reelle, requires: [suites-reelles], estimatedHours: 12, tags: [analyse]}
+  - {id: suites-series-fonctions, kind: concept, title: "Suites et séries de fonctions, convergence uniforme", parentId: analyse-reelle, requires: [series-numeriques, integration-riemann], estimatedHours: 14, tags: [analyse, preuve]}
+
+  - {id: algebre-lineaire, kind: topic, title: "Algèbre linéaire", parentId: niveau-0, requires: [], estimatedHours: 0, tags: [algebre]}
+  - {id: espaces-vectoriels, kind: concept, title: "Espaces vectoriels, bases et applications linéaires", parentId: algebre-lineaire, requires: [], estimatedHours: 12, tags: [algebre]}
+  - {id: determinant, kind: concept, title: "Déterminant et rang", parentId: algebre-lineaire, requires: [espaces-vectoriels], estimatedHours: 6, tags: [algebre, calculatoire]}
+  - {id: diagonalisation, kind: concept, title: "Réduction : valeurs propres et diagonalisation", parentId: algebre-lineaire, requires: [determinant], estimatedHours: 12, tags: [algebre]}
+  - {id: espaces-euclidiens-projections, kind: concept, title: "Produit scalaire, orthogonalité et projections", parentId: algebre-lineaire, requires: [espaces-vectoriels], estimatedHours: 12, tags: [algebre]}
+  - {id: formes-quadratiques, kind: concept, title: "Formes quadratiques, théorème spectral, matrices positives", parentId: algebre-lineaire, requires: [diagonalisation, espaces-euclidiens-projections], estimatedHours: 10, tags: [algebre]}
+
+  - {id: calcul-multivarie, kind: topic, title: "Calcul multivarié et optimisation", parentId: niveau-0, requires: [], estimatedHours: 0, tags: [analyse, calculatoire]}
+  - {id: gradient-differentielle, kind: concept, title: "Différentielle, gradient, dérivées partielles", parentId: calcul-multivarie, requires: [derivation-taylor, espaces-vectoriels], estimatedHours: 10, tags: [analyse, calculatoire]}
+  - {id: hessienne-optimisation, kind: concept, title: "Hessienne et extrema d'une fonction de plusieurs variables", parentId: calcul-multivarie, requires: [gradient-differentielle, formes-quadratiques], estimatedHours: 10, tags: [analyse, calculatoire]}
+  - {id: optimisation-convexe, kind: concept, title: "Convexité et optimisation convexe", parentId: calcul-multivarie, requires: [hessienne-optimisation], estimatedHours: 14, tags: [analyse, calculatoire]}
+  - {id: integrales-multiples, kind: concept, title: "Intégrales multiples", parentId: calcul-multivarie, requires: [integration-riemann, gradient-differentielle], estimatedHours: 10, tags: [analyse, calculatoire]}
+  - {id: changement-variables-jacobien, kind: concept, title: "Changement de variables et jacobien", parentId: calcul-multivarie, requires: [integrales-multiples, determinant], estimatedHours: 8, tags: [analyse, calculatoire]}
+
+  - {id: combinatoire, kind: topic, title: "Combinatoire et dénombrement", parentId: niveau-0, requires: [], estimatedHours: 0, tags: [combinatoire]}
+  - {id: denombrement-base, kind: concept, title: "Dénombrement : arrangements, combinaisons, binôme", parentId: combinatoire, requires: [], estimatedHours: 8, tags: [combinatoire]}
+  - {id: inclusion-exclusion, kind: concept, title: "Principe d'inclusion-exclusion", parentId: combinatoire, requires: [denombrement-base], estimatedHours: 6, tags: [combinatoire, preuve]}
+  - {id: denombrement-avance, kind: concept, title: "Multinomiales, partitions et compositions", parentId: combinatoire, requires: [inclusion-exclusion, series-numeriques], estimatedHours: 8, tags: [combinatoire]}
+
+  - {id: outillage-python, kind: topic, title: "Outillage Python scientifique", parentId: niveau-0, requires: [], estimatedHours: 0, tags: [simulation]}
+  - {id: python-environnement, kind: concept, title: "Environnement, notebooks et reproductibilité", parentId: outillage-python, requires: [], estimatedHours: 6, tags: [simulation]}
+  - {id: python-numpy, kind: concept, title: "NumPy : tableaux, vectorisation, aléatoire", parentId: outillage-python, requires: [python-environnement], estimatedHours: 10, tags: [simulation, calculatoire]}
+  - {id: python-visualisation, kind: concept, title: "Visualisation scientifique avec Matplotlib", parentId: outillage-python, requires: [python-numpy], estimatedHours: 8, tags: [simulation, donnees]}
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NIVEAU 1 — Probabilités élémentaires
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: niveau-1, kind: domain, title: "Niveau 1 — Probabilités élémentaires", parentId: null, requires: [], estimatedHours: 0, tags: []}
+
+  - {id: modele-probabiliste, kind: topic, title: "Le modèle probabiliste", parentId: niveau-1, requires: [], estimatedHours: 0, tags: []}
+  - {id: espace-probabilise, kind: concept, title: "Espace probabilisé et axiomes de Kolmogorov", parentId: modele-probabiliste, requires: [denombrement-base, suites-reelles], estimatedHours: 8, tags: [preuve]}
+  - {id: probabilite-conditionnelle, kind: concept, title: "Probabilité conditionnelle", parentId: modele-probabiliste, requires: [espace-probabilise], estimatedHours: 6, tags: []}
+  - {id: formule-bayes, kind: concept, title: "Probabilités totales et formule de Bayes", parentId: modele-probabiliste, requires: [probabilite-conditionnelle], estimatedHours: 6, tags: [bayesien]}
+  - {id: independance-evenements, kind: concept, title: "Indépendance d'événements et indépendance mutuelle", parentId: modele-probabiliste, requires: [probabilite-conditionnelle], estimatedHours: 6, tags: [preuve]}
+
+  - {id: variables-discretes, kind: topic, title: "Variables aléatoires discrètes", parentId: niveau-1, requires: [], estimatedHours: 0, tags: []}
+  - {id: variable-aleatoire-discrete, kind: concept, title: "Variable aléatoire discrète, loi et fonction de répartition", parentId: variables-discretes, requires: [espace-probabilise], estimatedHours: 8, tags: []}
+  - {id: loi-bernoulli-binomiale, kind: concept, title: "Lois de Bernoulli et binomiale", parentId: variables-discretes, requires: [variable-aleatoire-discrete, denombrement-base], estimatedHours: 6, tags: [calculatoire]}
+  - {id: loi-geometrique-negative-binomiale, kind: concept, title: "Lois géométrique et binomiale négative", parentId: variables-discretes, requires: [loi-bernoulli-binomiale, series-numeriques], estimatedHours: 6, tags: [calculatoire]}
+  - {id: loi-poisson, kind: concept, title: "Loi de Poisson et approximation poissonnienne", parentId: variables-discretes, requires: [loi-bernoulli-binomiale, series-numeriques], estimatedHours: 8, tags: [calculatoire, asymptotique]}
+  - {id: loi-hypergeometrique, kind: concept, title: "Loi hypergéométrique et tirages sans remise", parentId: variables-discretes, requires: [loi-bernoulli-binomiale, inclusion-exclusion], estimatedHours: 5, tags: [combinatoire]}
+
+  - {id: variables-continues, kind: topic, title: "Variables aléatoires continues", parentId: niveau-1, requires: [], estimatedHours: 0, tags: []}
+  - {id: variable-aleatoire-continue, kind: concept, title: "Variable à densité, fonction de répartition, quantiles", parentId: variables-continues, requires: [variable-aleatoire-discrete, integration-riemann], estimatedHours: 10, tags: [analyse]}
+  - {id: loi-uniforme-exponentielle, kind: concept, title: "Lois uniforme et exponentielle, absence de mémoire", parentId: variables-continues, requires: [variable-aleatoire-continue], estimatedHours: 6, tags: [calculatoire]}
+  - {id: loi-normale, kind: concept, title: "Loi normale", parentId: variables-continues, requires: [variable-aleatoire-continue, integrales-multiples], estimatedHours: 10, tags: [calculatoire]}
+  - {id: loi-gamma-beta, kind: concept, title: "Lois gamma et bêta", parentId: variables-continues, requires: [loi-uniforme-exponentielle, integration-riemann], estimatedHours: 8, tags: [calculatoire]}
+  - {id: loi-cauchy-lois-lourdes, kind: concept, title: "Loi de Cauchy et queues lourdes", parentId: variables-continues, requires: [loi-normale, series-numeriques], estimatedHours: 6, tags: [asymptotique]}
+
+  - {id: caracteristiques, kind: topic, title: "Caractéristiques d'une variable aléatoire", parentId: niveau-1, requires: [], estimatedHours: 0, tags: []}
+  - {id: esperance-variance, kind: concept, title: "Espérance, variance et moments", parentId: caracteristiques, requires: [variable-aleatoire-discrete, variable-aleatoire-continue], estimatedHours: 10, tags: [calculatoire]}
+  - {id: moments-et-inegalites, kind: concept, title: "Inégalités de Jensen et Cauchy-Schwarz, moments d'ordre supérieur", parentId: caracteristiques, requires: [esperance-variance, optimisation-convexe], estimatedHours: 8, tags: [preuve]}
+  - {id: fonctions-generatrices, kind: concept, title: "Fonctions génératrices des probabilités et des moments", parentId: caracteristiques, requires: [esperance-variance, series-numeriques], estimatedHours: 8, tags: [calculatoire]}
+  - {id: transformation-variables, kind: concept, title: "Transformation d'une variable aléatoire", parentId: caracteristiques, requires: [variable-aleatoire-continue, derivation-taylor], estimatedHours: 8, tags: [calculatoire]}
+
+  - {id: vecteurs-aleatoires, kind: topic, title: "Vecteurs aléatoires", parentId: niveau-1, requires: [], estimatedHours: 0, tags: []}
+  - {id: lois-jointes-marginales, kind: concept, title: "Lois jointes et lois marginales", parentId: vecteurs-aleatoires, requires: [esperance-variance, integrales-multiples], estimatedHours: 10, tags: []}
+  - {id: lois-conditionnelles, kind: concept, title: "Lois conditionnelles", parentId: vecteurs-aleatoires, requires: [lois-jointes-marginales, probabilite-conditionnelle], estimatedHours: 8, tags: []}
+  - {id: esperance-conditionnelle-elementaire, kind: concept, title: "Espérance conditionnelle élémentaire et formule de la tour", parentId: vecteurs-aleatoires, requires: [lois-conditionnelles], estimatedHours: 8, tags: []}
+  - {id: covariance-correlation, kind: concept, title: "Covariance, corrélation, matrice de covariance", parentId: vecteurs-aleatoires, requires: [lois-jointes-marginales, espaces-euclidiens-projections], estimatedHours: 8, tags: [algebre]}
+  - {id: transformation-vecteurs-jacobien, kind: concept, title: "Transformation d'un vecteur aléatoire", parentId: vecteurs-aleatoires, requires: [lois-jointes-marginales, changement-variables-jacobien], estimatedHours: 8, tags: [calculatoire]}
+  - {id: somme-variables-convolution, kind: concept, title: "Somme de variables indépendantes et convolution", parentId: vecteurs-aleatoires, requires: [transformation-vecteurs-jacobien, independance-evenements], estimatedHours: 6, tags: [calculatoire]}
+  - {id: vecteur-gaussien, kind: concept, title: "Vecteur gaussien", parentId: vecteurs-aleatoires, requires: [loi-normale, covariance-correlation, formes-quadratiques], estimatedHours: 12, tags: [algebre]}
+
+  - {id: theoremes-limites-intuitifs, kind: topic, title: "Théorèmes limites, version intuitive", parentId: niveau-1, requires: [], estimatedHours: 0, tags: [asymptotique]}
+  - {id: inegalites-markov-chebyshev, kind: concept, title: "Inégalités de Markov et de Chebyshev", parentId: theoremes-limites-intuitifs, requires: [moments-et-inegalites], estimatedHours: 6, tags: [preuve, asymptotique]}
+  - {id: loi-grands-nombres-intuitive, kind: concept, title: "Loi des grands nombres, énoncé et portée", parentId: theoremes-limites-intuitifs, requires: [inegalites-markov-chebyshev, independance-evenements], estimatedHours: 8, tags: [asymptotique]}
+  - {id: tcl-intuitif, kind: concept, title: "Théorème central limite, énoncé et portée", parentId: theoremes-limites-intuitifs, requires: [loi-grands-nombres-intuitive, loi-normale], estimatedHours: 8, tags: [asymptotique]}
+  - {id: approximations-lois, kind: concept, title: "Approximations entre lois usuelles", parentId: theoremes-limites-intuitifs, requires: [tcl-intuitif, loi-poisson], estimatedHours: 6, tags: [asymptotique, calculatoire]}
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NIVEAU 2 — Statistique inférentielle
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: niveau-2, kind: domain, title: "Niveau 2 — Statistique inférentielle", parentId: null, requires: [], estimatedHours: 0, tags: [inference]}
+
+  - {id: statistique-descriptive, kind: topic, title: "Description et échantillonnage", parentId: niveau-2, requires: [], estimatedHours: 0, tags: [donnees]}
+  - {id: description-donnees, kind: concept, title: "Résumés numériques et graphiques d'un jeu de données", parentId: statistique-descriptive, requires: [python-visualisation, esperance-variance], estimatedHours: 6, tags: [donnees]}
+  - {id: echantillonnage, kind: concept, title: "Modèle d'échantillonnage i.i.d. et statistiques", parentId: statistique-descriptive, requires: [independance-evenements, esperance-variance], estimatedHours: 8, tags: [inference]}
+  - {id: fdr-empirique-statistiques-ordre, kind: concept, title: "Fonction de répartition empirique et statistiques d'ordre", parentId: statistique-descriptive, requires: [echantillonnage, loi-bernoulli-binomiale], estimatedHours: 8, tags: [inference]}
+  - {id: loi-moyenne-variance-empiriques, kind: concept, title: "Lois de la moyenne et de la variance empiriques en modèle gaussien", parentId: statistique-descriptive, requires: [echantillonnage, vecteur-gaussien], estimatedHours: 10, tags: [inference, preuve]}
+
+  - {id: estimation-ponctuelle, kind: topic, title: "Estimation ponctuelle", parentId: niveau-2, requires: [], estimatedHours: 0, tags: [inference]}
+  - {id: estimateur-proprietes, kind: concept, title: "Estimateur : biais, variance, erreur quadratique moyenne", parentId: estimation-ponctuelle, requires: [echantillonnage, esperance-variance], estimatedHours: 10, tags: [inference]}
+  - {id: methode-moments, kind: concept, title: "Méthode des moments", parentId: estimation-ponctuelle, requires: [estimateur-proprietes], estimatedHours: 6, tags: [inference, calculatoire]}
+  - {id: maximum-vraisemblance, kind: concept, title: "Maximum de vraisemblance", parentId: estimation-ponctuelle, requires: [estimateur-proprietes, optimisation-convexe], estimatedHours: 12, tags: [inference, calculatoire]}
+  - {id: convergence-estimateurs, kind: concept, title: "Consistance d'un estimateur", parentId: estimation-ponctuelle, requires: [estimateur-proprietes, loi-grands-nombres-intuitive], estimatedHours: 8, tags: [inference, asymptotique]}
+
+  - {id: estimation-intervalle, kind: topic, title: "Estimation par intervalle", parentId: niveau-2, requires: [], estimatedHours: 0, tags: [inference]}
+  - {id: loi-chi2-student-fisher, kind: concept, title: "Lois du khi-deux, de Student et de Fisher", parentId: estimation-intervalle, requires: [loi-moyenne-variance-empiriques, loi-gamma-beta], estimatedHours: 10, tags: [inference, calculatoire]}
+  - {id: intervalle-confiance, kind: concept, title: "Intervalle de confiance : principe et fonction pivotale", parentId: estimation-intervalle, requires: [loi-chi2-student-fisher, tcl-intuitif], estimatedHours: 10, tags: [inference]}
+  - {id: ic-moyenne-variance-proportion, kind: concept, title: "Intervalles usuels : moyenne, variance, proportion", parentId: estimation-intervalle, requires: [intervalle-confiance], estimatedHours: 8, tags: [inference, calculatoire]}
+  - {id: delta-methode, kind: concept, title: "Delta-méthode", parentId: estimation-intervalle, requires: [convergence-estimateurs, derivation-taylor, tcl-intuitif], estimatedHours: 8, tags: [inference, asymptotique]}
+
+  - {id: tests-hypotheses, kind: topic, title: "Tests d'hypothèses", parentId: niveau-2, requires: [], estimatedHours: 0, tags: [inference]}
+  - {id: test-principe, kind: concept, title: "Test d'hypothèse : erreurs de première et seconde espèce", parentId: tests-hypotheses, requires: [intervalle-confiance], estimatedHours: 8, tags: [inference]}
+  - {id: p-valeur, kind: concept, title: "p-valeur : définition, interprétation, mésusages", parentId: tests-hypotheses, requires: [test-principe], estimatedHours: 6, tags: [inference]}
+  - {id: puissance-taille-echantillon, kind: concept, title: "Puissance et dimensionnement de l'échantillon", parentId: tests-hypotheses, requires: [test-principe], estimatedHours: 8, tags: [inference]}
+  - {id: neyman-pearson-lemme, kind: concept, title: "Lemme de Neyman-Pearson", parentId: tests-hypotheses, requires: [puissance-taille-echantillon, maximum-vraisemblance], estimatedHours: 8, tags: [inference, preuve]}
+  - {id: tests-classiques-gaussiens, kind: concept, title: "Tests gaussiens classiques : Student, Welch, appariés, variance", parentId: tests-hypotheses, requires: [test-principe, loi-chi2-student-fisher], estimatedHours: 10, tags: [inference, calculatoire]}
+  - {id: test-chi2, kind: concept, title: "Tests du khi-deux d'adéquation et d'indépendance", parentId: tests-hypotheses, requires: [tests-classiques-gaussiens, loi-chi2-student-fisher], estimatedHours: 8, tags: [inference]}
+  - {id: tests-non-parametriques, kind: concept, title: "Tests non paramétriques : signe, Wilcoxon, Mann-Whitney, Kolmogorov-Smirnov", parentId: tests-hypotheses, requires: [tests-classiques-gaussiens, fdr-empirique-statistiques-ordre], estimatedHours: 10, tags: [inference]}
+
+  - {id: modele-lineaire-classique, kind: topic, title: "Régression linéaire", parentId: niveau-2, requires: [], estimatedHours: 0, tags: [inference, donnees]}
+  - {id: regression-simple, kind: concept, title: "Régression linéaire simple", parentId: modele-lineaire-classique, requires: [covariance-correlation, estimateur-proprietes], estimatedHours: 8, tags: [inference]}
+  - {id: regression-lineaire, kind: concept, title: "Régression multiple : moindres carrés et géométrie", parentId: modele-lineaire-classique, requires: [regression-simple, espaces-euclidiens-projections, vecteur-gaussien], estimatedHours: 14, tags: [inference, algebre]}
+  - {id: gauss-markov, kind: concept, title: "Théorème de Gauss-Markov", parentId: modele-lineaire-classique, requires: [regression-lineaire], estimatedHours: 8, tags: [inference, preuve]}
+  - {id: diagnostics-residus, kind: concept, title: "Diagnostics : résidus, levier, points influents", parentId: modele-lineaire-classique, requires: [regression-lineaire, python-visualisation], estimatedHours: 8, tags: [donnees]}
+  - {id: anova, kind: concept, title: "Analyse de la variance", parentId: modele-lineaire-classique, requires: [regression-lineaire, loi-chi2-student-fisher], estimatedHours: 10, tags: [inference]}
+  - {id: selection-variables-classique, kind: concept, title: "Sélection de variables : tests emboîtés, AIC, BIC", parentId: modele-lineaire-classique, requires: [anova, maximum-vraisemblance], estimatedHours: 8, tags: [inference]}
+
+  - {id: plans-experience, kind: topic, title: "Comparaisons multiples et plans d'expérience", parentId: niveau-2, requires: [], estimatedHours: 0, tags: [inference]}
+  - {id: comparaisons-multiples, kind: concept, title: "Comparaisons multiples : Bonferroni, Tukey, Holm", parentId: plans-experience, requires: [anova, p-valeur], estimatedHours: 8, tags: [inference]}
+  - {id: design-experimental, kind: concept, title: "Plans d'expérience : randomisation, blocs, plans factoriels", parentId: plans-experience, requires: [comparaisons-multiples, puissance-taille-echantillon], estimatedHours: 10, tags: [inference, donnees]}
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NIVEAU 3 — Probabilités à la mesure
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: niveau-3, kind: domain, title: "Niveau 3 — Probabilités à la mesure", parentId: null, requires: [], estimatedHours: 0, tags: [mesure]}
+
+  - {id: theorie-mesure, kind: topic, title: "Théorie de la mesure", parentId: niveau-3, requires: [], estimatedHours: 0, tags: [mesure, preuve]}
+  - {id: tribus-mesurabilite, kind: concept, title: "Tribus, mesurabilité, tribu engendrée", parentId: theorie-mesure, requires: [espace-probabilise, suites-series-fonctions], estimatedHours: 12, tags: [mesure, preuve]}
+  - {id: mesures-construction, kind: concept, title: "Mesures, prolongement de Carathéodory, mesure de Lebesgue", parentId: theorie-mesure, requires: [tribus-mesurabilite], estimatedHours: 12, tags: [mesure, preuve]}
+  - {id: integrale-lebesgue, kind: concept, title: "Intégrale de Lebesgue", parentId: theorie-mesure, requires: [mesures-construction, integration-riemann], estimatedHours: 14, tags: [mesure, preuve]}
+  - {id: convergence-monotone-dominee, kind: concept, title: "Convergence monotone, lemme de Fatou, convergence dominée", parentId: theorie-mesure, requires: [integrale-lebesgue], estimatedHours: 10, tags: [mesure, preuve]}
+  - {id: espaces-lp, kind: concept, title: "Espaces L^p, inégalités de Hölder et Minkowski, complétude", parentId: theorie-mesure, requires: [convergence-monotone-dominee, moments-et-inegalites], estimatedHours: 12, tags: [mesure, analyse]}
+  - {id: projection-l2, kind: concept, title: "L² comme espace de Hilbert et projection orthogonale", parentId: theorie-mesure, requires: [espaces-lp, espaces-euclidiens-projections], estimatedHours: 10, tags: [mesure, algebre]}
+  - {id: fubini-tonelli, kind: concept, title: "Mesure produit, théorèmes de Fubini et Tonelli", parentId: theorie-mesure, requires: [convergence-monotone-dominee, integrales-multiples], estimatedHours: 8, tags: [mesure, preuve]}
+  - {id: radon-nikodym, kind: concept, title: "Absolue continuité, Radon-Nikodym, décomposition de Lebesgue", parentId: theorie-mesure, requires: [convergence-monotone-dominee, espaces-lp], estimatedHours: 12, tags: [mesure, preuve]}
+
+  - {id: modes-convergence, kind: topic, title: "Modes de convergence", parentId: niveau-3, requires: [], estimatedHours: 0, tags: [asymptotique, mesure]}
+  - {id: convergence-ps-probabilite, kind: concept, title: "Convergence presque sûre et convergence en probabilité", parentId: modes-convergence, requires: [convergence-monotone-dominee], estimatedHours: 10, tags: [asymptotique, preuve]}
+  - {id: borel-cantelli, kind: concept, title: "Lemmes de Borel-Cantelli et loi du 0-1", parentId: modes-convergence, requires: [convergence-ps-probabilite, series-numeriques], estimatedHours: 8, tags: [asymptotique, preuve]}
+  - {id: convergence-lp, kind: concept, title: "Convergence dans L^p", parentId: modes-convergence, requires: [espaces-lp, convergence-ps-probabilite], estimatedHours: 8, tags: [asymptotique]}
+  - {id: convergence-en-loi, kind: concept, title: "Convergence en loi et théorème de portemanteau", parentId: modes-convergence, requires: [convergence-ps-probabilite, variable-aleatoire-continue], estimatedHours: 12, tags: [asymptotique, preuve]}
+  - {id: uniforme-integrabilite, kind: concept, title: "Uniforme intégrabilité", parentId: modes-convergence, requires: [convergence-lp, convergence-ps-probabilite], estimatedHours: 10, tags: [asymptotique, mesure]}
+  - {id: slutsky-et-relations, kind: concept, title: "Relations entre modes de convergence, Slutsky, continuous mapping", parentId: modes-convergence, requires: [convergence-en-loi, convergence-lp], estimatedHours: 8, tags: [asymptotique]}
+
+  - {id: outils-analytiques, kind: topic, title: "Outils analytiques et théorèmes limites démontrés", parentId: niveau-3, requires: [], estimatedHours: 0, tags: [asymptotique, preuve]}
+  - {id: fonctions-caracteristiques, kind: concept, title: "Fonctions caractéristiques", parentId: outils-analytiques, requires: [integrale-lebesgue, fonctions-generatrices, vecteur-gaussien], estimatedHours: 14, tags: [asymptotique, calculatoire]}
+  - {id: theoreme-levy, kind: concept, title: "Théorème de continuité de Lévy", parentId: outils-analytiques, requires: [fonctions-caracteristiques, convergence-en-loi], estimatedHours: 10, tags: [asymptotique, preuve]}
+  - {id: lgn-demonstration, kind: concept, title: "Lois des grands nombres faible et forte, démontrées", parentId: outils-analytiques, requires: [borel-cantelli, uniforme-integrabilite], estimatedHours: 14, tags: [asymptotique, preuve]}
+  - {id: tcl-demonstration, kind: concept, title: "Théorème central limite : Lindeberg-Lévy et Lindeberg-Feller", parentId: outils-analytiques, requires: [theoreme-levy, lgn-demonstration], estimatedHours: 14, tags: [asymptotique, preuve]}
+  - {id: grandes-deviations, kind: concept, title: "Grandes déviations : Chernoff et Cramér", parentId: outils-analytiques, requires: [fonctions-caracteristiques, optimisation-convexe], estimatedHours: 12, tags: [asymptotique, preuve]}
+
+  - {id: conditionnement, kind: topic, title: "Espérance conditionnelle", parentId: niveau-3, requires: [], estimatedHours: 0, tags: [mesure]}
+  - {id: esperance-conditionnelle, kind: concept, title: "Espérance conditionnelle par rapport à une tribu", parentId: conditionnement, requires: [radon-nikodym, projection-l2], estimatedHours: 14, tags: [mesure, preuve]}
+  - {id: esperance-conditionnelle-proprietes, kind: concept, title: "Propriétés : tour, Jensen conditionnelle, indépendance", parentId: conditionnement, requires: [esperance-conditionnelle, esperance-conditionnelle-elementaire], estimatedHours: 10, tags: [mesure, preuve]}
+  - {id: lois-conditionnelles-regulieres, kind: concept, title: "Lois conditionnelles régulières et désintégration", parentId: conditionnement, requires: [esperance-conditionnelle, lois-conditionnelles], estimatedHours: 10, tags: [mesure]}
+
+  - {id: martingales, kind: topic, title: "Martingales", parentId: niveau-3, requires: [], estimatedHours: 0, tags: [processus, mesure]}
+  - {id: filtrations-temps-arret, kind: concept, title: "Filtrations et temps d'arrêt", parentId: martingales, requires: [esperance-conditionnelle-proprietes], estimatedHours: 10, tags: [processus]}
+  - {id: martingales-definition, kind: concept, title: "Martingales, sous- et sur-martingales", parentId: martingales, requires: [filtrations-temps-arret], estimatedHours: 10, tags: [processus]}
+  - {id: theoreme-arret-optionnel, kind: concept, title: "Théorème d'arrêt optionnel", parentId: martingales, requires: [martingales-definition, uniforme-integrabilite], estimatedHours: 12, tags: [processus, preuve]}
+  - {id: inegalites-doob, kind: concept, title: "Inégalités maximales de Doob", parentId: martingales, requires: [martingales-definition], estimatedHours: 10, tags: [processus, preuve]}
+  - {id: convergence-martingales, kind: concept, title: "Théorèmes de convergence des martingales", parentId: martingales, requires: [inegalites-doob, theoreme-arret-optionnel], estimatedHours: 14, tags: [processus, asymptotique, preuve]}
+  - {id: applications-martingales, kind: concept, title: "Applications : ruine du joueur, urne de Pólya, algorithmes", parentId: martingales, requires: [convergence-martingales], estimatedHours: 10, tags: [processus, simulation]}
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NIVEAU 4 — Statistique mathématique
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: niveau-4, kind: domain, title: "Niveau 4 — Statistique mathématique", parentId: null, requires: [], estimatedHours: 0, tags: [inference]}
+
+  - {id: theorie-estimation, kind: topic, title: "Théorie de l'estimation", parentId: niveau-4, requires: [], estimatedHours: 0, tags: [inference, preuve]}
+  - {id: exhaustivite, kind: concept, title: "Exhaustivité et critère de factorisation", parentId: theorie-estimation, requires: [maximum-vraisemblance, esperance-conditionnelle], estimatedHours: 12, tags: [inference, preuve]}
+  - {id: familles-exponentielles, kind: concept, title: "Familles exponentielles", parentId: theorie-estimation, requires: [exhaustivite], estimatedHours: 12, tags: [inference]}
+  - {id: rao-blackwell, kind: concept, title: "Théorème de Rao-Blackwell", parentId: theorie-estimation, requires: [exhaustivite, esperance-conditionnelle-proprietes], estimatedHours: 10, tags: [inference, preuve]}
+  - {id: lehmann-scheffe, kind: concept, title: "Complétude et théorème de Lehmann-Scheffé", parentId: theorie-estimation, requires: [rao-blackwell, familles-exponentielles], estimatedHours: 10, tags: [inference, preuve]}
+  - {id: information-fisher, kind: concept, title: "Information de Fisher", parentId: theorie-estimation, requires: [maximum-vraisemblance, familles-exponentielles], estimatedHours: 12, tags: [inference]}
+  - {id: cramer-rao, kind: concept, title: "Borne de Cramér-Rao et efficacité", parentId: theorie-estimation, requires: [information-fisher, projection-l2], estimatedHours: 10, tags: [inference, preuve]}
+  - {id: mle-asymptotique, kind: concept, title: "Comportement asymptotique du maximum de vraisemblance", parentId: theorie-estimation, requires: [convergence-en-loi, information-fisher, slutsky-et-relations], estimatedHours: 14, tags: [inference, asymptotique, preuve]}
+
+  - {id: theorie-tests, kind: topic, title: "Théorie des tests", parentId: niveau-4, requires: [], estimatedHours: 0, tags: [inference, preuve]}
+  - {id: tests-upp, kind: concept, title: "Tests uniformément plus puissants, Karlin-Rubin", parentId: theorie-tests, requires: [neyman-pearson-lemme, familles-exponentielles], estimatedHours: 12, tags: [inference, preuve]}
+  - {id: rapport-vraisemblance-generalise, kind: concept, title: "Rapport de vraisemblance généralisé et théorème de Wilks", parentId: theorie-tests, requires: [tests-upp, mle-asymptotique], estimatedHours: 12, tags: [inference, asymptotique]}
+  - {id: trinite-wald-score-lrt, kind: concept, title: "Trinité asymptotique : Wald, score, rapport de vraisemblance", parentId: theorie-tests, requires: [rapport-vraisemblance-generalise], estimatedHours: 12, tags: [inference, asymptotique]}
+  - {id: dualite-tests-intervalles, kind: concept, title: "Dualité tests / régions de confiance", parentId: theorie-tests, requires: [tests-upp, intervalle-confiance], estimatedHours: 8, tags: [inference]}
+
+  - {id: theorie-decision, kind: topic, title: "Théorie de la décision", parentId: niveau-4, requires: [], estimatedHours: 0, tags: [inference]}
+  - {id: fonction-risque-admissibilite, kind: concept, title: "Fonction de perte, risque, admissibilité", parentId: theorie-decision, requires: [estimateur-proprietes, esperance-conditionnelle], estimatedHours: 10, tags: [inference]}
+  - {id: regles-bayes, kind: concept, title: "Règles de Bayes et risque de Bayes", parentId: theorie-decision, requires: [fonction-risque-admissibilite], estimatedHours: 10, tags: [inference, bayesien]}
+  - {id: minimax, kind: concept, title: "Minimax et suites de priors les moins favorables", parentId: theorie-decision, requires: [regles-bayes], estimatedHours: 10, tags: [inference, preuve]}
+  - {id: stein-shrinkage, kind: concept, title: "Paradoxe de Stein et estimateurs à rétrécissement", parentId: theorie-decision, requires: [minimax, vecteur-gaussien], estimatedHours: 12, tags: [inference, preuve]}
+
+  - {id: statistique-bayesienne, kind: topic, title: "Statistique bayésienne", parentId: niveau-4, requires: [], estimatedHours: 0, tags: [bayesien]}
+  - {id: bayes-posterior, kind: concept, title: "Prior, vraisemblance, posterior", parentId: statistique-bayesienne, requires: [formule-bayes, lois-conditionnelles-regulieres], estimatedHours: 12, tags: [bayesien]}
+  - {id: conjugaison, kind: concept, title: "Familles conjuguées", parentId: statistique-bayesienne, requires: [bayes-posterior, familles-exponentielles], estimatedHours: 10, tags: [bayesien, calculatoire]}
+  - {id: priors-jeffreys, kind: concept, title: "Priors non informatifs et prior de Jeffreys", parentId: statistique-bayesienne, requires: [conjugaison, information-fisher], estimatedHours: 10, tags: [bayesien]}
+  - {id: bernstein-von-mises, kind: concept, title: "Théorème de Bernstein-von Mises", parentId: statistique-bayesienne, requires: [bayes-posterior, mle-asymptotique], estimatedHours: 12, tags: [bayesien, asymptotique, preuve]}
+  - {id: mcmc, kind: concept, title: "MCMC : Metropolis-Hastings et échantillonneur de Gibbs", parentId: statistique-bayesienne, requires: [chaines-markov-ergodicite, bayes-posterior], estimatedHours: 16, tags: [bayesien, simulation, processus]}
+  - {id: diagnostics-mcmc, kind: concept, title: "Diagnostics de convergence MCMC", parentId: statistique-bayesienne, requires: [mcmc, python-visualisation], estimatedHours: 10, tags: [bayesien, simulation]}
+
+  - {id: glm, kind: topic, title: "Modèles linéaires généralisés", parentId: niveau-4, requires: [], estimatedHours: 0, tags: [inference, donnees]}
+  - {id: glm-cadre, kind: concept, title: "Cadre des GLM : fonction de lien et IRLS", parentId: glm, requires: [familles-exponentielles, regression-lineaire], estimatedHours: 12, tags: [inference, calculatoire]}
+  - {id: regression-logistique, kind: concept, title: "Régression logistique", parentId: glm, requires: [glm-cadre, maximum-vraisemblance], estimatedHours: 12, tags: [inference, donnees]}
+  - {id: regression-poisson-surdispersion, kind: concept, title: "Régression de Poisson et surdispersion", parentId: glm, requires: [glm-cadre, loi-poisson], estimatedHours: 10, tags: [inference, donnees]}
+  - {id: deviance-diagnostics-glm, kind: concept, title: "Déviance, résidus et diagnostics des GLM", parentId: glm, requires: [regression-logistique, rapport-vraisemblance-generalise], estimatedHours: 10, tags: [inference, donnees]}
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NIVEAU 5 — Processus stochastiques
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: niveau-5, kind: domain, title: "Niveau 5 — Processus stochastiques", parentId: null, requires: [], estimatedHours: 0, tags: [processus]}
+
+  - {id: chaines-markov, kind: topic, title: "Chaînes de Markov", parentId: niveau-5, requires: [], estimatedHours: 0, tags: [processus]}
+  - {id: chaines-markov-definition, kind: concept, title: "Chaîne de Markov, matrice de transition, Chapman-Kolmogorov", parentId: chaines-markov, requires: [lois-conditionnelles, diagonalisation], estimatedHours: 10, tags: [processus]}
+  - {id: markov-recurrence, kind: concept, title: "Classification des états : récurrence et transience", parentId: chaines-markov, requires: [chaines-markov-definition, borel-cantelli], estimatedHours: 12, tags: [processus, preuve]}
+  - {id: mesures-stationnaires, kind: concept, title: "Mesures invariantes et stationnaires", parentId: chaines-markov, requires: [markov-recurrence], estimatedHours: 12, tags: [processus]}
+  - {id: chaines-markov-ergodicite, kind: concept, title: "Ergodicité et théorème de convergence", parentId: chaines-markov, requires: [mesures-stationnaires, lgn-demonstration], estimatedHours: 14, tags: [processus, asymptotique, preuve]}
+  - {id: reversibilite-detailed-balance, kind: concept, title: "Réversibilité et équations de balance détaillée", parentId: chaines-markov, requires: [mesures-stationnaires], estimatedHours: 10, tags: [processus]}
+  - {id: markov-temps-continu, kind: concept, title: "Chaînes de Markov à temps continu et générateur infinitésimal", parentId: chaines-markov, requires: [chaines-markov-ergodicite, processus-poisson], estimatedHours: 14, tags: [processus]}
+
+  - {id: poisson-files, kind: topic, title: "Processus de Poisson et files d'attente", parentId: niveau-5, requires: [], estimatedHours: 0, tags: [processus]}
+  - {id: processus-poisson, kind: concept, title: "Processus de Poisson", parentId: poisson-files, requires: [loi-poisson, loi-uniforme-exponentielle, filtrations-temps-arret], estimatedHours: 12, tags: [processus]}
+  - {id: poisson-non-homogene-marque, kind: concept, title: "Processus de Poisson non homogène, marqué, spatial", parentId: poisson-files, requires: [processus-poisson, integrale-lebesgue], estimatedHours: 10, tags: [processus, mesure]}
+  - {id: processus-renouvellement, kind: concept, title: "Processus de renouvellement et théorèmes associés", parentId: poisson-files, requires: [processus-poisson, lgn-demonstration], estimatedHours: 12, tags: [processus, asymptotique]}
+  - {id: files-attente, kind: concept, title: "Files d'attente M/M/1, M/M/c, formule de Little", parentId: poisson-files, requires: [markov-temps-continu, processus-renouvellement], estimatedHours: 12, tags: [processus, simulation]}
+
+  - {id: mouvement-brownien, kind: topic, title: "Mouvement brownien et calcul stochastique", parentId: niveau-5, requires: [], estimatedHours: 0, tags: [processus]}
+  - {id: brownien-construction, kind: concept, title: "Construction et propriétés du mouvement brownien", parentId: mouvement-brownien, requires: [vecteur-gaussien, convergence-en-loi, convergence-martingales], estimatedHours: 16, tags: [processus, preuve]}
+  - {id: integrale-ito, kind: concept, title: "Intégrale d'Itô", parentId: mouvement-brownien, requires: [brownien-construction, espaces-lp], estimatedHours: 16, tags: [processus, mesure, preuve]}
+  - {id: formule-ito, kind: concept, title: "Formule d'Itô", parentId: mouvement-brownien, requires: [integrale-ito], estimatedHours: 14, tags: [processus, calculatoire]}
+  - {id: eds, kind: concept, title: "Équations différentielles stochastiques", parentId: mouvement-brownien, requires: [formule-ito], estimatedHours: 14, tags: [processus, simulation]}
+  - {id: girsanov, kind: concept, title: "Théorème de Girsanov et changement de probabilité", parentId: mouvement-brownien, requires: [eds, radon-nikodym], estimatedHours: 12, tags: [processus, mesure]}
+  - {id: feynman-kac, kind: concept, title: "Formule de Feynman-Kac", parentId: mouvement-brownien, requires: [eds, esperance-conditionnelle-proprietes], estimatedHours: 12, tags: [processus]}
+
+  - {id: series-temporelles, kind: topic, title: "Séries temporelles", parentId: niveau-5, requires: [], estimatedHours: 0, tags: [processus, donnees]}
+  - {id: stationnarite-acf, kind: concept, title: "Stationnarité, autocovariance, autocorrélation", parentId: series-temporelles, requires: [covariance-correlation, convergence-ps-probabilite], estimatedHours: 10, tags: [processus, donnees]}
+  - {id: modeles-arma, kind: concept, title: "Modèles AR, MA et ARMA", parentId: series-temporelles, requires: [stationnarite-acf, series-numeriques], estimatedHours: 14, tags: [processus, donnees]}
+  - {id: arima-saisonnalite, kind: concept, title: "Différenciation, ARIMA et saisonnalité", parentId: series-temporelles, requires: [modeles-arma], estimatedHours: 10, tags: [processus, donnees]}
+  - {id: estimation-prevision-arma, kind: concept, title: "Estimation et prévision : Box-Jenkins", parentId: series-temporelles, requires: [modeles-arma, maximum-vraisemblance, projection-l2], estimatedHours: 14, tags: [processus, inference]}
+  - {id: espace-etat-kalman, kind: concept, title: "Modèles espace-état et filtre de Kalman", parentId: series-temporelles, requires: [estimation-prevision-arma, vecteur-gaussien, esperance-conditionnelle], estimatedHours: 14, tags: [processus, inference]}
+  - {id: garch-volatilite, kind: concept, title: "Modèles ARCH-GARCH et volatilité", parentId: series-temporelles, requires: [modeles-arma, martingales-definition], estimatedHours: 12, tags: [processus, donnees]}
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NIVEAU 6 — Spécialisations (2 à 3 à choisir ; granularité volontairement
+  # plus grossière : ces topics seront redécoupés au moment de les aborder)
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: niveau-6, kind: domain, title: "Niveau 6 — Spécialisations", parentId: null, requires: [], estimatedHours: 0, tags: []}
+
+  - {id: apprentissage-statistique, kind: topic, title: "Apprentissage statistique", parentId: niveau-6, requires: [], estimatedHours: 0, tags: [ml]}
+  - {id: inegalites-concentration, kind: concept, title: "Inégalités de concentration : Hoeffding, Bernstein, McDiarmid", parentId: apprentissage-statistique, requires: [grandes-deviations, borel-cantelli], estimatedHours: 24, tags: [ml, preuve, asymptotique]}
+  - {id: biais-variance-generalisation, kind: concept, title: "Décomposition biais-variance et risque de généralisation", parentId: apprentissage-statistique, requires: [estimateur-proprietes, regression-lineaire], estimatedHours: 20, tags: [ml]}
+  - {id: dimension-vc, kind: concept, title: "Dimension de Vapnik-Chervonenkis", parentId: apprentissage-statistique, requires: [inegalites-concentration, denombrement-avance], estimatedHours: 28, tags: [ml, preuve]}
+  - {id: complexite-rademacher, kind: concept, title: "Complexité de Rademacher", parentId: apprentissage-statistique, requires: [dimension-vc], estimatedHours: 28, tags: [ml, preuve]}
+  - {id: bornes-generalisation, kind: concept, title: "Bornes de généralisation et leur lecture pratique", parentId: apprentissage-statistique, requires: [complexite-rademacher, biais-variance-generalisation], estimatedHours: 28, tags: [ml, preuve]}
+
+  - {id: grande-dimension, kind: topic, title: "Statistique en grande dimension", parentId: niveau-6, requires: [], estimatedHours: 0, tags: [ml, inference]}
+  - {id: ridge-regularisation, kind: concept, title: "Régularisation ridge et compromis biais-variance", parentId: grande-dimension, requires: [regression-lineaire, formes-quadratiques], estimatedHours: 20, tags: [ml, inference]}
+  - {id: lasso, kind: concept, title: "Lasso et sélection par pénalisation L1", parentId: grande-dimension, requires: [regression-lineaire, optimisation-convexe], estimatedHours: 28, tags: [ml, calculatoire]}
+  - {id: sparsite-theorie, kind: concept, title: "Théorie de la sparsité : conditions RIP et compatibilité", parentId: grande-dimension, requires: [lasso, inegalites-concentration], estimatedHours: 32, tags: [ml, preuve]}
+  - {id: matrices-aleatoires, kind: concept, title: "Matrices aléatoires et loi de Marchenko-Pastur", parentId: grande-dimension, requires: [diagonalisation, convergence-en-loi], estimatedHours: 28, tags: [asymptotique, algebre]}
+  - {id: tests-multiples-fdr, kind: concept, title: "Tests multiples et contrôle du FDR (Benjamini-Hochberg)", parentId: grande-dimension, requires: [p-valeur, comparaisons-multiples], estimatedHours: 24, tags: [inference]}
+  - {id: inference-post-selection, kind: concept, title: "Inférence post-sélection", parentId: grande-dimension, requires: [tests-multiples-fdr, lasso], estimatedHours: 28, tags: [inference, ml]}
+
+  - {id: inference-causale, kind: topic, title: "Inférence causale", parentId: niveau-6, requires: [], estimatedHours: 0, tags: [causal]}
+  - {id: contrefactuels-rubin, kind: concept, title: "Contrefactuels et modèle causal de Rubin", parentId: inference-causale, requires: [esperance-conditionnelle, design-experimental], estimatedHours: 24, tags: [causal]}
+  - {id: dag-causaux-do-calculus, kind: concept, title: "DAG causaux, critère de porte arrière, do-calculus", parentId: inference-causale, requires: [contrefactuels-rubin], estimatedHours: 28, tags: [causal, preuve]}
+  - {id: propensity-score, kind: concept, title: "Score de propension : appariement et pondération", parentId: inference-causale, requires: [contrefactuels-rubin, regression-logistique], estimatedHours: 24, tags: [causal, donnees]}
+  - {id: variables-instrumentales, kind: concept, title: "Variables instrumentales et doubles moindres carrés", parentId: inference-causale, requires: [propensity-score, regression-lineaire], estimatedHours: 24, tags: [causal, inference]}
+  - {id: diff-in-diff, kind: concept, title: "Différences de différences", parentId: inference-causale, requires: [contrefactuels-rubin, stationnarite-acf], estimatedHours: 20, tags: [causal, donnees]}
+  - {id: rdd, kind: concept, title: "Régression sur discontinuité", parentId: inference-causale, requires: [contrefactuels-rubin, estimation-noyau], estimatedHours: 20, tags: [causal, donnees]}
+
+  - {id: bayesien-computationnel, kind: topic, title: "Bayésien computationnel", parentId: niveau-6, requires: [], estimatedHours: 0, tags: [bayesien, simulation]}
+  - {id: hmc-nuts, kind: concept, title: "Monte-Carlo hamiltonien et NUTS", parentId: bayesien-computationnel, requires: [mcmc, hessienne-optimisation], estimatedHours: 28, tags: [bayesien, simulation]}
+  - {id: inference-variationnelle, kind: concept, title: "Inférence variationnelle", parentId: bayesien-computationnel, requires: [bayes-posterior, optimisation-convexe, radon-nikodym], estimatedHours: 28, tags: [bayesien, ml]}
+  - {id: outils-stan-pymc, kind: concept, title: "Modélisation avec Stan et PyMC", parentId: bayesien-computationnel, requires: [hmc-nuts, diagnostics-mcmc], estimatedHours: 20, tags: [bayesien, simulation, donnees]}
+  - {id: selection-modeles-bayesienne, kind: concept, title: "Comparaison de modèles bayésiens : WAIC, LOO, facteurs de Bayes", parentId: bayesien-computationnel, requires: [bayes-posterior, deviance-diagnostics-glm], estimatedHours: 24, tags: [bayesien, inference]}
+
+  - {id: non-parametrique, kind: topic, title: "Statistique non paramétrique", parentId: niveau-6, requires: [], estimatedHours: 0, tags: [inference]}
+  - {id: estimation-noyau, kind: concept, title: "Estimation à noyau : densité et régression", parentId: non-parametrique, requires: [fdr-empirique-statistiques-ordre, convergence-lp], estimatedHours: 28, tags: [inference, asymptotique]}
+  - {id: splines-regression-penalisee, kind: concept, title: "Splines et régression pénalisée", parentId: non-parametrique, requires: [ridge-regularisation, estimation-noyau], estimatedHours: 24, tags: [inference, calculatoire]}
+  - {id: bootstrap, kind: concept, title: "Bootstrap et rééchantillonnage", parentId: non-parametrique, requires: [fdr-empirique-statistiques-ordre, delta-methode, convergence-en-loi], estimatedHours: 24, tags: [inference, simulation]}
+  - {id: processus-gaussiens, kind: concept, title: "Processus gaussiens et régression bayésienne non paramétrique", parentId: non-parametrique, requires: [vecteur-gaussien, espace-etat-kalman], estimatedHours: 28, tags: [bayesien, processus, ml]}
+
+  - {id: domaines-applicatifs, kind: topic, title: "Domaines applicatifs", parentId: niveau-6, requires: [], estimatedHours: 0, tags: [donnees]}
+  - {id: analyse-survie, kind: concept, title: "Analyse de survie : Kaplan-Meier et modèle de Cox", parentId: domaines-applicatifs, requires: [glm-cadre, estimation-noyau, martingales-definition], estimatedHours: 28, tags: [inference, donnees]}
+  - {id: valeurs-extremes, kind: concept, title: "Théorie des valeurs extrêmes", parentId: domaines-applicatifs, requires: [convergence-en-loi, loi-cauchy-lois-lourdes], estimatedHours: 24, tags: [asymptotique, donnees]}
+  - {id: statistique-spatiale, kind: concept, title: "Statistique spatiale et krigeage", parentId: domaines-applicatifs, requires: [processus-gaussiens], estimatedHours: 28, tags: [processus, donnees]}
+  - {id: statistique-robuste, kind: concept, title: "Statistique robuste : M-estimateurs et point de rupture", parentId: domaines-applicatifs, requires: [mle-asymptotique, estimation-noyau], estimatedHours: 24, tags: [inference]}
+  - {id: donnees-fonctionnelles, kind: concept, title: "Données fonctionnelles et ACP fonctionnelle", parentId: domaines-applicatifs, requires: [projection-l2, processus-gaussiens], estimatedHours: 28, tags: [donnees, mesure]}
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # TRANSVERSE — non bloquant, à mener en parallèle dès le niveau 1
+  # ══════════════════════════════════════════════════════════════════════════
+  - {id: transverse, kind: domain, title: "Transverse", parentId: null, requires: [], estimatedHours: 0, tags: []}
+
+  - {id: programmation-simulation, kind: topic, title: "Programmation et simulation", parentId: transverse, requires: [], estimatedHours: 0, tags: [simulation]}
+  - {id: generation-aleatoire, kind: concept, title: "Génération de variables aléatoires : inversion, rejet, RNG", parentId: programmation-simulation, requires: [transformation-variables, python-numpy], estimatedHours: 10, tags: [simulation, calculatoire]}
+  - {id: monte-carlo, kind: concept, title: "Méthodes de Monte-Carlo et estimation d'erreur", parentId: programmation-simulation, requires: [generation-aleatoire, loi-grands-nombres-intuitive], estimatedHours: 12, tags: [simulation]}
+  - {id: reduction-variance, kind: concept, title: "Réduction de variance : antithétiques, variables de contrôle, importance", parentId: programmation-simulation, requires: [monte-carlo, covariance-correlation], estimatedHours: 10, tags: [simulation]}
+  - {id: verification-numerique, kind: concept, title: "Vérifier un résultat par simulation : protocole et pièges", parentId: programmation-simulation, requires: [monte-carlo, python-visualisation], estimatedHours: 8, tags: [simulation, preuve]}
+
+  - {id: methodologie, kind: topic, title: "Méthodologie de travail", parentId: transverse, requires: [], estimatedHours: 0, tags: [preuve]}
+  - {id: strategies-resolution, kind: concept, title: "Stratégies de résolution d'un exercice de probabilités", parentId: methodologie, requires: [espace-probabilise], estimatedHours: 8, tags: [preuve]}
+  - {id: redaction-preuve, kind: concept, title: "Rédiger une démonstration en théorie de la mesure", parentId: methodologie, requires: [tribus-mesurabilite], estimatedHours: 10, tags: [preuve, mesure]}
+  - {id: lecture-articles, kind: concept, title: "Lire un article de statistique", parentId: methodologie, requires: [mle-asymptotique], estimatedHours: 12, tags: [inference]}
+
+  - {id: projets-donnees, kind: topic, title: "Projets sur données réelles", parentId: transverse, requires: [], estimatedHours: 0, tags: [donnees]}
+  - {id: pipeline-donnees-reelles, kind: concept, title: "Chaîne de traitement d'un jeu de données réel", parentId: projets-donnees, requires: [description-donnees, python-numpy], estimatedHours: 12, tags: [donnees, simulation]}
+  - {id: redaction-resultats, kind: concept, title: "Rédiger des résultats et leurs limites", parentId: projets-donnees, requires: [pipeline-donnees-reelles, diagnostics-residus], estimatedHours: 10, tags: [donnees]}

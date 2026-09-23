@@ -2,7 +2,7 @@
 
 Personal website and utility tools. Next.js (App Router) · Tailwind · Supabase · Vercel.
 
-Two tools live here so far:
+Three tools live here so far:
 
 - **`/agenda`** — a weekly planner: typed tasks in a backlog, reusable blocks,
   and a week grid you assemble by hand.
@@ -10,6 +10,9 @@ Two tools live here so far:
   needs, with the site's rake taken off the pot. No account and nothing stored:
   the whole model is pure functions in `src/lib/poker.ts`, and the page is
   static.
+- **`/maths`** — a probability & statistics learning path (in French): a DAG
+  of 192 concepts, courses in MDX with KaTeX, exercises, runnable Python
+  (Pyodide) and FSRS spaced repetition. See [The maths path](#the-maths-path).
 
 ## Getting started
 
@@ -227,6 +230,48 @@ The chosen preset is remembered in `localStorage` on the visitor's own device
 (`aderugy:poker:rake`) — nothing about it reaches the database. If the presets
 cannot be read at all, the menu falls back to its manual percent/cap fields and
 the page still works.
+
+## The maths path
+
+Formerly a standalone app (SQLite + Docker), now a signed-in segment of this
+site. The specs and design decisions it was built from are kept in
+`docs/maths/` (`prompt.md` is authoritative; paths in those docs predate the
+move — `content/` is now `content/maths/`, `src/lib/` is `src/lib/maths/`).
+
+**Content lives in git, state lives in Supabase.**
+
+```
+content/maths/graph.yaml          source of truth of the DAG — never rename an id
+content/maths/graph.layout.json   precomputed layout, versioned (npm run maths:layout)
+content/maths/notation.mdx        notation conventions
+content/maths/<domain>/<topic>/<concept>/course.mdx | cards.yaml | exercises/*.mdx
+src/lib/maths/                    graph, progression rules, FSRS, stats — pure, tested
+src/server/maths/data.ts          Supabase reads (one snapshot per request) and writes
+src/server/actions/maths.ts       server actions
+supabase/migrations/0012_maths.sql  per-user tables maths_*, RLS, two RPCs
+```
+
+Run `0012_maths.sql` once. `next.config.ts` adds `content/maths/**` to the
+output file trace: the pages read it from disk at request time, which the
+tracer cannot see on its own.
+
+| route | what it serves |
+|---|---|
+| `/maths` | the DAG map, per domain or as a tree |
+| `/maths/n/<id>` | a node: course, exercises, progress, cards, session log |
+| `/maths/revision` | the FSRS queue, interleaved across the corpus, keyboard-driven |
+| `/maths/recherche` | full-text search over courses, exercises and cards |
+| `/maths/tableau-de-bord` | hours, review load, forgetting curve, tags, fragile nodes |
+| `/maths/corpus` | the whole written corpus — **print to PDF from here** |
+| `/maths/notation` | notation conventions |
+
+Writing a node: create `course.mdx` with `status: draft | published` in its
+frontmatter, follow the nine sections with their anchors
+(`## 6. Contre-exemples et pièges {#pieges}`), then `npm run maths:check`.
+After any change to `graph.yaml`, run `npm run maths:layout` or the new node
+has no position on the map. Widgets (`src/components/maths/widgets/`) are
+used straight from MDX (`<Convergence />`) once declared in
+`src/lib/maths/mdx.tsx`.
 
 ## The agenda model
 

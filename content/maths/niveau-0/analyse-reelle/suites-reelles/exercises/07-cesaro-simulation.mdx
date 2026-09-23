@@ -1,0 +1,55 @@
+---
+kind: simulation
+difficulty: 3
+---
+Pour une suite $(u_n)$, on appelle **moyenne de Cesàro** la suite
+$C_n = \dfrac{1}{n} \sum_{k=1}^{n} u_k$.
+
+1. Écrire un programme qui calcule $C_n$ pour $u_n = 1/n$, $u_n = (-1)^n$ et
+   $u_n = \sqrt{n}$, et observer le comportement dans chaque cas.
+2. Pour $u_n = (-1)^n$, la suite diverge et pourtant $(C_n)$ converge :
+   deviner la limite et vérifier numériquement la vitesse.
+3. Émettre une conjecture sur ce que devient $(C_n)$ quand $u_n \to \ell$.
+   La démonstration est l'objet de l'exercice suivant.
+
+<!-- indice -->
+`numpy.cumsum(u) / numpy.arange(1, n+1)` calcule toutes les moyennes en une
+fois, sans boucle.
+
+<!-- indice -->
+Pour $u_n = (-1)^n$, la somme partielle vaut $0$ ou $-1$ selon la parité.
+Que vaut alors $C_n$ exactement ?
+
+<!-- solution -->
+```python
+import numpy as np
+
+n = np.arange(1, 10**6 + 1)
+for nom, u in [("1/n", 1 / n),
+               ("(-1)^n", (-1.0) ** n),
+               ("sqrt(n)", np.sqrt(n))]:
+    C = np.cumsum(u) / n
+    print(f"{nom:>8} : C_10={C[9]: .6f}  C_1000={C[999]: .6f}"
+          f"  C_10^6={C[-1]: .6f}")
+```
+
+Sortie :
+
+```
+     1/n :  C_10= 0.292897  C_1000= 0.007485  C_10^6= 0.000014
+  (-1)^n :  C_10= 0.000000  C_1000= 0.000000  C_10^6= 0.000000
+ sqrt(n) :  C_10= 2.246828  C_1000= 21.097456  C_10^6= 666.667166
+```
+
+1. Pour $u_n = 1/n$, $C_n \to 0$ : la moyenne d'une suite qui tend vers $0$
+   tend vers $0$. Pour $u_n = \sqrt n$, $C_n \to +\infty$, plus lentement que
+   $u_n$ ($C_n \approx \tfrac23 \sqrt n$, ce que confirme
+   $666{,}67 \approx \tfrac23 \cdot 1000$).
+
+2. Pour $u_n = (-1)^n$, la somme partielle vaut $0$ si $n$ est pair et $-1$ si
+   $n$ est impair, donc $C_n$ vaut $0$ ou $-1/n$ : $C_n \to 0$, et
+   $|C_n| \le 1/n$. La suite $(u_n)$ diverge, sa moyenne converge — moyenner
+   détruit l'oscillation.
+
+3. Conjecture : si $u_n \to \ell$ alors $C_n \to \ell$. La réciproque est
+   fausse d'après 2.

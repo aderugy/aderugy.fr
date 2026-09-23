@@ -1,0 +1,263 @@
+/* /maths — styles propres au parcours.
+ *
+ * Tout est rangé sous `.maths` (posé par src/app/maths/layout.tsx) : rien ici
+ * ne doit déborder sur /agenda ou /poker, et la feuille d'impression en
+ * particulier masque en-têtes et formulaires.
+ *
+ * Couleurs : les jetons du site (--foreground, --muted, --border, --accent…)
+ * plus une rampe de maîtrise tirée de l'accent. La couleur encode l'état de
+ * maîtrise et rien d'autre ; chaque aplat a sa couleur de texte, choisie pour
+ * rester lisible sur l'étiquette 11 px du graphe, en clair comme en sombre.  */
+
+:root {
+  --maitrise-10: #dde4fb;
+  --maitrise-40: #8a9deb;
+  --maitrise-70: #3b5bdb;
+  --maitrise-100: #1f2f7a;
+  --maitrise-texte-10: #1a1a19;
+  --maitrise-texte-40: #1a1a19;
+  --maitrise-texte-70: #ffffff;
+  --maitrise-texte-100: #ffffff;
+  --maths-alerte: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* En sombre, « plus maîtrisé » veut dire « plus lumineux » : l'intensité
+       croît en s'éloignant du fond, pas en s'en rapprochant. */
+    --maitrise-10: #1f2540;
+    --maitrise-40: #33448f;
+    --maitrise-70: #7c93f5;
+    --maitrise-100: #c7d0fb;
+    --maitrise-texte-10: #eceae4;
+    --maitrise-texte-40: #eceae4;
+    --maitrise-texte-70: #111110;
+    --maitrise-texte-100: #111110;
+    --maths-alerte: #f87171;
+  }
+}
+
+/* Chrome : navigation, rails, métadonnées. Ne touche jamais la colonne de
+   lecture. */
+.maths .chrome {
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.maths .chrome-15 {
+  font-size: 15px;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Colonne de lecture ─────────────────────────────────────────────────── */
+
+.maths .prose-cours {
+  max-width: 68ch;
+  font-size: 17px;
+  line-height: 28px;
+}
+
+.maths .prose-cours h2 {
+  font-size: 20px;
+  line-height: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 40px;
+  margin-bottom: 8px;
+  scroll-margin-top: 96px;
+}
+
+.maths .prose-cours h3 {
+  font-size: 17px;
+  line-height: 28px;
+  font-weight: 600;
+  margin-top: 28px;
+  margin-bottom: 4px;
+  scroll-margin-top: 96px;
+}
+
+.maths .prose-cours p,
+.maths .prose-cours ul,
+.maths .prose-cours ol {
+  margin-block: 14px;
+}
+
+.maths .prose-cours ul {
+  list-style: disc;
+  padding-left: 20px;
+}
+
+.maths .prose-cours ol {
+  list-style: decimal;
+  padding-left: 24px;
+}
+
+.maths .prose-cours li {
+  margin-block: 4px;
+}
+
+.maths .prose-cours a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.maths .prose-cours strong {
+  font-weight: 600;
+}
+
+.maths .prose-cours code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+/* `.brut` : blocs déjà encadrés par leur composant (BlocPython). */
+.maths .prose-cours pre:not(.brut) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  padding: 12px 16px;
+  overflow-x: auto;
+  margin-block: 20px;
+}
+
+.maths .prose-cours pre code {
+  font-size: inherit;
+}
+
+.maths .prose-cours blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 16px;
+  margin-block: 20px;
+}
+
+.maths .prose-cours table {
+  border-collapse: collapse;
+  margin-block: 20px;
+  font-size: 15px;
+}
+
+.maths .prose-cours th,
+.maths .prose-cours td {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 16px 6px 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.maths .prose-cours th {
+  font-weight: 600;
+}
+
+/* ── KaTeX ──────────────────────────────────────────────────────────────────
+   Une formule n'a ni taille ni couleur propre. Les formules affichées sont
+   alignées sur la marge gauche du paragraphe, jamais centrées.               */
+
+.maths .katex {
+  font-size: 1.08em;
+  color: inherit;
+}
+
+.maths .katex-display {
+  margin: 20px 0;
+  text-align: left;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 2px;
+}
+
+.maths .katex-display > .katex {
+  text-align: left;
+  display: block;
+}
+
+/* Ancres stables des sections (voir lib/maths/mdx.tsx et la décision D1). */
+.maths .ancre {
+  display: block;
+  height: 0;
+  scroll-margin-top: 96px;
+}
+
+/* ── Impression ─────────────────────────────────────────────────────────────
+   L'export PDF est cette feuille de style : « imprimer vers un PDF » depuis
+   /maths/corpus. Pas de second moteur de rendu à maintenir, donc pas d'écart
+   possible entre le PDF et l'écran.                                          */
+
+@media print {
+  :root {
+    --background: #fff;
+    --surface: #fff;
+    --foreground: #000;
+    --muted: #444;
+    --border: #999;
+    --accent: #000;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .maths .prose-cours {
+    max-width: 100%;
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+
+  /* Le chrome n'a rien à faire sur le papier : rails, en-tête, boutons,
+     formulaires, contrôles de widget. */
+  .maths header,
+  .maths nav,
+  .maths aside,
+  .maths button,
+  .maths form,
+  .maths input,
+  .maths select,
+  .maths textarea,
+  .maths figure > div:last-of-type,
+  .maths .print\:hidden {
+    display: none !important;
+  }
+
+  .maths main {
+    padding: 0 !important;
+  }
+
+  .maths .noeud-imprime {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  .maths .noeud-imprime:first-of-type {
+    break-before: auto;
+  }
+
+  /* Ce qui ne doit pas être coupé en deux : un énoncé, une figure, un bloc de
+     code, une formule affichée. */
+  .maths .eviter-coupure,
+  .maths figure,
+  .maths pre,
+  .maths .katex-display,
+  .maths blockquote,
+  .maths table {
+    break-inside: avoid;
+  }
+
+  .maths h1,
+  .maths h2,
+  .maths h3 {
+    break-after: avoid;
+  }
+
+  .maths a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

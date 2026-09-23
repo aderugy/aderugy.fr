@@ -11,6 +11,11 @@ const tools = [
     name: "Poker odds",
     description: "Pot odds, drawing equity and fold equity, rake included.",
   },
+  {
+    href: "/maths",
+    name: "Maths",
+    description: "Probability & statistics path: a DAG of concepts, courses, exercises, spaced repetition.",
+  },
 ];
 
 export default function Home() {

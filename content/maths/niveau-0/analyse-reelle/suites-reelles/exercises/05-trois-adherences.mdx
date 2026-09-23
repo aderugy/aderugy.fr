@@ -1,0 +1,37 @@
+---
+kind: contre-exemple
+difficulty: 2
+---
+1. Construire une suite bornée admettant exactement trois valeurs d'adhérence,
+   et le démontrer.
+2. Construire une suite bornée dont l'ensemble des valeurs d'adhérence est
+   $[0, 1]$ tout entier.
+3. Une suite bornée peut-elle n'avoir aucune valeur d'adhérence ?
+
+<!-- indice -->
+Pour 1, penser à une suite périodique. Quelles sont ses suites extraites
+convergentes ?
+
+<!-- indice -->
+Pour 2, il faut une suite qui passe arbitrairement près de chaque point de
+$[0,1]$ : une énumération d'un ensemble dénombrable dense convient.
+
+<!-- solution -->
+1. Prenons la suite $3$-périodique $u_n = n \bmod 3$, soit
+   $0, 1, 2, 0, 1, 2, \dots$ Une
+   suite extraite $(u_{\varphi(k)})$ converge si et seulement si $\varphi(k)$
+   finit par rester dans une seule classe modulo $3$ ; sa limite est alors
+   $0$, $1$ ou $2$. Réciproquement chacune de ces trois valeurs est atteinte
+   par une extraction. L'ensemble des valeurs d'adhérence est donc exactement
+   $\{0, 1, 2\}$.
+
+2. Soit $(q_n)$ une énumération de $\mathbb{Q} \cap [0,1]$, qui est dénombrable.
+   Pour tout $x \in [0,1]$ et tout $\varepsilon > 0$, il y a une infinité de
+   rationnels dans $]x - \varepsilon, x + \varepsilon[ \cap [0,1]$, donc une
+   infinité de rangs $n$ avec $|q_n - x| < \varepsilon$ : on peut extraire une
+   suite convergeant vers $x$. Tout point de $[0,1]$ est valeur d'adhérence, et
+   il n'y en a pas d'autre puisque la suite est à valeurs dans $[0,1]$, fermé.
+
+3. Non. C'est exactement le théorème de Bolzano-Weierstrass : toute suite
+   bornée admet au moins une suite extraite convergente, donc au moins une
+   valeur d'adhérence.

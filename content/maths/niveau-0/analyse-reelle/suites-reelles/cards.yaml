@@ -1,0 +1,107 @@
+# Cartes de révision du nœud. L'état FSRS (stabilité, difficulté, échéance)
+# vit en base, pas ici : ce fichier ne contient que le contenu, versionné.
+#
+# `ref` pointe vers l'ancre de la section du cours dont la carte provient
+# (décision D1) : une carte échouée ramène au passage exact à relire.
+
+cards:
+  - id: definition-convergence
+    ref: construction
+    front: "Écrire la définition de $u_n \\to \\ell$, avec les quantificateurs dans l'ordre."
+    back: |
+      $\forall \varepsilon > 0,\ \exists N \in \mathbb{N},\ \forall n \ge N,\
+      |u_n - \ell| < \varepsilon$.
+
+      L'ordre compte : $N$ dépend de $\varepsilon$, jamais l'inverse.
+
+  - id: axiome-borne-sup
+    ref: construction
+    front: "Quel axiome distingue $\\mathbb{R}$ de $\\mathbb{Q}$, et où sert-il dans ce nœud ?"
+    back: |
+      L'axiome de la borne supérieure : toute partie non vide et majorée de
+      $\mathbb{R}$ admet une borne supérieure dans $\mathbb{R}$.
+
+      Il sert une seule fois, dans la démonstration du théorème de la limite
+      monotone ; Bolzano-Weierstrass et le critère de Cauchy en découlent.
+
+  - id: caracterisation-sup
+    ref: construction
+    front: "Caractérisation de $s = \\sup A$ avec un $\\varepsilon$ ?"
+    back: |
+      $s$ majore $A$, et pour tout $\varepsilon > 0$ il existe $a \in A$ tel que
+      $a > s - \varepsilon$.
+
+      C'est la forme à utiliser en démonstration : écrire « soit $a \in A$ tel
+      que $a = \sup A$ » suppose un maximum, qui peut ne pas exister.
+
+  - id: limite-monotone
+    ref: construction
+    front: "Théorème de la limite monotone : énoncé et limite."
+    back: |
+      Une suite croissante et majorée converge, et sa limite est
+      $\sup_n u_n$. (Symétriquement pour décroissante et minorée, vers l'inf.)
+
+  - id: bolzano-weierstrass
+    ref: construction
+    front: "Énoncé de Bolzano-Weierstrass. Que ne dit-il **pas** ?"
+    back: |
+      De toute suite bornée on peut extraire une suite convergente.
+
+      Il ne dit pas que la suite converge : $(-1)^n$ est bornée, a deux valeurs
+      d'adhérence, et diverge.
+
+  - id: cauchy-definition
+    ref: construction
+    front: "Définition d'une suite de Cauchy, et pourquoi elle est utile."
+    back: |
+      $\forall \varepsilon > 0,\ \exists N,\ \forall p, q \ge N,\
+      |u_p - u_q| < \varepsilon$.
+
+      Elle ne mentionne aucune limite : on peut donc l'établir sans savoir
+      vers quoi la suite converge. Dans $\mathbb{R}$ — et pas dans
+      $\mathbb{Q}$ — elle équivaut à la convergence.
+
+  - id: pas-consecutifs
+    ref: pieges
+    front: "$u_{n+1} - u_n \\to 0$ entraîne-t-il la convergence ? Contre-exemple."
+    back: |
+      Non. $u_n = \sqrt n$ : $u_{n+1} - u_n = \dfrac{1}{\sqrt{n+1} + \sqrt n}
+      \to 0$ et $u_n \to +\infty$.
+
+      Cauchy contrôle $|u_p - u_q|$ pour **tous** les couples de rangs assez
+      grands, pas seulement les rangs consécutifs.
+
+  - id: inegalites-strictes
+    ref: pieges
+    front: "Que devient une inégalité stricte par passage à la limite ?"
+    back: |
+      Elle devient large. $u_n = 1/n > 0$ pour tout $n$, et $\lim u_n = 0$.
+
+      De $u_n < v_n$ on ne tire que $\lim u_n \le \lim v_n$.
+
+  - id: sup-non-atteint
+    ref: pieges
+    front: "Donner un ensemble dont la borne supérieure n'est pas un maximum."
+    back: |
+      $A = \{1 - 1/n : n \ge 1\}$ : $\sup A = 1 \notin A$.
+
+      La borne supérieure existe toujours (pour une partie non vide majorée),
+      le maximum non.
+
+  - id: cesaro
+    ref: liens
+    front: "Théorème de Cesàro : énoncé, et la réciproque est-elle vraie ?"
+    back: |
+      Si $u_n \to \ell$ alors $\dfrac1n \sum_{k=1}^n u_k \to \ell$.
+
+      La réciproque est fausse : $u_n = (-1)^n$ diverge et sa moyenne tend vers
+      $0$. Elle redevient vraie si $(u_n)$ est monotone.
+
+  - id: heron-precision
+    ref: simulation
+    front: "Deux suites convergentes peuvent-elles avoir des coûts incomparables ?"
+    back: |
+      Oui, et la définition $\varepsilon$-$N$ ne les distingue pas. Héron double
+      le nombre de décimales exactes à chaque itération ; une moyenne empirique
+      a une erreur en $1/\sqrt n$ — cent fois plus de termes pour un chiffre de
+      plus.

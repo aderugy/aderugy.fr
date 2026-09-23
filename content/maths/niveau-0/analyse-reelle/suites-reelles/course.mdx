@@ -1,0 +1,386 @@
+---
+title: Suites réelles, bornes et convergence
+status: published
+updated: 2026-09-10
+---
+
+## 1. Position dans le graphe {#position}
+
+Ce nœud n'a aucun prérequis : c'est l'entrée du parcours. Tout ce qui suit en
+analyse — limites de fonctions, séries, intégrale de Riemann — se ramène à des
+limites de suites. Et en probabilités, la loi des grands nombres, la convergence
+presque sûre et les lemmes de Borel-Cantelli sont des énoncés sur des suites de
+nombres réels ou de variables aléatoires : la définition $\varepsilon$-$N$ vue
+ici est littéralement celle qui y sera employée.
+
+## 2. Le problème {#probleme}
+
+On ne sait calculer qu'un nombre fini d'opérations, et pourtant on veut
+manipuler des objets qui n'ont pas d'écriture finie. $\sqrt{2}$ n'est pas un
+quotient d'entiers ; $\pi$ n'a pas de développement décimal qui s'arrête. La
+seule chose qu'on sache produire, c'est une liste de valeurs approchées :
+
+$$
+1,\quad 1{,}5,\quad 1{,}4166\ldots,\quad 1{,}41421568\ldots
+$$
+
+— ici la méthode de Héron pour $\sqrt{2}$, dont chaque terme s'obtient du
+précédent par $u_{n+1} = \tfrac{1}{2}(u_n + 2/u_n)$.
+
+La question n'est pas « ces nombres se rapprochent-ils ? » — cela s'observe.
+Elle est : **de quoi se rapprochent-ils, et ce quelque chose existe-t-il ?**
+Dans $\mathbb{Q}$, la réponse est non : la suite de Héron est faite de
+rationnels, elle se resserre autant qu'on veut, et sa limite n'est pas un
+rationnel. Il n'y a donc pas de théorème de convergence à espérer sans une
+propriété qui distingue $\mathbb{R}$ de $\mathbb{Q}$. Cette propriété est
+l'axiome de la borne supérieure, et tout ce nœud en découle.
+
+Deuxième question, moins visible mais plus utile en pratique : **à quelle
+distance de la limite est-on après $n$ étapes ?** Savoir qu'une suite converge
+ne dit rien du coût. Une moyenne empirique de Monte-Carlo converge, mais gagner
+un chiffre décimal demande cent fois plus de tirages ; la méthode de Héron
+double le nombre de décimales exactes à chaque étape. Ces deux suites convergent
+au même sens et sont incomparables à l'usage.
+
+## 3. Construction {#construction}
+
+**Suite.** Une suite réelle est une application $u : \mathbb{N} \to \mathbb{R}$,
+notée $(u_n)_{n \in \mathbb{N}}$.
+
+**Majorant, borne supérieure.** Une partie $A \subseteq \mathbb{R}$ non vide est
+majorée s'il existe $M$ tel que $a \le M$ pour tout $a \in A$. La borne
+supérieure $\sup A$ est le plus petit des majorants.
+
+> **Axiome de la borne supérieure.** Toute partie non vide et majorée de
+> $\mathbb{R}$ admet une borne supérieure dans $\mathbb{R}$.
+
+Ce n'est pas un théorème : c'est ce qui définit $\mathbb{R}$ parmi les corps
+totalement ordonnés. $\mathbb{Q}$ ne le vérifie pas — la partie
+$\{q \in \mathbb{Q} : q^2 < 2\}$ est majorée et n'a pas de borne supérieure
+rationnelle.
+
+Caractérisation utilisée en permanence : $s = \sup A$ si et seulement si $s$
+majore $A$ et, pour tout $\varepsilon > 0$, il existe $a \in A$ tel que
+$a > s - \varepsilon$.
+
+**Convergence.** $(u_n)$ converge vers $\ell \in \mathbb{R}$ si
+
+$$
+\forall \varepsilon > 0,\ \exists N \in \mathbb{N},\ \forall n \ge N,\quad
+|u_n - \ell| < \varepsilon .
+$$
+
+On note $u_n \to \ell$ ou $\lim_{n \to \infty} u_n = \ell$. Une suite qui ne
+converge vers aucun réel est dite divergente.
+
+**Suite bornée.** $(u_n)$ est bornée s'il existe $M \ge 0$ tel que
+$|u_n| \le M$ pour tout $n$.
+
+**Suite extraite.** Une extraction est une application $\varphi : \mathbb{N} \to
+\mathbb{N}$ strictement croissante ; $(u_{\varphi(n)})$ est une suite extraite
+(*subsequence*) de $(u_n)$. Un réel $a$ est une valeur d'adhérence de $(u_n)$
+s'il existe une extraction $\varphi$ telle que $u_{\varphi(n)} \to a$.
+
+**Suite de Cauchy.**
+
+$$
+\forall \varepsilon > 0,\ \exists N,\ \forall p, q \ge N,\quad |u_p - u_q| < \varepsilon .
+$$
+
+La définition ne mentionne aucune limite : elle ne parle que des termes entre
+eux. C'est ce qui la rend vérifiable sans connaître à l'avance vers quoi la
+suite va.
+
+Les quatre énoncés qui structurent le nœud :
+
+- **Théorème de la limite monotone.** Une suite croissante et majorée converge,
+  vers $\sup_n u_n$.
+- **Théorème de Bolzano-Weierstrass.** De toute suite bornée on peut extraire
+  une suite convergente.
+- **Critère de Cauchy.** Une suite réelle converge si et seulement si elle est
+  de Cauchy. (On dit que $\mathbb{R}$ est complet.)
+- **Passage à la limite dans les inégalités.** Si $u_n \le v_n$ pour tout $n$
+  assez grand et si les deux suites convergent, alors
+  $\lim u_n \le \lim v_n$. **Les inégalités strictes ne se conservent pas.**
+
+## 4. Intuition {#intuition}
+
+La définition $\varepsilon$-$N$ se lit comme un jeu à deux coups. Un adversaire
+annonce une tolérance $\varepsilon$, aussi petite qu'il veut ; je dois répondre
+un rang $N$ à partir duquel je garantis que la suite reste dans la bande
+$]\ell - \varepsilon, \ell + \varepsilon[$. La suite converge si j'ai une réponse
+à *toutes* ses annonces. L'ordre des quantificateurs est l'énoncé : $N$ dépend de
+$\varepsilon$, et c'est l'adversaire qui parle en premier.
+
+La borne supérieure, c'est « le meilleur majorant possible ». Elle n'est pas
+forcément atteinte : $\sup\{1 - 1/n : n \ge 1\} = 1$ alors qu'aucun terme ne vaut
+$1$. Un maximum est une borne supérieure qui appartient à l'ensemble ; l'inverse
+est faux, et c'est précisément pour cela que la borne supérieure existe toujours
+alors que le maximum, non.
+
+Le critère de Cauchy dit : « les termes se tassent les uns sur les autres ».
+Dans $\mathbb{R}$, se tasser suffit à converger — il y a toujours un point où
+atterrir. Dans $\mathbb{Q}$, la suite peut se tasser autour d'un trou. La
+complétude, c'est l'absence de trous, et c'est une propriété de l'ensemble, pas
+de la suite.
+
+## 5. Démonstrations {#demonstrations}
+
+Le brief n'exige des démonstrations complètes qu'à partir du niveau 3. Elles
+sont données ici quand même, parce que ce sont les premières du parcours et
+qu'elles servent de modèle de rédaction. Ce qui est admis est signalé.
+
+**Unicité de la limite.** Supposons $u_n \to \ell$ et $u_n \to \ell'$ avec
+$\ell \ne \ell'$. Posons $\varepsilon = |\ell - \ell'|/2 > 0$. Il existe $N_1$
+tel que $|u_n - \ell| < \varepsilon$ pour $n \ge N_1$, et $N_2$ tel que
+$|u_n - \ell'| < \varepsilon$ pour $n \ge N_2$. Pour
+$n \ge \max(N_1, N_2)$, l'inégalité triangulaire donne
+
+$$
+|\ell - \ell'| \le |\ell - u_n| + |u_n - \ell'| < 2\varepsilon = |\ell - \ell'| ,
+$$
+
+soit $|\ell - \ell'| < |\ell - \ell'|$, ce qui est absurde. $\square$
+
+Le choix $\varepsilon = |\ell - \ell'|/2$ n'a rien d'évident a priori : on part
+de la conclusion voulue et on choisit la tolérance qui la rend contradictoire.
+C'est le mouvement le plus fréquent de toute l'analyse.
+
+**Une suite convergente est bornée.** Prenons $\varepsilon = 1$ dans la
+définition : il existe $N$ tel que $|u_n - \ell| < 1$ pour $n \ge N$, donc
+$|u_n| < |\ell| + 1$ pour ces $n$. Les rangs $0, \dots, N-1$ sont en nombre
+fini. Avec
+$M = \max\big(|u_0|, \dots, |u_{N-1}|, |\ell| + 1\big)$, on a $|u_n| \le M$ pour
+tout $n$. $\square$
+
+L'étape qui compte est « en nombre fini » : un maximum sur un ensemble fini
+existe toujours, sur un ensemble infini non. C'est le seul endroit du parcours
+où la finitude d'un paquet de rangs est utilisée aussi crûment.
+
+**Théorème de la limite monotone.** Soit $(u_n)$ croissante et majorée. La
+partie $A = \{u_n : n \in \mathbb{N}\}$ est non vide et majorée, donc
+$s = \sup A$ existe par l'axiome de la borne supérieure. Soit
+$\varepsilon > 0$. Comme $s - \varepsilon$ n'est pas un majorant de $A$, il
+existe $N$ tel que $u_N > s - \varepsilon$. La croissance donne, pour tout
+$n \ge N$,
+
+$$
+s - \varepsilon < u_N \le u_n \le s < s + \varepsilon ,
+$$
+
+donc $|u_n - s| < \varepsilon$. Ainsi $u_n \to s$. $\square$
+
+C'est ici que l'axiome entre en scène, et c'est le seul point du nœud où il est
+utilisé directement : les deux théorèmes suivants s'en déduisent.
+
+**Bolzano-Weierstrass.** Soit $(u_n)$ bornée. On construit une suite extraite
+monotone, puis on applique le théorème précédent.
+
+Appelons $n$ un *pic* si $u_m \le u_n$ pour tout $m > n$ : aucun terme
+ultérieur ne dépasse $u_n$. Deux cas, et ils sont exhaustifs.
+
+*Cas 1 : il y a une infinité de pics.* Notons-les
+$n_0 < n_1 < n_2 < \cdots$. Par définition d'un pic, $u_{n_{k+1}} \le u_{n_k}$ :
+la suite extraite $(u_{n_k})$ est décroissante.
+
+*Cas 2 : il n'y a qu'un nombre fini de pics.* Soit $N$ un rang strictement plus
+grand que tous les pics. Posons $n_0 = N$. Comme $n_0$ n'est pas un pic, il
+existe $n_1 > n_0$ avec $u_{n_1} > u_{n_0}$. Comme $n_1$ n'est pas un pic non
+plus, il existe $n_2 > n_1$ avec $u_{n_2} > u_{n_1}$, et ainsi de suite. La
+suite extraite obtenue est strictement croissante.
+
+Dans les deux cas on dispose d'une suite extraite monotone ; elle est bornée
+comme extraite d'une suite bornée, donc elle converge par le théorème de la
+limite monotone. $\square$
+
+**Critère de Cauchy.** Le sens direct est facile : si $u_n \to \ell$, pour
+$\varepsilon > 0$ il existe $N$ tel que $|u_n - \ell| < \varepsilon/2$ pour
+$n \ge N$, et alors $|u_p - u_q| \le |u_p - \ell| + |\ell - u_q| < \varepsilon$
+pour $p, q \ge N$.
+
+Réciproque. Soit $(u_n)$ de Cauchy. Elle est d'abord bornée : en prenant
+$\varepsilon = 1$, il existe $N$ tel que $|u_p - u_N| < 1$ pour $p \ge N$, et on
+conclut comme plus haut avec les rangs $0, \dots, N-1$. Par
+Bolzano-Weierstrass, il existe une extraction $\varphi$ et un réel $\ell$ tels
+que $u_{\varphi(k)} \to \ell$. Montrons que la suite entière converge vers
+$\ell$. Soit $\varepsilon > 0$. Il existe $N_1$ tel que
+$|u_p - u_q| < \varepsilon/2$ pour $p, q \ge N_1$, et $K$ tel que
+$|u_{\varphi(k)} - \ell| < \varepsilon/2$ pour $k \ge K$. Choisissons
+$k \ge \max(K, N_1)$ ; comme $\varphi$ est strictement croissante,
+$\varphi(k) \ge k \ge N_1$. Alors, pour tout $n \ge N_1$,
+
+$$
+|u_n - \ell| \le |u_n - u_{\varphi(k)}| + |u_{\varphi(k)} - \ell|
+< \tfrac{\varepsilon}{2} + \tfrac{\varepsilon}{2} = \varepsilon . \qquad\square
+$$
+
+L'inégalité $\varphi(k) \ge k$ pour une extraction se démontre par récurrence
+immédiate ; elle est utilisée sans commentaire dans toute la littérature, mais
+c'est elle qui permet ici d'appliquer la propriété de Cauchy au couple
+$(n, \varphi(k))$.
+
+**Admis dans ce nœud.** L'unicité de $\mathbb{R}$ à isomorphisme près comme
+corps totalement ordonné vérifiant l'axiome de la borne supérieure, et sa
+construction effective (coupures de Dedekind ou complétion de $\mathbb{Q}$). La
+démonstration se trouve dans Rudin, *Principles of Mathematical Analysis*,
+chapitre 1 et son appendice.
+
+## 6. Contre-exemples et pièges {#pieges}
+
+**Bornée n'implique pas convergente.** $u_n = (-1)^n$ est bornée et n'a pas de
+limite : elle a deux valeurs d'adhérence, $-1$ et $1$. Bolzano-Weierstrass ne
+promet qu'une suite extraite convergente, jamais la convergence de la suite.
+
+**$u_{n+1} - u_n \to 0$ n'implique pas la convergence.** Prenons
+$u_n = \sqrt{n}$. Alors
+
+$$
+u_{n+1} - u_n = \frac{1}{\sqrt{n+1} + \sqrt{n}} \xrightarrow[n \to \infty]{} 0 ,
+$$
+
+et pourtant $u_n \to +\infty$. Les pas deviennent arbitrairement petits, leur
+somme reste infinie. C'est exactement la différence entre l'hypothèse de Cauchy
+— qui contrôle $|u_p - u_q|$ pour **tous** les couples de rangs assez grands —
+et le seul contrôle des pas consécutifs. Retirer cette hypothèse fait tomber le
+critère de Cauchy, et c'est l'erreur la plus fréquente à ce stade.
+
+**Les inégalités strictes ne se conservent pas.** $u_n = 1/n > 0$ pour tout
+$n \ge 1$, et $\lim u_n = 0$. De $u_n > 0$ on ne peut conclure que
+$\lim u_n \ge 0$. Cette perte de la stricte inégalité réapparaîtra telle quelle
+en probabilités, où un événement de probabilité strictement positive à chaque
+rang peut avoir une limite de probabilité nulle.
+
+**La borne supérieure n'est pas un maximum.** $A = \{1 - 1/n : n \ge 1\}$ a pour
+borne supérieure $1$, qui n'appartient pas à $A$. Écrire « soit $a \in A$ tel que
+$a = \sup A$ » est faux en général ; c'est « pour tout $\varepsilon > 0$, il
+existe $a \in A$ tel que $a > \sup A - \varepsilon$ » qu'il faut écrire.
+
+**Sans la complétude, tout s'effondre.** La suite de Héron
+$u_{n+1} = \tfrac12(u_n + 2/u_n)$, partant de $u_0 = 1$, est une suite de
+rationnels, elle est de Cauchy, et elle n'a pas de limite dans $\mathbb{Q}$.
+Le critère de Cauchy est donc un énoncé sur $\mathbb{R}$, pas sur les suites :
+retirer l'axiome de la borne supérieure le rend faux.
+
+**Une suite peut avoir une infinité de valeurs d'adhérence.** Une énumération
+des rationnels de $[0,1]$ admet tout point de $[0,1]$ comme valeur d'adhérence.
+« Avoir une valeur d'adhérence » est donc une information très faible ; « en
+avoir exactement une, et être bornée » équivaut en revanche à converger.
+
+## 7. Vérification par simulation {#simulation}
+
+Trois choses à vérifier numériquement : que le rang $N$ de la définition se
+calcule vraiment, que « converger » ne dit rien sur la vitesse, et qu'une suite
+bornée non convergente a bien plusieurs valeurs d'adhérence.
+
+```python
+import numpy as np
+
+# 1. Heron : le nombre de decimales exactes double a chaque iteration
+u, cible = 1.0, np.sqrt(2)
+for n in range(1, 6):
+    u = 0.5 * (u + 2 / u)
+    print(f"Heron  n={n}  u={u:.15f}  erreur={abs(u - cible):.3e}")
+
+# 2. Le rang N de la definition, pour u_n = 1/n et l = 0.
+#    L'inegalite est stricte : N = floor(1/eps) + 1, pas ceil(1/eps).
+for eps in (1e-2, 1e-4, 1e-6):
+    N = int(np.floor(1 / eps)) + 1
+    print(f"eps={eps:.0e}  N={N:>9}  |u_N - 0|={1/N:.3e} < eps : {1 / N < eps}")
+
+# 3. Moyenne empirique : converge aussi, mais l'erreur est aleatoire.
+#    Sur UNE trajectoire elle fluctue ; c'est en moyenne sur les trajectoires
+#    qu'apparait le regime en 1/sqrt(n).
+rng = np.random.default_rng(0)
+R = 400                                    # trajectoires independantes
+for n in (10**2, 10**4, 10**6):
+    x = rng.random((R, n))                 # uniformes sur [0, 1], moyenne 1/2
+    err = np.abs(x.mean(axis=1) - 0.5)
+    print(f"moyenne  n={n:>7}  erreur moyenne={err.mean():.3e}"
+          f"  une trajectoire={err[0]:.3e}")
+
+# 4. (-1)^n : bornee, deux valeurs d'adherence, aucune limite
+v = np.array([(-1) ** n for n in range(20)])
+print("pairs  ->", np.unique(v[::2]), "  impairs ->", np.unique(v[1::2]))
+```
+
+Sortie obtenue :
+
+```
+Heron  n=2  u=1.416666666666667  erreur=2.453e-03
+Heron  n=3  u=1.414215686274510  erreur=2.124e-06
+Heron  n=4  u=1.414213562374690  erreur=1.595e-12
+Heron  n=5  u=1.414213562373095  erreur=2.220e-16
+eps=1e-02  N=      101  |u_N - 0|=9.901e-03 < eps : True
+moyenne  n=    100  erreur moyenne=2.298e-02  une trajectoire=4.829e-02
+moyenne  n=  10000  erreur moyenne=2.199e-03  une trajectoire=1.551e-03
+moyenne  n=1000000  erreur moyenne=2.334e-04  une trajectoire=3.320e-04
+```
+
+Trois choses à lire.
+
+**Héron.** L'erreur passe de $2 \cdot 10^{-3}$ à $2 \cdot 10^{-6}$ puis
+$1{,}6 \cdot 10^{-12}$ : le nombre de décimales exactes double à chaque
+itération. À l'étape suivante elle devrait valoir $10^{-24}$ ; elle vaut
+$2 \cdot 10^{-16}$, parce qu'on a atteint la précision des flottants sur 64
+bits. La suite mathématique continue de converger, la suite calculée non — c'est
+une limite de la machine, pas du théorème.
+
+**Le rang $N$.** Avec $\varepsilon = 10^{-2}$, le rang correct est $101$ et non
+$100$ : $u_{100} = 10^{-2}$ n'est pas strictement inférieur à $\varepsilon$. La
+définition demande une inégalité stricte, donc $N = \lfloor 1/\varepsilon
+\rfloor + 1$. L'erreur d'une unité n'a aucune conséquence pratique et fausse
+l'énoncé.
+
+**La moyenne empirique.** Multiplier $n$ par $100$ divise l'erreur *moyenne* par
+environ $10$ — c'est le $1/\sqrt{n}$ qui sera démontré au théorème central
+limite. Mais la colonne de droite montre une seule trajectoire, où l'erreur
+peut très bien augmenter quand $n$ augmente. La convergence d'une moyenne
+empirique est un énoncé sur une suite aléatoire : il faut moyenner sur les
+trajectoires pour voir le régime. Confondre les deux est l'erreur qui attend au
+niveau 1.
+
+Les deux suites, Héron et la moyenne empirique, convergent au même sens. La
+définition $\varepsilon$-$N$ ne les distingue pas ; c'est le rôle des vitesses
+de convergence, hors de ce nœud.
+
+Le même phénomène, en interactif : chaque trait est une trajectoire de moyennes
+empiriques, l'axe des abscisses est logarithmique.
+
+<Convergence />
+
+Changer la loi pour Cauchy est instructif : la moyenne empirique cesse de
+converger. Ce n'est pas un défaut de la simulation, c'est que la loi de Cauchy
+n'a pas d'espérance — et donc que la loi des grands nombres a une hypothèse,
+qui sera énoncée au [niveau 1](/n/loi-grands-nombres-intuitive).
+
+## 8. Liens {#liens}
+
+- [limites-continuite](/n/limites-continuite) : la caractérisation séquentielle
+  de la continuité transporte tout ce nœud aux fonctions.
+- [series-numeriques](/n/series-numeriques) : une série n'est rien d'autre que
+  la suite de ses sommes partielles ; le critère de Cauchy y devient le critère
+  de Cauchy des séries.
+- [suites-series-fonctions](/n/suites-series-fonctions) : la convergence
+  uniforme est la convergence d'une suite dans un espace de fonctions, avec la
+  même définition $\varepsilon$-$N$.
+- [espace-probabilise](/n/espace-probabilise) : la $\sigma$-additivité est un
+  énoncé de convergence de suites, et la continuité monotone d'une mesure est le
+  théorème de la limite monotone.
+- [convergence-ps-probabilite](/n/convergence-ps-probabilite) : la convergence
+  presque sûre est la convergence, au sens de ce nœud, de la suite
+  $(X_n(\omega))$ pour presque tout $\omega$.
+- [borel-cantelli](/n/borel-cantelli) : la limite supérieure d'une suite
+  d'événements est l'analogue ensembliste de la limite supérieure d'une suite
+  réelle.
+
+## 9. Références {#references}
+
+- Walter Rudin, *Principles of Mathematical Analysis*, 3<sup>e</sup> édition,
+  chapitre 3 (« Numerical Sequences and Series »). L'axiome de la borne
+  supérieure et la construction de $\mathbb{R}$ sont au chapitre 1.
+- Terence Tao, *Analysis I*, chapitre 6 (« Limits of sequences »). Traitement
+  plus lent, avec la construction de $\mathbb{R}$ par les suites de Cauchy au
+  chapitre 5.
+- Stephen Abbott, *Understanding Analysis*, chapitre 2 (« Sequences and
+  Series »). C'est la référence à préférer pour les contre-exemples, qui y sont
+  systématiquement discutés.

@@ -1,0 +1,39 @@
+---
+kind: calcul
+difficulty: 2
+---
+Soit $u_n = \dfrac{2n + 1}{n + 3}$.
+
+1. Montrer que $u_n \to 2$.
+2. Donner, en fonction de $\varepsilon > 0$, un rang $N$ explicite tel que
+   $|u_n - 2| < \varepsilon$ pour tout $n \ge N$.
+3. Calculer $N$ pour $\varepsilon = 10^{-3}$, puis vérifier que le rang
+   $N - 1$ ne convient pas.
+
+<!-- indice -->
+Calculer d'abord $u_n - 2$ et simplifier : la différence est une fraction dont
+le numérateur est constant.
+
+<!-- indice -->
+De $\dfrac{5}{n+3} < \varepsilon$, isoler $n$. Attention au sens de l'inégalité
+quand on passe aux inverses.
+
+<!-- solution -->
+1. $u_n - 2 = \dfrac{2n + 1 - 2(n+3)}{n+3} = \dfrac{-5}{n+3}$, donc
+   $|u_n - 2| = \dfrac{5}{n+3} \to 0$.
+
+2. $\dfrac{5}{n+3} < \varepsilon \iff n + 3 > \dfrac{5}{\varepsilon} \iff
+   n > \dfrac{5}{\varepsilon} - 3$. Le plus petit entier qui convient est
+
+   $$
+   N = \left\lfloor \frac{5}{\varepsilon} - 3 \right\rfloor + 1 .
+   $$
+
+   Le $+1$ après la partie entière est nécessaire : l'inégalité de la
+   définition est stricte. Prendre $\lceil 5/\varepsilon - 3 \rceil$ échoue
+   exactement quand $5/\varepsilon - 3$ est entier.
+
+3. Pour $\varepsilon = 10^{-3}$ : $5/\varepsilon - 3 = 4997$, donc $N = 4998$.
+   Vérification : $|u_{4998} - 2| = 5/5001 \approx 9{,}998 \cdot 10^{-4} <
+   10^{-3}$, tandis que $|u_{4997} - 2| = 5/5000 = 10^{-3}$, qui n'est pas
+   strictement inférieur à $\varepsilon$. Le rang $4997$ ne convient donc pas.

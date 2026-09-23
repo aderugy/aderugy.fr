@@ -1,0 +1,39 @@
+---
+kind: preuve
+difficulty: 2
+---
+Soient $(u_n)$ et $(v_n)$ deux suites convergentes, de limites $\ell$ et
+$\ell'$.
+
+1. Montrer que si $u_n \le v_n$ pour tout $n$, alors $\ell \le \ell'$.
+2. Montrer par un contre-exemple que l'hypothèse $u_n < v_n$ pour tout $n$ ne
+   permet pas de conclure $\ell < \ell'$.
+3. En déduire que si $u_n \in [a, b]$ pour tout $n$, alors $\ell \in [a, b]$.
+
+<!-- indice -->
+Pour 1, raisonner par l'absurde : supposer $\ell > \ell'$ et choisir
+$\varepsilon = (\ell - \ell')/2$.
+
+<!-- indice -->
+Avec ce choix, les deux bandes $]\ell - \varepsilon, \ell + \varepsilon[$ et
+$]\ell' - \varepsilon, \ell' + \varepsilon[$ sont disjointes. Que devient alors
+$u_n \le v_n$ pour $n$ grand ?
+
+<!-- solution -->
+1. Supposons $\ell > \ell'$ et posons $\varepsilon = (\ell - \ell')/2 > 0$. Il
+   existe $N$ tel que, pour $n \ge N$, à la fois
+   $|u_n - \ell| < \varepsilon$ et $|v_n - \ell'| < \varepsilon$. Alors
+
+   $$
+   v_n < \ell' + \varepsilon = \frac{\ell + \ell'}{2} = \ell - \varepsilon < u_n ,
+   $$
+
+   ce qui contredit $u_n \le v_n$. Donc $\ell \le \ell'$.
+
+2. $u_n = 0$ et $v_n = 1/n$ : on a $u_n < v_n$ pour tout $n \ge 1$, et
+   pourtant $\ell = \ell' = 0$. La stricte inégalité est perdue à la limite.
+
+3. Appliquer 1 aux couples de suites constantes $(a)$ et $(u_n)$, puis
+   $(u_n)$ et $(b)$ : on obtient $a \le \ell$ et $\ell \le b$. Un intervalle
+   fermé est stable par passage à la limite ; un intervalle ouvert ne l'est
+   pas, comme le montre 2.

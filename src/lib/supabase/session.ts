@@ -4,9 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 export const LOGIN_PATH = "/agenda/login";
 export const HOME_PATH = "/agenda";
 
-// Segment roots a `next` may point at. Both feature areas share the one Google
-// sign-in, so a redirect target is legitimate for either.
-const ALLOWED_ROOTS = [HOME_PATH, "/poker/spots", "/poker/trainers"];
+// Segment roots a `next` may point at. Every feature area shares the one Google
+// sign-in, so a redirect target is legitimate for any of them.
+const ALLOWED_ROOTS = [HOME_PATH, "/poker/spots", "/poker/trainers", "/maths"];
 
 /**
  * The only function allowed to turn a `next` parameter into a redirect target.

@@ -1,0 +1,124 @@
+---
+title: Conventions de notation
+status: published
+updated: 2026-09-09
+---
+
+Ce fichier fixe la notation de tout le corpus. Chaque cours s'y conforme sans
+la redéfinir. Quand un manuel de référence utilise une autre convention, le
+cours le signale une fois, à l'endroit où la divergence apparaît.
+
+## 1. Espaces et ensembles {#espaces}
+
+L'espace probabilisé de base est le triplet $(\Omega, \mathcal{F}, \mathbb{P})$ :
+$\Omega$ l'univers, $\mathcal{F}$ une tribu sur $\Omega$, $\mathbb{P}$ une mesure
+de probabilité. Les tribus sont en calligraphie ronde ($\mathcal{F}$,
+$\mathcal{G}$, $\mathcal{B}(\mathbb{R})$ pour les boréliens), les mesures en
+lettres grecques ($\mu$, $\nu$, $\lambda$ pour Lebesgue).
+
+Les ensembles de nombres sont en ajouré : $\mathbb{N}$, $\mathbb{Z}$,
+$\mathbb{Q}$, $\mathbb{R}$, $\mathbb{C}$. On écrit $\mathbb{R}_+ = [0, +\infty[$
+et $\overline{\mathbb{R}} = [-\infty, +\infty]$.
+
+## 2. Variables aléatoires {#variables}
+
+**Majuscule pour la variable, minuscule pour sa réalisation.** $X$ est une
+variable aléatoire, $x$ une valeur qu'elle peut prendre ; $X_1, \dots, X_n$ est
+un échantillon, $x_1, \dots, x_n$ son observation. Les vecteurs aléatoires sont
+en gras : $\mathbf{X} = (X_1, \dots, X_d)^{\top}$, toujours en colonne.
+
+Loi d'une variable : $X \sim \mathcal{N}(\mu, \sigma^2)$. Les lois usuelles
+gardent leur nom français abrégé, en romain droit :
+
+$$
+\begin{aligned}
+&\mathrm{Ber}(p), \quad \mathrm{Bin}(n, p), \quad \mathrm{Geo}(p), \quad
+ \mathcal{P}(\lambda), \quad \mathrm{Hyp}(N, K, n), \\
+&\mathcal{U}([a,b]), \quad \mathcal{E}(\lambda), \quad
+ \Gamma(\alpha, \beta), \quad \mathrm{Beta}(\alpha, \beta), \quad
+ \mathcal{N}(\mu, \sigma^2).
+\end{aligned}
+$$
+
+Fonction de répartition $F_X(t) = \mathbb{P}(X \le t)$, densité $f_X$, fonction
+caractéristique $\varphi_X(t) = \mathbb{E}[e^{itX}]$, fonction génératrice des
+moments $M_X(t) = \mathbb{E}[e^{tX}]$.
+
+## 3. Opérateurs {#operateurs}
+
+$\mathbb{P}$, $\mathbb{E}$, $\mathbb{V}$ et $\operatorname{Cov}$ sont en ajouré
+ou en romain droit, jamais en italique. L'argument de $\mathbb{E}$ est entre
+crochets, celui de $\mathbb{P}$ entre parenthèses :
+
+$$
+\mathbb{E}[X], \qquad \mathbb{V}(X) = \mathbb{E}\big[(X - \mathbb{E}[X])^2\big],
+\qquad \mathbb{P}(X \in A).
+$$
+
+L'espérance conditionnelle par rapport à une tribu s'écrit
+$\mathbb{E}[X \mid \mathcal{G}]$, avec une barre de conditionnement `\mid` et
+non `|`, pour l'espacement.
+
+L'indicatrice d'un événement $A$ est $\mathbf{1}_A$, ou $\mathbf{1}\{X > 0\}$
+quand la condition est plus lisible que l'ensemble.
+
+## 4. Convergences {#convergences}
+
+Quatre flèches, jamais mélangées :
+
+$$
+\begin{aligned}
+X_n &\xrightarrow{\text{p.s.}} X && \text{presque sûrement,} \\
+X_n &\xrightarrow{\mathbb{P}} X && \text{en probabilité,} \\
+X_n &\xrightarrow{L^p} X && \text{dans } L^p, \\
+X_n &\xrightarrow{\mathcal{L}} X && \text{en loi.}
+\end{aligned}
+$$
+
+La convergence en loi porte sur les lois, pas sur les variables : on écrit
+$X_n \xrightarrow{\mathcal{L}} \mathcal{N}(0,1)$ sans que cela désigne une
+variable limite particulière.
+
+## 5. Vecteurs et matrices {#matrices}
+
+Matrices en majuscules droites grasses, transposition en exposant $\top$ :
+
+$$
+\Sigma = \mathbb{E}\big[(\mathbf{X} - \mathbf{m})(\mathbf{X} - \mathbf{m})^{\top}\big],
+\qquad
+\Sigma = \begin{bmatrix}
+\sigma_1^2 & \rho\,\sigma_1\sigma_2 \\
+\rho\,\sigma_1\sigma_2 & \sigma_2^2
+\end{bmatrix}.
+$$
+
+Une matrice symétrique positive est notée $\Sigma \succeq 0$, définie positive
+$\Sigma \succ 0$.
+
+## 6. Statistique {#statistique}
+
+Le paramètre est $\theta \in \Theta$, son estimateur $\hat{\theta}$ ou
+$\hat{\theta}_n$ quand la taille d'échantillon compte. La vraisemblance
+(*likelihood*) est $L(\theta ; x_1, \dots, x_n)$ et la log-vraisemblance
+$\ell(\theta) = \log L(\theta)$. L'information de Fisher est $I(\theta)$.
+
+Une définition par cas utilise l'environnement `cases` :
+
+$$
+f_X(x) =
+\begin{cases}
+\lambda e^{-\lambda x} & \text{si } x \ge 0, \\
+0 & \text{sinon.}
+\end{cases}
+$$
+
+## 7. Typographie {#typographie}
+
+- Les noms de fonctions et d'opérateurs sont en romain :
+  $\operatorname{Var}$, $\operatorname{Cov}$, $\log$, $\exp$, $\arg\max$.
+- Les constantes mathématiques sont droites : $\mathrm{e}$, $\mathrm{i}$,
+  $\mathrm{d}x$ dans une intégrale.
+- Le terme anglais apparaît entre parenthèses et en italique à sa première
+  occurrence dans un nœud, jamais ensuite.
+- Les énoncés admis portent la mention « admis » et renvoient à l'endroit où la
+  démonstration se trouve.

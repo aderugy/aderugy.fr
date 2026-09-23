@@ -1,0 +1,40 @@
+---
+kind: qcm
+difficulty: 1
+---
+Vrai ou faux ? Justifier par une démonstration en deux lignes ou par un
+contre-exemple.
+
+1. Toute suite bornée converge.
+2. Toute suite convergente est bornée.
+3. Si $u_n \to \ell$ et $u_n > 0$ pour tout $n$, alors $\ell > 0$.
+4. Si $(u_n)$ admet une suite extraite convergente, alors $(u_n)$ converge.
+5. Si $\sup A$ existe, alors $\sup A \in A$.
+6. Une suite croissante non majorée tend vers $+\infty$.
+
+<!-- indice -->
+Quatre de ces six énoncés sont faux. Pour chacun, le contre-exemple le plus
+court tient en un symbole.
+
+<!-- indice -->
+Les énoncés 1, 3, 4 et 5 ont chacun un contre-exemple donné dans la section
+« Contre-exemples et pièges » du cours.
+
+<!-- solution -->
+1. **Faux.** $u_n = (-1)^n$ est bornée et n'a pas de limite.
+
+2. **Vrai.** Avec $\varepsilon = 1$, il existe $N$ tel que $|u_n| < |\ell| + 1$
+   pour $n \ge N$ ; on majore les $N$ premiers termes par leur maximum, qui
+   existe car ils sont en nombre fini.
+
+3. **Faux.** $u_n = 1/n > 0$ et $\ell = 0$. On a seulement $\ell \ge 0$ : le
+   passage à la limite conserve les inégalités larges, jamais les strictes.
+
+4. **Faux.** $u_n = (-1)^n$ : la suite extraite des rangs pairs converge vers
+   $1$, la suite entière ne converge pas.
+
+5. **Faux.** $A = \{1 - 1/n : n \ge 1\}$ a pour borne supérieure $1 \notin A$.
+
+6. **Vrai.** Soit $M \in \mathbb{R}$. Comme $M$ n'est pas un majorant, il existe
+   $N$ avec $u_N > M$, et la croissance donne $u_n \ge u_N > M$ pour tout
+   $n \ge N$. C'est exactement la définition de $u_n \to +\infty$.

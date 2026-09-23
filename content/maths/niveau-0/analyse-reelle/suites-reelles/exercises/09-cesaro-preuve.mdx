@@ -1,0 +1,58 @@
+---
+kind: preuve
+difficulty: 4
+---
+**Théorème de Cesàro.** Si $u_n \to \ell$, alors
+$C_n = \dfrac{1}{n} \sum_{k=1}^{n} u_k \to \ell$.
+
+Démontrer ce théorème.
+
+<!-- indice -->
+Se ramener au cas $\ell = 0$ en posant $v_n = u_n - \ell$ : vérifier que
+$C_n - \ell$ est la moyenne de Cesàro de $(v_n)$.
+
+<!-- indice -->
+Couper la somme en deux à un rang $N$ bien choisi : les premiers termes sont en
+nombre fini mais peuvent être gros, les suivants sont petits mais nombreux.
+
+<!-- indice -->
+Il faut deux rangs, pas un. Fixer d'abord $N$ pour que $|v_k| < \varepsilon/2$
+au-delà, **puis** un rang $N'$ pour que le bloc des $N$ premiers termes, divisé
+par $n$, soit lui aussi $< \varepsilon/2$.
+
+<!-- solution -->
+Posons $v_n = u_n - \ell$, de sorte que $v_n \to 0$ et
+
+$$
+C_n - \ell = \frac{1}{n} \sum_{k=1}^{n} (u_k - \ell) = \frac{1}{n}
+\sum_{k=1}^{n} v_k .
+$$
+
+Il suffit donc de traiter le cas $\ell = 0$.
+
+Soit $\varepsilon > 0$. Comme $v_n \to 0$, il existe $N$ tel que
+$|v_k| < \varepsilon/2$ pour tout $k > N$. Pour $n > N$, séparons :
+
+$$
+\left| \frac{1}{n} \sum_{k=1}^{n} v_k \right|
+\le \underbrace{\frac{1}{n} \sum_{k=1}^{N} |v_k|}_{A_n}
+ + \underbrace{\frac{1}{n} \sum_{k=N+1}^{n} |v_k|}_{B_n} .
+$$
+
+Le second bloc se majore immédiatement :
+
+$$
+B_n \le \frac{1}{n} \cdot (n - N) \cdot \frac{\varepsilon}{2}
+< \frac{\varepsilon}{2} .
+$$
+
+Le premier bloc a un numérateur **fixe** : $S = \sum_{k=1}^{N} |v_k|$ ne dépend
+pas de $n$, puisque $N$ a été choisi avant. Donc $A_n = S/n \to 0$, et il
+existe $N'$ tel que $A_n < \varepsilon/2$ pour $n \ge N'$.
+
+Pour $n \ge \max(N, N')$, on a $|C_n| \le A_n + B_n < \varepsilon$. $\square$
+
+**Le point de la démonstration** est l'ordre des choix : $N$ dépend de
+$\varepsilon$ seul, $S$ dépend de $N$, et $N'$ dépend de $S$ et de
+$\varepsilon$. Choisir $N$ après $n$, ou faire dépendre $N$ de $n$, rend
+l'argument circulaire — c'est l'erreur qui fait échouer cet exercice.

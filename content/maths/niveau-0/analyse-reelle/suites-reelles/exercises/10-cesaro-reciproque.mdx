@@ -1,0 +1,65 @@
+---
+kind: contre-exemple
+difficulty: 4
+---
+1. Montrer que la réciproque du théorème de Cesàro est fausse : construire une
+   suite $(u_n)$ divergente dont la moyenne de Cesàro converge.
+2. Peut-on trouver une telle suite qui soit de plus **non bornée** ?
+3. Que devient l'énoncé si l'on suppose $(u_n)$ monotone ?
+
+<!-- indice -->
+Pour 1, l'exercice de simulation en donne déjà une.
+
+<!-- indice -->
+Pour 2, il faut des termes non bornés mais assez rares pour que leur
+contribution à la moyenne reste finie. Concentrer la masse sur les carrés
+parfaits, et calibrer la taille des pics : $u_{k^2} = k^\alpha$ pour un
+$\alpha$ à choisir.
+
+<!-- indice -->
+Pour 3, une suite croissante fait exactement deux choses : elle est majorée, ou
+elle tend vers $+\infty$. Traiter les deux cas séparément.
+
+<!-- solution -->
+1. $u_n = (-1)^n$ diverge et $C_n \to 0$, comme calculé à l'exercice précédent.
+
+2. Oui, à condition de calibrer les pics. Posons $u_n = \sqrt n$ si $n$ est un
+   carré parfait, $u_n = 0$ sinon — autrement dit $u_{k^2} = k$. La suite n'est
+   pas bornée. Les carrés parfaits $\le n$ sont les $k^2$ pour
+   $k \le \lfloor \sqrt n \rfloor =: m$, donc
+
+   $$
+   \sum_{k=1}^{n} u_k = \sum_{j=1}^{m} j = \frac{m(m+1)}{2} .
+   $$
+
+   Comme $m \le \sqrt n < m + 1$, on a $\dfrac{m(m+1)}{2n} \to \dfrac12$ :
+   la moyenne converge vers $1/2$ alors que la suite est non bornée. Une
+   vérification numérique donne $C_{10^3} = 0{,}4960$ et
+   $C_{10^7} = 0{,}50007$, avec des pics allant jusqu'à $3162$.
+
+   **Le calibrage est essentiel.** Avec $u_{k^2} = k^2$ — des pics plus hauts —
+   la somme vaut $\sum_{j \le m} j^2 \approx n^{3/2}/3$ et
+   $C_n \approx \sqrt n / 3$ diverge. Les pics doivent être rares *et* assez
+   petits ; la rareté seule ne suffit pas.
+
+3. L'énoncé devient vrai. Une suite croissante fait exactement deux choses.
+
+   *Cas 1 : $(u_n)$ est majorée.* Elle converge par le théorème de la limite
+   monotone, vers un réel $\ell$, et le théorème de Cesàro donne alors
+   $C_n \to \ell$, donc $\ell = c$.
+
+   *Cas 2 : $(u_n)$ n'est pas majorée.* Croissante et non majorée, elle tend
+   vers $+\infty$. Soit $M > 0$ ; il existe $N$ tel que $u_k \ge M$ pour
+   $k \ge N$. Pour $n > N$,
+
+   $$
+   C_n = \frac{1}{n} \sum_{k=1}^{N-1} u_k + \frac{1}{n} \sum_{k=N}^{n} u_k
+   \ge \frac{S}{n} + \frac{n - N + 1}{n} M ,
+   $$
+
+   où $S = \sum_{k=1}^{N-1} u_k$ est une constante. En faisant $n \to \infty$,
+   $\liminf_n C_n \ge M$. Comme $M$ est arbitraire, $C_n \to +\infty$, ce qui
+   contredit $C_n \to c$. Ce cas est donc impossible.
+
+   La monotonie interdit à la fois les oscillations de 1 et les pics rares de
+   2, c'est-à-dire les deux seuls mécanismes qui font échouer la réciproque.

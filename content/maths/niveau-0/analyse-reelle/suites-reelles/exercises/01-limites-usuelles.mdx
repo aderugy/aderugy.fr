@@ -1,0 +1,37 @@
+---
+kind: calcul
+difficulty: 1
+---
+Déterminer, en justifiant brièvement, la limite de chacune des suites suivantes.
+
+1. $u_n = \dfrac{n}{n+1}$
+2. $v_n = \dfrac{3n^2 + 1}{n^2 - n}$ pour $n \ge 2$
+3. $w_n = \dfrac{\sin n}{n}$ pour $n \ge 1$
+4. $x_n = \sqrt{n+1} - \sqrt{n}$
+
+<!-- indice -->
+Pour 1 et 2, mettre en facteur la plus grande puissance de $n$ au numérateur et
+au dénominateur.
+
+<!-- indice -->
+Pour 3, on ne connaît pas la limite de $\sin n$ — et elle n'existe pas. Utiliser
+un encadrement.
+
+<!-- indice -->
+Pour 4, la forme est indéterminée ($\infty - \infty$) : multiplier par la
+quantité conjuguée $\sqrt{n+1} + \sqrt{n}$.
+
+<!-- solution -->
+1. $u_n = \dfrac{1}{1 + 1/n} \to 1$.
+
+2. $v_n = \dfrac{3 + 1/n^2}{1 - 1/n} \to 3$.
+
+3. $|w_n| \le 1/n$ pour tout $n \ge 1$, et $1/n \to 0$, donc $w_n \to 0$ par
+   encadrement. Noter que $(\sin n)$ elle-même n'a pas de limite : c'est la
+   division par $n$ qui écrase l'oscillation.
+
+4. $x_n = \dfrac{(n+1) - n}{\sqrt{n+1} + \sqrt{n}} = \dfrac{1}{\sqrt{n+1} +
+   \sqrt{n}} \to 0$.
+
+   Ce dernier calcul est celui du contre-exemple $u_n = \sqrt n$ du cours : les
+   écarts successifs tendent vers $0$ alors que la suite tend vers $+\infty$.

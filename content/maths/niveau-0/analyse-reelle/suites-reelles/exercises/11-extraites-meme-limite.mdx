@@ -1,0 +1,67 @@
+---
+kind: preuve
+difficulty: 5
+---
+Soit $(u_n)$ une suite **bornée** telle que toutes ses suites extraites
+convergentes aient la même limite $\ell$. Montrer que $(u_n)$ converge vers
+$\ell$.
+
+Puis montrer par un contre-exemple que l'hypothèse « bornée » ne peut pas être
+retirée.
+
+<!-- indice -->
+Raisonner par l'absurde : si $(u_n)$ ne converge pas vers $\ell$, écrire la
+négation de la définition. Attention à l'ordre des quantificateurs.
+
+<!-- indice -->
+La négation fournit un $\varepsilon_0 > 0$ et une infinité de rangs $n$ tels
+que $|u_n - \ell| \ge \varepsilon_0$. Ces rangs définissent une suite extraite.
+
+<!-- indice -->
+Cette suite extraite est bornée : lui appliquer Bolzano-Weierstrass. Que dit
+l'hypothèse sur la limite qu'on obtient ?
+
+<!-- solution -->
+Supposons que $(u_n)$ ne converge pas vers $\ell$. La négation de
+
+$$
+\forall \varepsilon > 0,\ \exists N,\ \forall n \ge N,\ |u_n - \ell| < \varepsilon
+$$
+
+est
+
+$$
+\exists \varepsilon_0 > 0,\ \forall N,\ \exists n \ge N,\
+|u_n - \ell| \ge \varepsilon_0 .
+$$
+
+Autrement dit, il existe $\varepsilon_0 > 0$ tel que l'ensemble
+$E = \{n : |u_n - \ell| \ge \varepsilon_0\}$ soit infini. On peut donc énumérer
+$E$ de façon strictement croissante : $\varphi(0) < \varphi(1) < \cdots$, ce
+qui définit une extraction.
+
+La suite $(u_{\varphi(k)})$ est bornée, comme extraite d'une suite bornée. Par
+Bolzano-Weierstrass, il en existe une suite extraite $(u_{\varphi(\psi(j))})$
+qui converge, vers un réel $a$. Une extraite d'une extraite est une extraite de
+$(u_n)$ — la composée $\varphi \circ \psi$ est strictement croissante — donc
+$(u_{\varphi(\psi(j))})$ est une suite extraite convergente de $(u_n)$, et
+l'hypothèse impose $a = \ell$.
+
+Mais $|u_{\varphi(\psi(j))} - \ell| \ge \varepsilon_0$ pour tout $j$, et le
+passage à la limite dans cette inégalité large donne
+$|a - \ell| \ge \varepsilon_0 > 0$, donc $a \ne \ell$. Contradiction. Ainsi
+$(u_n)$ converge vers $\ell$. $\square$
+
+**Sans l'hypothèse « bornée », c'est faux.** Prenons
+
+$$
+u_n = \begin{cases} 0 & \text{si } n \text{ est pair,} \\ n & \text{sinon.}
+\end{cases}
+$$
+
+Toute suite extraite convergente de $(u_n)$ ne contient qu'un nombre fini de
+rangs impairs — sinon elle serait non bornée — donc elle est nulle à partir
+d'un certain rang et converge vers $0$. Toutes les suites extraites
+convergentes ont donc la même limite $0$, et pourtant $(u_n)$ ne converge pas.
+C'est Bolzano-Weierstrass qui tombe : la sous-suite des rangs impairs n'a
+aucune valeur d'adhérence dans $\mathbb{R}$.
