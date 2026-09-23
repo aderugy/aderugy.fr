@@ -53,6 +53,12 @@ export function Mdx({ source }: { source: string }) {
       source={extraireAncres(source)}
       // Les widgets sont utilisables directement dans un .mdx :
       // `<Convergence loiInitiale="cauchy" />`.
+      //
+      // next-mdx-remote ≥ 6 bloque par défaut toute expression JavaScript
+      // (`blockJS`) : un attribut `trajectoires={30}` est retiré à la
+      // compilation. Les props de widget s'écrivent donc en chaînes, ou
+      // gardent leur valeur par défaut. Le contenu est versionné et n'exécute
+      // rien : on laisse ce garde-fou en place plutôt que de le désactiver.
       components={{ pre: Pre, Convergence }}
       options={{
         parseFrontmatter: true,
