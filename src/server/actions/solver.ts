@@ -2,7 +2,15 @@
 
 import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
-import { asSetup, NODE_TYPES, type NodeData, type NodeType, type SpotSetup, type StrategyWeights } from "@/lib/solver/types";
+import {
+  asSetup,
+  NODE_TYPES,
+  type NodeData,
+  type NodeType,
+  type SpotSetup,
+  type StrategyStats,
+  type StrategyWeights,
+} from "@/lib/solver/types";
 
 /** Like ActionResult but hands the new row's id back to the client. */
 type CreatedResult = { ok: true; id: string } | { ok: false; error: string };
@@ -148,7 +156,7 @@ export async function createNode(input: {
       .single();
     if (error) throw error;
 
-    // The canvas keeps its own optimistic copy, so no refresh() here.
+    // The spot page keeps its own optimistic copy, so no refresh() here.
     return { ok: true, id: data.id as string };
   } catch (e) {
     return fail(e) as CreatedResult;
@@ -200,18 +208,35 @@ export async function deleteNode(id: string): Promise<ActionResult> {
 
 /* --------------------------------------------------------------- strategies */
 
+export type SaveStrategyResult = { ok: true; warning?: string } | { ok: false; error: string };
+
+/**
+ * Save a decision's grid. `stats` (solver equity / EV, see StrategyStats) is
+ * written when given — null clears it, for a grid that no longer comes from
+ * the solver — and left as it is when omitted.
+ */
 export async function saveStrategy(input: {
   nodeId: string;
   weights: StrategyWeights;
-}): Promise<ActionResult> {
+  stats?: StrategyStats | null;
+}): Promise<SaveStrategyResult> {
   try {
     const { supabase, user } = await requireUser();
-    const { error } = await supabase
-      .from("poker_strategies")
-      .upsert(
-        { node_id: input.nodeId, user_id: user.id, weights: input.weights },
-        { onConflict: "node_id" },
-      );
+    const row: Record<string, unknown> = { node_id: input.nodeId, user_id: user.id, weights: input.weights };
+    if (input.stats !== undefined) row.stats = input.stats;
+    const upsert = () => supabase.from("poker_strategies").upsert(row, { onConflict: "node_id" });
+    let { error } = await upsert();
+    // Before migration 0014 the column doesn't exist: keep the grid anyway.
+    if (error && "stats" in row && /stats/.test(error.message ?? "")) {
+      delete row.stats;
+      ({ error } = await upsert());
+      if (!error) {
+        return {
+          ok: true,
+          warning: "Equity and EV were not saved: apply supabase/migrations/0014_poker_strategy_stats.sql.",
+        };
+      }
+    }
     if (error) throw error;
 
     return { ok: true };

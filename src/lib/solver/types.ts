@@ -14,6 +14,7 @@
  */
 
 import { derivedPosition, isSeat, type Seat } from "./seats";
+import type { PioLink, PlayerStats, StrategyStats } from "./pio";
 
 export type Street = "preflop" | "flop" | "turn" | "river";
 
@@ -120,11 +121,21 @@ export type NodeData =
 
 /**
  * Free-form notes every node type can carry alongside its own payload: a short
- * summary shown on the canvas card and extensive Markdown notes. They live in
- * the same `data` jsonb; the canvas merges patches into it, so type-specific
+ * summary shown under the node's title and extensive Markdown notes. They live in
+ * the same `data` jsonb; the spot page merges patches into it, so type-specific
  * edits never drop them.
  */
-export type NodeMeta = { summary?: string; notes?: string; override?: StateOverride | null };
+export type NodeMeta = {
+  summary?: string;
+  notes?: string;
+  override?: StateOverride | null;
+  /**
+   * Where this node sits in a PioSOLVER save. On a flop node it links the
+   * whole line below to that save; on an imported decision it also keeps the
+   * solver's pot and stack there.
+   */
+  pio?: PioLink | null;
+};
 
 /**
  * The hand's state forced at a node, for when the action above can't give it
@@ -267,6 +278,22 @@ export function asMeta(node: PokerNode): { summary: string; notes: string } {
     notes: typeof d.notes === "string" ? d.notes : "",
   };
 }
+
+/** The solver link on a node (see NodeMeta.pio), when it names a save and a node. */
+export function asPio(node: PokerNode): PioLink | null {
+  const p = (node.data as NodeMeta).pio;
+  if (!p || typeof p.file !== "string" || typeof p.id !== "string" || !p.file || !p.id) return null;
+  const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
+  return {
+    file: p.file,
+    id: p.id,
+    potBb: num(p.potBb),
+    stackBb: num(p.stackBb),
+    importedAt: typeof p.importedAt === "string" ? p.importedAt : undefined,
+  };
+}
+
+export type { PioLink, PlayerStats, StrategyStats };
 
 /** The state override on a node, when it holds two positive numbers. */
 export function asOverride(node: PokerNode): StateOverride | null {
