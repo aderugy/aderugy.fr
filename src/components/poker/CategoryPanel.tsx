@@ -522,7 +522,15 @@ function CategoryGrid({
               live.length === 0 ? "opacity-25" : filter && shown === 0 ? "opacity-30" : "",
             ].join(" ")}
           >
-            <span className="absolute inset-0 flex flex-col justify-end bg-background">
+            {/* Top: the categories, on grey (Other stays grey). */}
+            <span className="absolute inset-x-0 top-0 flex h-[30%] border-b border-black/20" style={{ backgroundColor: OTHER }}>
+              {shown > 0 &&
+                order.map((k) => (
+                  <span key={k} style={{ width: `${((parts.get(k) ?? 0) / shown) * 100}%`, backgroundColor: colorOf.get(k) }} />
+                ))}
+            </span>
+            {/* Below: the strategy, height = share in range. */}
+            <span className="absolute inset-x-0 bottom-0 top-[30%] flex flex-col justify-end bg-background">
               {stratTotal > 0 && (
                 <span className="flex w-full" style={{ height: `${Math.max(8, height)}%` }}>
                   {actions.map((a, i) =>
@@ -531,14 +539,7 @@ function CategoryGrid({
                 </span>
               )}
             </span>
-            {order.length > 0 && shown > 0 && (
-              <span className="absolute inset-x-0 top-0 flex h-[30%] border-b border-black/25">
-                {order.map((k) => (
-                  <span key={k} style={{ width: `${((parts.get(k) ?? 0) / shown) * 100}%`, backgroundColor: colorOf.get(k) }} />
-                ))}
-              </span>
-            )}
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-white mix-blend-difference">{hand}</span>
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 top-[30%] flex items-center justify-center text-black">{hand}</span>
           </div>
         );
       })}
