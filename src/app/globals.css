@@ -156,14 +156,14 @@ body {
 @keyframes trn-rise {
   from { opacity: 0; transform: translateY(10px); }
 }
-.trn-chip-in { animation: trn-chip-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.trn-sweep { animation: trn-sweep 420ms cubic-bezier(0.55, 0, 0.75, 0.3) forwards; }
-.trn-pot-win { animation: trn-pot-win 1300ms cubic-bezier(0.4, 0, 0.3, 1) forwards; }
-.trn-deal { animation: trn-deal 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.trn-deal-hole { animation: trn-deal-hole 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.trn-flip { animation: trn-flip 380ms ease-out both; }
-.trn-muck { animation: trn-muck 500ms ease-in forwards; }
-.trn-pop { animation: trn-pop 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-chip-in { animation: trn-chip-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-sweep { animation: trn-sweep 300ms cubic-bezier(0.55, 0, 0.75, 0.3) forwards; }
+.trn-pot-win { animation: trn-pot-win 750ms cubic-bezier(0.4, 0, 0.3, 1) forwards; }
+.trn-deal { animation: trn-deal 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-deal-hole { animation: trn-deal-hole 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-flip { animation: trn-flip 260ms ease-out both; }
+.trn-muck { animation: trn-muck 320ms ease-in forwards; }
+.trn-pop { animation: trn-pop 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .trn-bump { animation: trn-bump 360ms ease-out; }
 .trn-turn { animation: trn-turn 1.4s ease-in-out infinite; }
 .trn-rise { animation: trn-rise 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }

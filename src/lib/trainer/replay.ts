@@ -70,14 +70,14 @@ export function replayFrames(before: HandState, steps: Step[], heroSeat: Seat, o
       state: before,
       dealt: before.board,
       caption: before.board.length ? `New hand · ${STREET_LABELS[before.street]}` : "New hand",
-      ms: 900,
+      ms: 600,
     });
   }
   let prev = before;
   for (const step of steps) {
     const after = step.after;
     if (step.type === "card") {
-      frames.push({ ...base, state: after, dealt: step.cards, caption: `${STREET_LABELS[after.street]} ${step.cards.join(" ")}`, ms: 950 });
+      frames.push({ ...base, state: after, dealt: step.cards, caption: `${STREET_LABELS[after.street]} ${step.cards.join(" ")}`, ms: 600 });
       prev = after;
       continue;
     }
@@ -91,16 +91,16 @@ export function replayFrames(before: HandState, steps: Step[], heroSeat: Seat, o
     const closed = sum(after.bets) < EPS && after.center > prev.center + EPS;
     if (closed) {
       const held = beforeSweep(prev, after, e);
-      frames.push({ ...base, state: held, bubble, caption, ms: 850 });
-      frames.push({ ...base, state: held, bubble, sweep: true, caption, ms: 450 });
-      frames.push({ ...base, state: after, caption, ms: 250 });
+      frames.push({ ...base, state: held, bubble, caption, ms: 550 });
+      frames.push({ ...base, state: held, bubble, sweep: true, caption, ms: 330 });
+      frames.push({ ...base, state: after, caption, ms: 100 });
     } else {
-      frames.push({ ...base, state: after, bubble, caption, ms: 850 });
+      frames.push({ ...base, state: after, bubble, caption, ms: 550 });
     }
     prev = after;
   }
   if (prev.terminal) {
-    frames.push({ ...base, state: prev, end: true, caption: endCaption(prev, heroSeat), ms: 1400 });
+    frames.push({ ...base, state: prev, end: true, caption: endCaption(prev, heroSeat), ms: 800 });
   }
   return frames;
 }

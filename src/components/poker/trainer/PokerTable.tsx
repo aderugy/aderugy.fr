@@ -138,7 +138,7 @@ export function PokerTable({
             {scene.board.map((c) => {
               const k = dealt.indexOf(c);
               return (
-                <span key={`${handKey}-${c}`} className="trn-deal" style={{ animationDelay: `${Math.max(0, k) * 110}ms` }}>
+                <span key={`${handKey}-${c}`} className="trn-deal" style={{ animationDelay: `${Math.max(0, k) * 80}ms` }}>
                   <PlayingCard card={c} size="md" />
                 </span>
               );
