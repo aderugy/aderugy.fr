@@ -5,28 +5,29 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 import { isSeat, type Seat } from "@/lib/solver/seats";
 import { vectorTotal } from "@/lib/solver/strategy";
-import { asStrategy, type PokerNode, type StrategyWeights } from "@/lib/solver/types";
-import { compatibility, resolveNodeContext } from "@/lib/trainer/resolve";
-import type { DrillNode, NodeContext, Trainer, TrainerNodeRow } from "@/lib/trainer/types";
+import { initialState, nodeState, walkPath, type HandState } from "@/lib/solver/gameState";
+import { asSetup, type PokerNode, type SpotSetup, type StrategyWeights } from "@/lib/solver/types";
+import { compatibility, resolveEntry } from "@/lib/trainer/resolve";
+import { entryLabel } from "@/lib/trainer/labels";
+import type { Drill, DrillSpot, EntryContext, Feedback, Trainer, TrainerNodeRow } from "@/lib/trainer/types";
 
 type CreatedResult = { ok: true; id: string } | { ok: false; error: string };
 
 const NODE_SELECT = "id, spot_id, parent_id, type, position, data, created_at, updated_at";
 const TRAINER_SELECT =
-  "id, name, hero_seat, villain_seat, pot_bb, stack_bb, street, archived, created_at, updated_at";
+  "id, name, hero_seat, villain_seat, pot_bb, stack_bb, street, stop_at_street_end, feedback, archived, created_at, updated_at";
 
 /* ------------------------------------------------------------------ helpers */
-
-function positiveNumber(value: unknown, name: string): number {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number`);
-  return n;
-}
 
 function seatsOrThrow(hero: unknown, villain: unknown): [Seat, Seat] {
   if (!isSeat(hero) || !isSeat(villain)) throw new Error("Pick hero and villain seats");
   if (hero === villain) throw new Error("Hero and villain must sit in different seats");
   return [hero, villain];
+}
+
+function feedbackOrThrow(value: unknown): Feedback {
+  if (value === "each" || value === "hand_end") return value;
+  throw new Error("Unknown feedback mode");
 }
 
 function normalizeWeights(raw: unknown): StrategyWeights {
@@ -54,6 +55,21 @@ async function loadSpotNodes(
   return Object.fromEntries(((data ?? []) as PokerNode[]).map((n) => [n.id, n]));
 }
 
+async function loadSetups(
+  supabase: SupabaseClient,
+  userId: string,
+  spotIds: string[],
+): Promise<Map<string, { name: string; setup: SpotSetup }>> {
+  if (spotIds.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from("poker_spots")
+    .select("id, name, setup")
+    .eq("user_id", userId)
+    .in("id", spotIds);
+  if (error) throw error;
+  return new Map((data ?? []).map((s) => [s.id as string, { name: s.name as string, setup: asSetup(s.setup) }]));
+}
+
 function pathFrom(nodes: Record<string, PokerNode>, nodeId: string): PokerNode[] | null {
   const out: PokerNode[] = [];
   const seen = new Set<string>();
@@ -68,14 +84,96 @@ function pathFrom(nodes: Record<string, PokerNode>, nodeId: string): PokerNode[]
   return out.reverse();
 }
 
-function sameContext(row: TrainerNodeRow, ctx: NodeContext): boolean {
+function childrenIndex(nodes: Record<string, PokerNode>): Map<string, PokerNode[]> {
+  const m = new Map<string, PokerNode[]>();
+  for (const n of Object.values(nodes)) {
+    if (!n.parent_id) continue;
+    const list = m.get(n.parent_id);
+    if (list) list.push(n);
+    else m.set(n.parent_id, [n]);
+  }
+  return m;
+}
+
+/** The entry and everything below it. */
+function subtree(kids: Map<string, PokerNode[]>, root: PokerNode): PokerNode[] {
+  const out: PokerNode[] = [];
+  const stack = [root];
+  const seen = new Set<string>();
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (seen.has(n.id)) continue;
+    seen.add(n.id);
+    out.push(n);
+    stack.push(...(kids.get(n.id) ?? []));
+  }
+  return out;
+}
+
+/**
+ * The decision nodes below an entry where `hero` acts — the only nodes a hand
+ * from there can ask about. Walked with the engine, so an invalid branch
+ * doesn't count.
+ */
+function heroDecisions(
+  kids: Map<string, PokerNode[]>,
+  entry: PokerNode,
+  parent: PokerNode | null,
+  before: HandState,
+  hero: Seat,
+): string[] {
+  const out: string[] = [];
+  const visit = (node: PokerNode, par: PokerNode | null, state: HandState) => {
+    const ns = nodeState(state, node, par, false);
+    if (ns.error) return;
+    if (node.type === "strategy" && ns.actor === hero) out.push(node.id);
+    for (const k of kids.get(node.id) ?? []) visit(k, node, ns.state);
+  };
+  visit(entry, parent, before);
+  return out;
+}
+
+/** Hero's decisions reachable from the last node of `path` (the entry). */
+function entryDecisions(
+  setup: SpotSetup & { players: [Seat, Seat] },
+  kids: Map<string, PokerNode[]>,
+  path: PokerNode[],
+  hero: Seat,
+): string[] {
+  const before =
+    path.length > 1 ? walkPath(setup, path.slice(0, -1)).at(-1)!.state : initialState(setup);
+  return heroDecisions(kids, path[path.length - 1], path.length > 1 ? path[path.length - 2] : null, before, hero);
+}
+
+function sameContext(row: TrainerNodeRow, ctx: EntryContext): boolean {
   return (
     row.street === ctx.street &&
     JSON.stringify(row.board) === JSON.stringify(ctx.board) &&
-    JSON.stringify(row.line) === JSON.stringify(ctx.line) &&
-    row.hero_seat === ctx.seat &&
-    row.villain_seat === ctx.vsSeat
+    JSON.stringify(row.line) === JSON.stringify(ctx.line)
   );
+}
+
+/** Read `node_id → weights` in slices, so a big tree never makes a huge query string. */
+async function loadWeights(
+  supabase: SupabaseClient,
+  userId: string,
+  nodeIds: string[],
+): Promise<Record<string, StrategyWeights>> {
+  const out: Record<string, StrategyWeights> = {};
+  for (let i = 0; i < nodeIds.length; i += 100) {
+    const slice = nodeIds.slice(i, i + 100);
+    const { data, error } = await supabase
+      .from("poker_strategies")
+      .select("node_id, weights")
+      .eq("user_id", userId)
+      .in("node_id", slice);
+    if (error) throw error;
+    for (const r of data ?? []) {
+      const w = normalizeWeights(r.weights);
+      if (hasRange(w)) out[r.node_id as string] = w;
+    }
+  }
+  return out;
 }
 
 /* ----------------------------------------------------------------- trainers */
@@ -84,9 +182,9 @@ export async function createTrainer(input: {
   name: string;
   heroSeat: string;
   villainSeat: string;
-  potBb: number;
-  stackBb: number;
-  /** Add this strategy node right away (the "New trainer…" entry in Solver notes). */
+  stopAtStreetEnd?: boolean;
+  feedback?: Feedback;
+  /** Start hands at this node right away (the "New trainer…" entry in Solver notes). */
   nodeId?: string;
 }): Promise<CreatedResult> {
   try {
@@ -102,8 +200,9 @@ export async function createTrainer(input: {
         name,
         hero_seat: hero,
         villain_seat: villain,
-        pot_bb: positiveNumber(input.potBb, "Pot"),
-        stack_bb: positiveNumber(input.stackBb, "Stack"),
+        pot_bb: null,
+        stop_at_street_end: !!input.stopAtStreetEnd,
+        feedback: feedbackOrThrow(input.feedback ?? "each"),
       })
       .select("id")
       .single();
@@ -130,8 +229,8 @@ export async function updateTrainer(input: {
   name?: string;
   heroSeat?: string;
   villainSeat?: string;
-  potBb?: number;
-  stackBb?: number;
+  stopAtStreetEnd?: boolean;
+  feedback?: Feedback;
   archived?: boolean;
 }): Promise<ActionResult> {
   try {
@@ -147,8 +246,8 @@ export async function updateTrainer(input: {
       patch.hero_seat = hero;
       patch.villain_seat = villain;
     }
-    if (input.potBb !== undefined) patch.pot_bb = positiveNumber(input.potBb, "Pot");
-    if (input.stackBb !== undefined) patch.stack_bb = positiveNumber(input.stackBb, "Stack");
+    if (input.stopAtStreetEnd !== undefined) patch.stop_at_street_end = !!input.stopAtStreetEnd;
+    if (input.feedback !== undefined) patch.feedback = feedbackOrThrow(input.feedback);
     if (input.archived !== undefined) patch.archived = input.archived;
 
     const { error } = await supabase
@@ -181,12 +280,12 @@ export async function deleteTrainer(id: string): Promise<ActionResult> {
   }
 }
 
-/* -------------------------------------------------------------------- nodes */
+/* ------------------------------------------------------------------ entries */
 
 /**
- * Add a strategy node. The tree is walked here, from the database rows, not
- * from anything the client sends: the checks below are the rule, the popover
- * only previews them.
+ * Start this trainer's hands at a node. The tree is walked here, from the
+ * database rows, not from anything the client sends: these checks are the
+ * rule, the popover only previews them.
  */
 export async function addNodeToTrainer(input: {
   trainerId: string;
@@ -195,34 +294,41 @@ export async function addNodeToTrainer(input: {
   try {
     const { supabase, user } = await requireUser();
 
-    const [trainerRes, nodeRes, stratRes] = await Promise.all([
+    const [trainerRes, nodeRes] = await Promise.all([
       supabase.from("poker_trainers").select(TRAINER_SELECT).eq("id", input.trainerId).eq("user_id", user.id).maybeSingle(),
       supabase.from("poker_nodes").select("spot_id").eq("id", input.nodeId).eq("user_id", user.id).maybeSingle(),
-      supabase.from("poker_strategies").select("weights").eq("node_id", input.nodeId).eq("user_id", user.id).maybeSingle(),
     ]);
     if (trainerRes.error) throw trainerRes.error;
     if (nodeRes.error) throw nodeRes.error;
-    if (stratRes.error) throw stratRes.error;
     const trainer = trainerRes.data as Trainer | null;
     if (!trainer) return { ok: false, error: "Trainer not found" };
     if (!nodeRes.data) return { ok: false, error: "Node not found" };
+    const spotId = nodeRes.data.spot_id as string;
 
-    const nodes = await loadSpotNodes(supabase, user.id, [nodeRes.data.spot_id as string]);
+    const [nodes, setups] = await Promise.all([
+      loadSpotNodes(supabase, user.id, [spotId]),
+      loadSetups(supabase, user.id, [spotId]),
+    ]);
+    const setup = setups.get(spotId)?.setup;
+    if (!setup) return { ok: false, error: "Spot not found" };
     const path = pathFrom(nodes, input.nodeId);
     if (!path) return { ok: false, error: "Could not read this node's tree" };
-    const resolved = resolveNodeContext(path);
+    const resolved = resolveEntry(setup, path);
     if (!resolved.ok) return { ok: false, error: resolved.error };
     const ctx = resolved.context;
 
-    if (!hasRange(normalizeWeights(stratRes.data?.weights))) {
-      return { ok: false, error: "This node has no strategy yet — import or paint one first." };
-    }
-    if (asStrategy(path[path.length - 1]).actions.length < 2) {
-      return { ok: false, error: "This node needs at least two actions to train on." };
-    }
-
-    const fit = compatibility(ctx, trainer);
+    const fit = compatibility(ctx.players, trainer);
     if (!fit.ok) return { ok: false, error: `Doesn't fit this trainer: ${fit.reason}.` };
+
+    // A hand from here must reach a decision of hero's that has a grid.
+    const decisions = entryDecisions({ ...setup, players: ctx.players }, childrenIndex(nodes), path, trainer.hero_seat);
+    const weights = await loadWeights(supabase, user.id, decisions);
+    if (Object.keys(weights).length === 0) {
+      return {
+        ok: false,
+        error: `No decision of ${trainer.hero_seat} with a strategy below this node — import or paint one first.`,
+      };
+    }
 
     const { error } = await supabase.from("poker_trainer_nodes").insert({
       trainer_id: trainer.id,
@@ -232,21 +338,12 @@ export async function addNodeToTrainer(input: {
       street: ctx.street,
       board: ctx.board,
       line: ctx.line,
-      hero_seat: ctx.seat,
-      villain_seat: ctx.vsSeat,
+      hero_seat: trainer.hero_seat,
+      villain_seat: trainer.villain_seat,
     });
     if (error) {
       if (error.code === "23505") return { ok: false, error: "Already in this trainer" };
       throw error;
-    }
-
-    if (!trainer.street) {
-      const { error: streetError } = await supabase
-        .from("poker_trainers")
-        .update({ street: ctx.street })
-        .eq("id", trainer.id)
-        .eq("user_id", user.id);
-      if (streetError) throw streetError;
     }
 
     refresh();
@@ -269,22 +366,6 @@ export async function removeNodeFromTrainer(input: {
       .eq("node_id", input.nodeId)
       .eq("user_id", user.id);
     if (error) throw error;
-
-    // An empty trainer forgets its street, so it can be refilled with any.
-    const { count, error: countError } = await supabase
-      .from("poker_trainer_nodes")
-      .select("node_id", { count: "exact", head: true })
-      .eq("trainer_id", input.trainerId)
-      .eq("user_id", user.id);
-    if (countError) throw countError;
-    if (count === 0) {
-      await supabase
-        .from("poker_trainers")
-        .update({ street: null })
-        .eq("id", input.trainerId)
-        .eq("user_id", user.id);
-    }
-
     refresh();
     return { ok: true };
   } catch (e) {
@@ -298,7 +379,7 @@ export type StartedSession =
   | {
       ok: true;
       sessionId: string;
-      drill: DrillNode[];
+      drill: Drill;
       skipped: { nodeId: string; reason: string }[];
       updated: number;
     }
@@ -306,8 +387,8 @@ export type StartedSession =
 
 /**
  * Open a session: close any session left open (its end is its last answer),
- * re-walk every node's tree so an edited card or line is picked up, and load
- * the strategies once so dealing and grading run in the browser.
+ * re-walk every entry's tree so an edited card or line is picked up, and load
+ * the subtrees and their grids once, so every hand plays in the browser.
  */
 export async function startSession(trainerId: string): Promise<StartedSession> {
   try {
@@ -326,39 +407,33 @@ export async function startSession(trainerId: string): Promise<StartedSession> {
     const trainer = trainerRes.data as Trainer | null;
     if (!trainer) return { ok: false, error: "Trainer not found" };
     const rows = (rowsRes.data ?? []) as TrainerNodeRow[];
-    if (rows.length === 0) return { ok: false, error: "Add strategy nodes from Solver notes first." };
+    if (rows.length === 0) return { ok: false, error: "Pick where hands start: “Train from here” in Solver notes." };
 
     await closeStaleSessions(supabase, user.id, trainerId);
 
     const spotIds = [...new Set(rows.map((r) => r.spot_id))];
-    const [nodes, spotsRes, stratRes] = await Promise.all([
+    const [nodes, setups] = await Promise.all([
       loadSpotNodes(supabase, user.id, spotIds),
-      supabase.from("poker_spots").select("id, name").eq("user_id", user.id).in("id", spotIds),
-      supabase
-        .from("poker_strategies")
-        .select("node_id, weights")
-        .eq("user_id", user.id)
-        .in("node_id", rows.map((r) => r.node_id)),
+      loadSetups(supabase, user.id, spotIds),
     ]);
-    if (spotsRes.error) throw spotsRes.error;
-    if (stratRes.error) throw stratRes.error;
-    const spotNames = new Map((spotsRes.data ?? []).map((s) => [s.id as string, s.name as string]));
-    const strategies = new Map(
-      (stratRes.data ?? []).map((s) => [s.node_id as string, normalizeWeights(s.weights)]),
-    );
+    const kids = childrenIndex(nodes);
 
-    const drill: DrillNode[] = [];
     const skipped: { nodeId: string; reason: string }[] = [];
+    const spots: Record<string, DrillSpot> = {};
+    const entries: Drill["entries"] = [];
+    const decisionIds = new Set<string>();
+    const heroByEntry = new Map<string, string[]>();
     let updated = 0;
     const now = new Date().toISOString();
 
     for (const row of rows) {
+      const spot = setups.get(row.spot_id);
       const path = pathFrom(nodes, row.node_id);
-      if (!path) {
+      if (!spot || !path) {
         skipped.push({ nodeId: row.node_id, reason: "Tree could not be read" });
         continue;
       }
-      const resolved = resolveNodeContext(path);
+      const resolved = resolveEntry(spot.setup, path);
       if (!resolved.ok) {
         skipped.push({ nodeId: row.node_id, reason: resolved.error });
         continue;
@@ -368,43 +443,45 @@ export async function startSession(trainerId: string): Promise<StartedSession> {
         updated++;
         await supabase
           .from("poker_trainer_nodes")
-          .update({
-            street: ctx.street,
-            board: ctx.board,
-            line: ctx.line,
-            hero_seat: ctx.seat,
-            villain_seat: ctx.vsSeat,
-            resolved_at: now,
-          })
+          .update({ street: ctx.street, board: ctx.board, line: ctx.line, resolved_at: now })
           .eq("trainer_id", trainerId)
           .eq("node_id", row.node_id)
           .eq("user_id", user.id);
       }
-      const fit = compatibility(ctx, trainer);
+      const fit = compatibility(ctx.players, trainer);
       if (!fit.ok) {
         skipped.push({ nodeId: row.node_id, reason: fit.reason });
         continue;
       }
-      const weights = strategies.get(row.node_id);
-      if (!weights || !hasRange(weights)) {
-        skipped.push({ nodeId: row.node_id, reason: "No strategy" });
+      const entry = path[path.length - 1];
+      const heroNodes = entryDecisions({ ...spot.setup, players: ctx.players }, kids, path, trainer.hero_seat);
+      if (heroNodes.length === 0) {
+        skipped.push({ nodeId: row.node_id, reason: `No decision of ${trainer.hero_seat} below this node` });
         continue;
       }
-      const strategy = asStrategy(path[path.length - 1]);
-      drill.push({
-        nodeId: row.node_id,
-        spotId: row.spot_id,
-        spotName: spotNames.get(row.spot_id) ?? "Spot",
-        label: strategy.label ?? null,
-        weight: Number(row.weight) || 1,
-        context: ctx,
-        actions: strategy.actions,
-        weights,
-      });
+
+      const below = subtree(kids, entry);
+      for (const n of below) if (n.type === "strategy") decisionIds.add(n.id);
+      const drillSpot = (spots[row.spot_id] ??= { spotId: row.spot_id, spotName: spot.name, setup: spot.setup, nodes: [] });
+      const have = new Set(drillSpot.nodes.map((n) => n.id));
+      for (const n of [...path, ...below]) if (!have.has(n.id)) {
+        drillSpot.nodes.push(n);
+        have.add(n.id);
+      }
+      entries.push({ nodeId: row.node_id, spotId: row.spot_id, weight: Number(row.weight) || 1, label: entryLabel(entry) });
+      heroByEntry.set(row.node_id, heroNodes);
     }
 
-    if (drill.length === 0) {
-      return { ok: false, error: `No node can be trained right now: ${skipped[0]?.reason ?? "empty"}.` };
+    // Only entries where hero meets a grid can deal a hand worth playing.
+    const weights = await loadWeights(supabase, user.id, [...decisionIds]);
+    const playable = entries.filter((e) => {
+      const ok = (heroByEntry.get(e.nodeId) ?? []).some((id) => weights[id]);
+      if (!ok) skipped.push({ nodeId: e.nodeId, reason: `No strategy for ${trainer.hero_seat} below this node` });
+      return ok;
+    });
+
+    if (playable.length === 0) {
+      return { ok: false, error: `No hand can be dealt right now: ${skipped[0]?.reason ?? "empty"}.` };
     }
 
     const { data, error } = await supabase
@@ -414,7 +491,7 @@ export async function startSession(trainerId: string): Promise<StartedSession> {
       .single();
     if (error) throw error;
 
-    return { ok: true, sessionId: data.id as string, drill, skipped, updated };
+    return { ok: true, sessionId: data.id as string, drill: { spots, entries: playable, weights }, skipped, updated };
   } catch (e) {
     return fail(e) as StartedSession;
   }

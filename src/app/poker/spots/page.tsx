@@ -15,7 +15,7 @@ export default async function SpotsPage() {
 
   const { data, error } = await supabase
     .from("poker_spots")
-    .select("id, name, description, created_at, updated_at")
+    .select("id, name, description, setup, created_at, updated_at")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 

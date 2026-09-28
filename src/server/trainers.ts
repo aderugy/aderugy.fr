@@ -1,13 +1,17 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { asStrategy, type PokerNode } from "@/lib/solver/types";
-import type { Trainer, TrainerAnswer, TrainerNodeRow, TrainerSession } from "@/lib/trainer/types";
+import type { PokerNode } from "@/lib/solver/types";
+import { entryLabel } from "@/lib/trainer/labels";
+import type { Trainer, TrainerAnswer, TrainerHand, TrainerNodeRow, TrainerSession } from "@/lib/trainer/types";
 
 export const TRAINER_SELECT =
-  "id, name, hero_seat, villain_seat, pot_bb, stack_bb, street, archived, created_at, updated_at";
-const SESSION_SELECT = "id, trainer_id, started_at, ended_at, hands, correct, blunders, last_answer_at";
+  "id, name, hero_seat, villain_seat, pot_bb, stack_bb, street, stop_at_street_end, feedback, archived, created_at, updated_at";
+const SESSION_SELECT =
+  "id, trainer_id, started_at, ended_at, hands, correct, blunders, played_hands, perfect_hands, last_answer_at";
 const ANSWER_SELECT =
-  "id, session_id, node_id, combo, board, actions, freqs, rng, expected_action_id, chosen_action_id, chosen_freq, grade, answered_ms, answered_at";
+  "id, session_id, node_id, combo, board, actions, freqs, rng, expected_action_id, chosen_action_id, chosen_freq, grade, answered_ms, answered_at, hand_id, step, line, pot_bb";
+const HAND_SELECT =
+  "id, session_id, entry_node_id, end_node_id, combo, villain_combo, board, line, end_reason, decisions, correct, ended_at";
 
 async function userClient() {
   const supabase = await createClient();
@@ -73,6 +77,9 @@ export type TrainerPage = {
   nodes: TrainerNodeView[];
   sessions: TrainerSession[];
   answers: TrainerAnswer[];
+  hands: TrainerHand[];
+  /** Nodes that answers and hands point at (decisions, where hands stopped): id → label and spot, to link to them. */
+  nodeInfo: Record<string, { label: string; spotId: string; spotName: string }>;
 };
 
 /** Answers read for the history tab: the most recent ones are enough for trends and leaks. */
@@ -104,7 +111,7 @@ export async function getTrainerPage(trainerId: string): Promise<TrainerPage | n
   const sessions = ((s.data ?? []) as TrainerSession[]).filter((x) => x.hands > 0 || x.ended_at === null);
   const spotIds = [...new Set(rows.map((r) => r.spot_id))];
 
-  const [spots, nodes, answers] = await Promise.all([
+  const [spots, nodes, answers, hands] = await Promise.all([
     spotIds.length
       ? supabase.from("poker_spots").select("id, name").eq("user_id", user.id).in("id", spotIds)
       : Promise.resolve({ data: [], error: null }),
@@ -124,13 +131,42 @@ export async function getTrainerPage(trainerId: string): Promise<TrainerPage | n
           .order("answered_at", { ascending: false })
           .limit(HISTORY_ANSWERS)
       : Promise.resolve({ data: [], error: null }),
+    sessions.length
+      ? supabase
+          .from("poker_trainer_hands")
+          .select(HAND_SELECT)
+          .eq("user_id", user.id)
+          .in("session_id", sessions.map((x) => x.id))
+          .order("ended_at", { ascending: false })
+          .limit(HISTORY_ANSWERS)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (spots.error) throw spots.error;
   if (nodes.error) throw nodes.error;
   if (answers.error) throw answers.error;
+  if (hands.error) throw hands.error;
 
   const spotNames = new Map((spots.data ?? []).map((x) => [x.id as string, x.name as string]));
   const nodeById = new Map(((nodes.data ?? []) as PokerNode[]).map((x) => [x.id, x]));
+
+  // Decisions answered and nodes where hands ended, named for the history tab.
+  const handRows = (hands.data ?? []) as TrainerHand[];
+  const answerRows = (answers.data ?? []) as TrainerAnswer[];
+  const endIds = [
+    ...new Set([...handRows.map((h) => h.end_node_id), ...answerRows.map((a) => a.node_id)].filter((x): x is string => !!x)),
+  ];
+  const nodeInfo: TrainerPage["nodeInfo"] = {};
+  for (let i = 0; i < endIds.length; i += 100) {
+    const { data, error } = await supabase
+      .from("poker_nodes")
+      .select("id, spot_id, parent_id, type, position, data, created_at, updated_at")
+      .eq("user_id", user.id)
+      .in("id", endIds.slice(i, i + 100));
+    if (error) throw error;
+    for (const n of (data ?? []) as PokerNode[]) {
+      nodeInfo[n.id] = { label: entryLabel(n), spotId: n.spot_id, spotName: spotNames.get(n.spot_id) ?? "Spot" };
+    }
+  }
 
   return {
     trainer: t.data as Trainer,
@@ -139,18 +175,20 @@ export async function getTrainerPage(trainerId: string): Promise<TrainerPage | n
       return {
         ...r,
         spotName: spotNames.get(r.spot_id) ?? "Spot",
-        label: node ? (asStrategy(node).label ?? null) : null,
+        label: node ? entryLabel(node) : null,
         missing: !node,
       };
     }),
     sessions,
-    answers: (answers.data ?? []) as TrainerAnswer[],
+    answers: answerRows,
+    hands: handRows,
+    nodeInfo,
   };
 }
 
 export async function getSessionReview(trainerId: string, sessionId: string) {
   const { supabase, user } = await userClient();
-  const [t, s, a] = await Promise.all([
+  const [t, s, a, h] = await Promise.all([
     supabase.from("poker_trainers").select(TRAINER_SELECT).eq("id", trainerId).eq("user_id", user.id).maybeSingle(),
     supabase
       .from("poker_trainer_sessions")
@@ -165,14 +203,22 @@ export async function getSessionReview(trainerId: string, sessionId: string) {
       .eq("session_id", sessionId)
       .eq("user_id", user.id)
       .order("answered_at"),
+    supabase
+      .from("poker_trainer_hands")
+      .select(HAND_SELECT)
+      .eq("session_id", sessionId)
+      .eq("user_id", user.id)
+      .order("ended_at"),
   ]);
   if (t.error) throw t.error;
   if (s.error) throw s.error;
   if (a.error) throw a.error;
+  if (h.error) throw h.error;
   if (!t.data || !s.data) return null;
   return {
     trainer: t.data as Trainer,
     session: s.data as TrainerSession,
     answers: (a.data ?? []) as TrainerAnswer[],
+    hands: (h.data ?? []) as TrainerHand[],
   };
 }

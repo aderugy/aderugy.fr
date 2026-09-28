@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
-import { NODE_TYPES, type NodeData, type NodeType, type StrategyWeights } from "@/lib/solver/types";
+import { asSetup, NODE_TYPES, type NodeData, type NodeType, type SpotSetup, type StrategyWeights } from "@/lib/solver/types";
 
 /** Like ActionResult but hands the new row's id back to the client. */
 type CreatedResult = { ok: true; id: string } | { ok: false; error: string };
@@ -61,6 +61,27 @@ export async function updateSpot(input: {
     if (error) throw error;
 
     refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * The root of the spot's tree: who plays, where it starts, pot and stacks,
+ * and the root's notes. Normalised through `asSetup`, so a bad value can't be
+ * stored.
+ */
+export async function updateSpotSetup(input: { id: string; setup: SpotSetup }): Promise<ActionResult> {
+  try {
+    const { supabase, user } = await requireUser();
+    const setup = asSetup(input.setup);
+    const { error } = await supabase
+      .from("poker_spots")
+      .update({ setup })
+      .eq("id", input.id)
+      .eq("user_id", user.id);
+    if (error) throw error;
     return { ok: true };
   } catch (e) {
     return fail(e);

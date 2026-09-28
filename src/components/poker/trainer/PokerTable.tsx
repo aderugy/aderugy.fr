@@ -58,7 +58,18 @@ const POS = "absolute -translate-x-1/2 -translate-y-1/2 left-(--tx) top-(--ty) s
  * the parent must be a size container (`container-type: size`), and the table
  * takes the largest 3:4 box that fits in it, so the drill never scrolls.
  */
-export function PokerTable({ scene, combo, fit = false }: { scene: Scene; combo: string | null; fit?: boolean }) {
+export function PokerTable({
+  scene,
+  combo,
+  villainCombo = null,
+  fit = false,
+}: {
+  scene: Scene;
+  combo: string | null;
+  /** Shown face up at showdown. */
+  villainCombo?: string | null;
+  fit?: boolean;
+}) {
   const hero = scene.seats.find((s) => s.role === "hero");
   const order = hero ? seatsFromHero(hero.seat) : scene.seats.map((s) => s.seat);
   const bySeat = new Map(scene.seats.map((s) => [s.seat, s]));
@@ -113,8 +124,17 @@ export function PokerTable({ scene, combo, fit = false }: { scene: Scene; combo:
               )}
               {seat.role === "villain" && (
                 <div className="mb-1 flex gap-0.5">
-                  <CardBack size="sm" />
-                  <CardBack size="sm" />
+                  {villainCombo ? (
+                    <>
+                      <PlayingCard card={comboCards(villainCombo)[0]} size="sm" />
+                      <PlayingCard card={comboCards(villainCombo)[1]} size="sm" />
+                    </>
+                  ) : (
+                    <>
+                      <CardBack size="sm" />
+                      <CardBack size="sm" />
+                    </>
+                  )}
                 </div>
               )}
               <div

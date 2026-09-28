@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { STREET_LABELS } from "@/lib/trainer/types";
 import { createTrainer, updateTrainer } from "@/server/actions/trainers";
 import type { TrainerListItem } from "@/server/trainers";
 import { NewTrainerForm } from "@/components/poker/trainer/AddToTrainer";
@@ -23,8 +22,7 @@ export function TrainerList({ trainers }: { trainers: TrainerListItem[] }) {
       {creating ? (
         <div className="rounded-lg border border-line bg-surface p-4">
           <NewTrainerForm
-            seat={null}
-            vsSeat={null}
+            players={null}
             pending={pending}
             compact={false}
             onCancel={() => setCreating(false)}
@@ -54,7 +52,7 @@ export function TrainerList({ trainers }: { trainers: TrainerListItem[] }) {
 
       {visible.length === 0 ? (
         <p className="rounded border border-line bg-surface p-4 text-sm text-muted">
-          No trainer yet. Create one here, or straight from a strategy node in{" "}
+          No trainer yet. Create one here, or with “Train from here…” on a node in{" "}
           <Link href="/poker/spots" className="text-accent hover:underline">
             Solver notes
           </Link>
@@ -73,16 +71,15 @@ export function TrainerList({ trainers }: { trainers: TrainerListItem[] }) {
                   {t.archived && <span className="ml-2 text-xs font-normal text-muted">archived</span>}
                 </span>
                 <span className="block text-xs text-muted">
-                  {t.hero_seat} vs {t.villain_seat}
-                  {t.street ? ` · ${STREET_LABELS[t.street]}` : ""} · {t.nodeCount} node
-                  {t.nodeCount === 1 ? "" : "s"} · {t.sessions} session{t.sessions === 1 ? "" : "s"}
+                  hero {t.hero_seat} vs {t.villain_seat} · {t.nodeCount} entr
+                  {t.nodeCount === 1 ? "y" : "ies"} · {t.sessions} session{t.sessions === 1 ? "" : "s"}
                 </span>
               </Link>
               <span className="shrink-0 text-right">
                 <span className="block text-sm font-semibold tabular-nums">
                   {t.lastScore === null ? "—" : `${Math.round(t.lastScore)}%`}
                 </span>
-                <span className="block text-[10px] text-muted">last score</span>
+                <span className="block text-[10px] text-muted">last session</span>
               </span>
               <button
                 type="button"

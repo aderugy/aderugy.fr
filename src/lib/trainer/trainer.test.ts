@@ -5,11 +5,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SEATS, derivedPosition, firstToAct, isInPosition } from "../solver/seats";
-import type { PokerNode, StrategyWeights } from "../solver/types";
+import type { PokerNode, SpotSetup, StrategyWeights } from "../solver/types";
 import { comboPool, pickWeighted } from "./deal";
 import { byHandClass, confusions, handClass, mixDiscipline } from "./history";
-import { compatibility, resolveNodeContext } from "./resolve";
-import { buildScene, seatsFromHero } from "./scene";
+import { compatibility, resolveEntry } from "./resolve";
+import { sceneFromState, seatsFromHero } from "./scene";
+import { answer, buildTree, handScore, startHand } from "./play";
+import { walkPath } from "../solver/gameState";
+import { comboToHand } from "../solver/cards";
+import type { Seat } from "../solver/seats";
 import { bandIndex, bands, playableFreqs, rollRng, scoreAnswer, sessionScore } from "./score";
 import type { TrainerAnswer } from "./types";
 
@@ -30,13 +34,6 @@ function node(type: PokerNode["type"], data: object, parent: PokerNode | null): 
   };
 }
 
-function chain(...specs: [PokerNode["type"], object][]): PokerNode[] {
-  const out: PokerNode[] = [];
-  for (const [type, data] of specs) out.push(node(type, data, out[out.length - 1] ?? null));
-  return out;
-}
-
-const strat = (seat: string | null, vsSeat: string | null) => ({ seat, vsSeat, actions: [] });
 
 /** Deterministic PRNG (mulberry32). */
 function seeded(seed: number) {
@@ -76,197 +73,303 @@ test("first to act: UTG before BB preflop, BB before BTN postflop", () => {
   assert.equal(firstToAct("river", "SB", "CO"), "SB");
 });
 
+/* ------------------------------------------------------------ tree helpers */
+
+const SRP: SpotSetup = { players: ["BTN", "BB"], street: "flop", potBb: 5.5, stackBb: 97.5 };
+
+type Kid = [PokerNode["type"], object, Kid[]?];
+
+/** Build a tree: each spec is [type, data, children]. Returns every node, parents first. */
+function tree(specs: Kid[], parent: PokerNode | null = null, out: PokerNode[] = []): PokerNode[] {
+  specs.forEach(([type, data, kids], i) => {
+    const n = node(type, data, parent);
+    n.position = i;
+    out.push(n);
+    if (kids) tree(kids, n, out);
+  });
+  return out;
+}
+
+const opt = (id: string, kind: string, label: string, sizePct: number | null = null) => ({ id, kind, label, sizePct, color: "#000" });
+const act = (strategyActionId: string, kind: string, label: string, sizePct: number | null = null) => ({
+  strategyActionId,
+  kind,
+  label,
+  sizePct,
+  color: "#000",
+});
+
+function drill(nodes: PokerNode[], weights: Record<string, StrategyWeights>, setup: SpotSetup = SRP) {
+  return buildTree({ spotId: "spot", spotName: "SRP", setup, nodes }, weights)!;
+}
+
+const pure = (i: number, len: number) => Array.from({ length: len }, (_, k) => (k === i ? 100 : 0));
+
 /* ----------------------------------------------------------------- resolve */
 
-test("resolve: flop decision after a check, board and line read from the tree", () => {
-  const path = chain(
-    ["text", { title: "BTN vs BB SRP", body: "" }],
-    ["flop", { cards: ["Ah", "7d", "2c"] }],
-    ["strategy", strat("BB", "BTN")],
-    ["action", { kind: "check", label: "Check", color: "" }],
-    ["strategy", strat("BTN", "BB")],
-  );
-  const r = resolveNodeContext(path);
-  assert.ok(r.ok, !r.ok ? r.error : "");
+test("resolve: an entry's context comes from the walk (flop decision after a check)", () => {
+  const nodes = tree([
+    ["flop", { cards: ["Ks", "7d", "2c"] }, [
+      ["strategy", { actions: [opt("x", "check", "Check"), opt("b", "bet", "Bet 33%", 33)] }, [
+        ["action", act("x", "check", "Check"), [
+          ["strategy", { actions: [opt("x2", "check", "Check"), opt("b2", "bet", "Bet 33%", 33)] }],
+        ]],
+      ]],
+    ]],
+  ]);
+  const r = resolveEntry(SRP, nodes);
+  assert.ok(r.ok);
   if (!r.ok) return;
   assert.equal(r.context.street, "flop");
-  assert.deepEqual(r.context.board, ["Ah", "7d", "2c"]);
-  assert.deepEqual(r.context.line, [{ seat: "BB", kind: "check", sizePct: null, label: "Check" }]);
-  assert.equal(r.context.seat, "BTN");
-  assert.equal(r.context.vsSeat, "BB");
+  assert.deepEqual(r.context.board, ["Ks", "7d", "2c"]);
+  assert.deepEqual(r.context.line.map((l) => `${l.seat} ${l.kind}`), ["BB check"]);
+  assert.equal(r.context.toAct, "BTN");
+  assert.ok(Math.abs(r.context.potBb - 5.5) < 1e-9);
 });
 
-test("resolve: the line resets on each new street; turn and river extend the board", () => {
-  const path = chain(
-    ["flop", { cards: ["Ah", "7d", "2c"] }],
-    ["strategy", strat("BB", "BTN")],
-    ["action", { kind: "check", label: "Check", color: "" }],
-    ["strategy", strat("BTN", "BB")],
-    ["action", { kind: "bet", sizePct: 33, label: "Bet 33%", color: "" }],
-    ["strategy", strat("BB", "BTN")],
-    ["action", { kind: "call", label: "Call", color: "" }],
-    ["turn", { card: "Ks" }],
-    ["strategy", strat("BB", "BTN")],
-    ["action", { kind: "bet", sizePct: 75, label: "Bet 75%", color: "" }],
-    ["strategy", strat("BTN", "BB")],
-  );
-  const r = resolveNodeContext(path);
-  assert.ok(r.ok);
-  if (!r.ok) return;
-  assert.equal(r.context.street, "turn");
-  assert.deepEqual(r.context.board, ["Ah", "7d", "2c", "Ks"]);
-  assert.equal(r.context.line.length, 1);
-  assert.equal(r.context.line[0].seat, "BB");
-  assert.equal(r.context.line[0].sizePct, 75);
+test("resolve: refusals — setup, invalid path, hand over", () => {
+  const flop = tree([["flop", { cards: ["Ks", "7d", "2c"] }]]);
+  assert.match((resolveEntry({ ...SRP, players: null }, flop) as { error: string }).error, /set up/);
+  assert.match((resolveEntry({ ...SRP, potBb: null }, flop) as { error: string }).error, /pot/);
+  const bad = tree([["flop", { cards: ["Ks", "7d"] }]]);
+  assert.match((resolveEntry(SRP, bad) as { error: string }).error, /3 cards/);
+  const fold = tree([
+    ["flop", { cards: ["Ks", "7d", "2c"] }, [
+      ["strategy", { actions: [opt("f", "fold", "Fold")] }, [["action", act("f", "fold", "Fold")]]],
+    ]],
+  ]);
+  assert.match((resolveEntry(SRP, fold) as { error: string }).error, /over/);
 });
 
-test("resolve: free-form actions alternate from the first player to act", () => {
-  const path = chain(
-    ["flop", { cards: ["Ah", "7d", "2c"] }],
-    ["action", { kind: "check", label: "Check", color: "" }],
-    ["action", { kind: "bet", sizePct: 50, label: "Bet 50%", color: "" }],
-    ["strategy", strat("BB", "BTN")],
-  );
-  const r = resolveNodeContext(path);
-  assert.ok(r.ok);
-  if (!r.ok) return;
-  assert.deepEqual(r.context.line.map((a) => a.seat), ["BB", "BTN"]);
-});
-
-test("resolve: preflop node keeps every action from the root", () => {
-  const path = chain(
-    ["strategy", strat("CO", "BB")],
-    ["action", { kind: "raise", sizePct: 2.5, label: "Raise 2.5bb", color: "" }],
-    ["strategy", strat("BB", "CO")],
-  );
-  const r = resolveNodeContext(path);
-  assert.ok(r.ok);
-  if (!r.ok) return;
-  assert.equal(r.context.street, "preflop");
-  assert.deepEqual(r.context.board, []);
-  assert.equal(r.context.line[0].seat, "CO");
-});
-
-test("resolve: every refusal", () => {
-  const refused = (path: PokerNode[], pattern: RegExp) => {
-    const r = resolveNodeContext(path);
-    assert.equal(r.ok, false);
-    if (!r.ok) assert.match(r.error, pattern);
-  };
-  refused(chain(["flop", { cards: ["Ah"] }]), /Only a strategy/);
-  refused(chain(["flop", { cards: ["Ah", "7d", "2c"] }], ["strategy", strat(null, "BB")]), /positions/);
-  refused(chain(["strategy", strat("BB", "BB")]), /same/);
-  refused(chain(["flop", { cards: ["Ah", "7d"] }], ["strategy", strat("BB", "BTN")]), /3 cards/);
-  refused(chain(["turn", { card: "Ks" }], ["strategy", strat("BB", "BTN")]), /no flop/);
-  refused(
-    chain(["flop", { cards: ["Ah", "7d", "2c"] }], ["river", { card: "Ks" }], ["strategy", strat("BB", "BTN")]),
-    /no turn/,
-  );
-  refused(
-    chain(["flop", { cards: ["Ah", "7d", "2c"] }], ["turn", { card: null }], ["strategy", strat("BB", "BTN")]),
-    /no card/,
-  );
-  refused(
-    chain(["flop", { cards: ["Ah", "7d", "2c"] }], ["turn", { card: "Ah" }], ["strategy", strat("BB", "BTN")]),
-    /twice/,
-  );
-  refused(
-    chain(["strategy", strat(null, null)], ["action", { kind: "check", label: "Check", color: "" }], ["strategy", strat("BTN", "BB")]),
-    /no positions/,
-  );
-  refused(
-    chain(["strategy", strat("CO", "BB")], ["action", { kind: "check", label: "Check", color: "" }], ["strategy", strat("BTN", "BB")]),
-    /CO vs BB/,
-  );
-  const broken = chain(["flop", { cards: ["Ah", "7d", "2c"] }], ["strategy", strat("BB", "BTN")]);
-  broken[1] = { ...broken[1], parent_id: "elsewhere" };
-  refused(broken, /Broken/);
-});
-
-test("compatibility: exact seats and same street", () => {
-  const ctx = { seat: "BTN" as const, vsSeat: "BB" as const, street: "flop" as const };
-  assert.deepEqual(compatibility(ctx, { hero_seat: "BTN", villain_seat: "BB", street: null }), { ok: true });
-  assert.deepEqual(compatibility(ctx, { hero_seat: "BTN", villain_seat: "BB", street: "flop" }), { ok: true });
-  assert.equal(compatibility(ctx, { hero_seat: "CO", villain_seat: "BB", street: "flop" }).ok, false);
-  assert.equal(compatibility(ctx, { hero_seat: "BB", villain_seat: "BTN", street: "flop" }).ok, false);
-  assert.equal(compatibility(ctx, { hero_seat: "BTN", villain_seat: "BB", street: "turn" }).ok, false);
+test("compatibility: the spot's two seats must be the trainer's, either way round", () => {
+  assert.deepEqual(compatibility(["BTN", "BB"], { hero_seat: "BB", villain_seat: "BTN" }), { ok: true });
+  assert.deepEqual(compatibility(["BTN", "BB"], { hero_seat: "BTN", villain_seat: "BB" }), { ok: true });
+  assert.equal(compatibility(["CO", "BB"], { hero_seat: "BTN", villain_seat: "BB" }).ok, false);
 });
 
 /* ------------------------------------------------------------------- scene */
 
-const acts = [
-  { id: "f", kind: "fold" as const, label: "Fold", color: "" },
-  { id: "c", kind: "call" as const, label: "Call", color: "" },
-  { id: "r", kind: "raise" as const, sizePct: 100, label: "Raise 100%", color: "" },
-  { id: "j", kind: "raise" as const, sizePct: null, label: "All-in", color: "" },
-];
-
-test("scene: facing a 33% c-bet in a 6bb pot", () => {
-  const s = buildScene({
+test("scene: facing a 33% c-bet, from the engine's state", () => {
+  const setup = { ...SRP, players: ["BTN", "BB"] as [Seat, Seat] };
+  const nodes = tree([
+    ["flop", { cards: ["Ks", "7d", "2c"] }, [
+      ["strategy", { actions: [] }, [
+        ["action", act("x", "check", "Check"), [
+          ["strategy", { actions: [] }, [["action", act("b", "bet", "Bet 33%", 33)]]],
+        ]],
+      ]],
+    ]],
+  ]);
+  const states = walkPath(setup, nodes);
+  const scene = sceneFromState({
+    state: states[states.length - 1].state,
     heroSeat: "BB",
     villainSeat: "BTN",
-    potBb: 6,
-    stackBb: 97,
-    street: "flop",
-    board: ["Ah", "7d", "2c"],
-    line: [
-      { seat: "BB", kind: "check", sizePct: null, label: "Check" },
-      { seat: "BTN", kind: "bet", sizePct: 33, label: "Bet 33%" },
-    ],
-    heroActions: acts,
-  });
-  assert.equal(s.centerBb, 6);
-  assert.equal(s.toCallBb, 1.98);
-  assert.equal(s.totalPotBb, 7.98);
-  const btn = s.seats.find((x) => x.seat === "BTN")!;
-  assert.equal(btn.bet, 1.98);
-  assert.equal(btn.stack, 95.02);
-  const [fold, call, raise, jam] = s.actions;
-  assert.equal(fold.amountBb, null);
-  assert.equal(call.amountBb, 1.98);
-  // pot after call = 7.98 + 1.98 = 9.96 → raise to 1.98 + 9.96
-  assert.equal(raise.amountBb, 11.94);
-  assert.equal(jam.amountBb, 97);
-  assert.equal(jam.allIn, true);
-  assert.equal(s.seats.filter((x) => x.role === "folded").length, 4);
-});
-
-test("scene: sizes are capped at the stack", () => {
-  const s = buildScene({
-    heroSeat: "BB",
-    villainSeat: "BTN",
-    potBb: 100,
-    stackBb: 20,
-    street: "turn",
-    board: ["Ah", "7d", "2c", "Ks"],
-    line: [{ seat: "BB", kind: "check", sizePct: null, label: "Check" }, { seat: "BTN", kind: "bet", sizePct: 75, label: "Bet 75%" }],
-    heroActions: acts,
-  });
-  assert.equal(s.toCallBb, 20);
-  assert.equal(s.actions[2].amountBb, 20);
-  assert.equal(s.actions[2].allIn, true);
-});
-
-test("scene: preflop blinds posted, raise-to in bb", () => {
-  const s = buildScene({
-    heroSeat: "BB",
-    villainSeat: "CO",
-    potBb: 1.5,
     stackBb: 100,
-    street: "preflop",
-    board: [],
-    line: [{ seat: "CO", kind: "raise", sizePct: 2.5, label: "Raise 2.5bb" }],
     heroActions: [
       { id: "f", kind: "fold", label: "Fold", color: "" },
       { id: "c", kind: "call", label: "Call", color: "" },
-      { id: "r", kind: "raise", sizePct: 11, label: "Raise 11bb", color: "" },
+      { id: "r", kind: "raise", sizePct: 50, label: "Raise 50%", color: "" },
     ],
   });
-  assert.equal(s.centerBb, 0.5); // the dead SB
-  assert.equal(s.seats.find((x) => x.seat === "BB")!.bet, 1);
-  assert.equal(s.toCallBb, 1.5);
-  assert.equal(s.actions[1].amountBb, 1.5);
-  assert.equal(s.actions[2].amountBb, 11);
+  assert.ok(Math.abs(scene.toCallBb - 1.815) < 1e-9);
+  assert.ok(Math.abs(scene.totalPotBb - 7.315) < 1e-9);
+  assert.equal(scene.centerBb, 5.5);
+  assert.ok(Math.abs((scene.actions[1].amountBb ?? 0) - 1.815) < 1e-9);
+  assert.ok(Math.abs((scene.actions[2].amountBb ?? 0) - 6.38) < 1e-9);
+  assert.deepEqual(scene.line.map((l) => l.seat), ["BB", "BTN"]);
+  assert.equal(scene.seats.find((x) => x.seat === "CO")?.role, "folded");
+});
+
+/* -------------------------------------------------------------------- play */
+
+// BB (hero) checks or bets; BTN c-bets or checks back; BB calls or folds; turn.
+function cbetTree(opts: { developBet?: boolean; turns?: string[] } = {}) {
+  const turns = (opts.turns ?? ["5h"]).map((c): Kid => ["turn", { card: c }, [["strategy", { actions: [opt("t", "check", "Check")] }]]]);
+  const bbFacing: Kid = ["strategy", { actions: [opt("f", "fold", "Fold"), opt("c", "call", "Call"), opt("r", "raise", "Raise 50%", 50)] }, [
+    ["action", act("f", "fold", "Fold")],
+    ["action", act("c", "call", "Call"), turns],
+  ]];
+  const btnKids: Kid[] = [["action", act("bb", "bet", "Bet 33%", 33), [bbFacing]]];
+  if (opts.developBet !== false) btnKids.push(["action", act("bx", "check", "Check")]);
+  return tree([
+    ["flop", { cards: ["Ks", "7d", "2c"] }, [
+      ["strategy", { actions: [opt("x", "check", "Check"), opt("b", "bet", "Bet 75%", 75)] }, [
+        ["action", act("x", "check", "Check"), [
+          ["strategy", { actions: [opt("bb", "bet", "Bet 33%", 33), opt("bx", "check", "Check")] }, btnKids],
+        ]],
+      ]],
+    ]],
+  ]);
+}
+
+function ids(nodes: PokerNode[]) {
+  const byLabel = (type: string, i = 0) => nodes.filter((n) => n.type === type)[i];
+  return { flop: byLabel("flop"), bbFlop: byLabel("strategy", 0), btn: byLabel("strategy", 1), bbFacing: byLabel("strategy", 2) };
+}
+
+test("play: C2 — two hero decisions, villain bets, a runout, then end of solution", () => {
+  const nodes = cbetTree();
+  const n = ids(nodes);
+  const weights: Record<string, StrategyWeights> = {
+    [n.bbFlop.id]: { hands: { "87s": pure(0, 2) }, combos: {} },
+    [n.btn.id]: { hands: { AA: pure(0, 2) }, combos: {} },
+    [n.bbFacing.id]: { hands: { "87s": [0, 100, 0] }, combos: {} },
+  };
+  const t = drill(nodes, weights);
+  let h = startHand(t, n.flop.id, "BB", "h1", { rand: seeded(1) })!;
+  assert.ok(h.pending);
+  assert.equal(h.pending!.nodeId, n.bbFlop.id);
+  assert.equal(comboToHand(h.combo!), "87s");
+  h = answer(t, h, 0, { rand: seeded(2) });
+  assert.equal(h.decisions[0].scored?.grade, "correct");
+  // Villain always bets (AA bets 100%); hero now faces 1.815.
+  assert.equal(h.pending?.nodeId, n.bbFacing.id);
+  assert.deepEqual(h.steps.map((s) => s.type), ["hero", "villain"]);
+  h = answer(t, h, 1, { rand: seeded(3) });
+  assert.equal(h.end?.reason, "end_of_solution");
+  assert.deepEqual(h.state.board, ["Ks", "7d", "2c", "5h"]);
+  assert.ok(Math.abs(h.state.center - 9.13) < 1e-9);
+  assert.deepEqual(handScore(h), { decisions: 2, correct: 2 });
+});
+
+test("play: villain draws only among developed branches", () => {
+  const nodes = cbetTree({ developBet: false });
+  const n = ids(nodes);
+  const weights: Record<string, StrategyWeights> = {
+    [n.bbFlop.id]: { hands: { "87s": pure(0, 2) }, combos: {} },
+    // BTN checks back 90% of the time, but only the bet has a branch.
+    [n.btn.id]: { hands: { AA: [10, 90] }, combos: {} },
+  };
+  const t = drill(nodes, weights);
+  for (let i = 0; i < 20; i++) {
+    let h = startHand(t, n.flop.id, "BB", `h${i}`, { rand: seeded(10 + i) })!;
+    h = answer(t, h, 0, { rand: seeded(100 + i) });
+    const v = h.steps.find((s) => s.type === "villain");
+    assert.equal(v && v.type === "villain" ? v.label : null, "Bet 33%");
+  }
+});
+
+test("play: hero's option with no branch ends the hand; fold ends it too", () => {
+  const nodes = cbetTree();
+  const n = ids(nodes);
+  const weights: Record<string, StrategyWeights> = {
+    [n.bbFlop.id]: { hands: { "87s": [50, 50] }, combos: {} },
+    [n.btn.id]: { hands: { AA: pure(0, 2) }, combos: {} },
+    [n.bbFacing.id]: { hands: { "87s": [30, 40, 30] }, combos: {} },
+  };
+  const t = drill(nodes, weights);
+  let h = startHand(t, n.flop.id, "BB", "a", { rand: seeded(5) })!;
+  const bet = answer(t, h, 1, { rand: seeded(6) });
+  assert.equal(bet.end?.reason, "branch_not_developed");
+  assert.equal(bet.end?.nodeId, n.bbFlop.id);
+
+  h = answer(t, h, 0, { rand: seeded(7) });
+  const raise = answer(t, h, 2, { rand: seeded(8) });
+  assert.equal(raise.end?.reason, "branch_not_developed");
+  const fold = answer(t, h, 0, { rand: seeded(8) });
+  assert.equal(fold.end?.reason, "fold");
+});
+
+test("play: off range when hero's hand has no strategy at a later decision", () => {
+  const nodes = cbetTree();
+  const n = ids(nodes);
+  const weights: Record<string, StrategyWeights> = {
+    [n.bbFlop.id]: { hands: { "87s": pure(0, 2) }, combos: {} },
+    [n.btn.id]: { hands: { AA: pure(0, 2) }, combos: {} },
+    [n.bbFacing.id]: { hands: { QQ: [0, 100, 0] }, combos: {} },
+  };
+  const t = drill(nodes, weights);
+  let h = startHand(t, n.flop.id, "BB", "o", { rand: seeded(9) })!;
+  h = answer(t, h, 0, { rand: seeded(9) });
+  assert.equal(h.end?.reason, "off_range");
+});
+
+test("play: runouts skip hero's cards; none left ends the hand", () => {
+  const weightsFor = (nodes: PokerNode[]) => {
+    const n = ids(nodes);
+    return {
+      [n.bbFlop.id]: { hands: {}, combos: { AhQh: pure(0, 2) } },
+      [n.btn.id]: { hands: { AA: pure(0, 2) }, combos: {} },
+      [n.bbFacing.id]: { hands: {}, combos: { AhQh: [0, 100, 0] } },
+    } as Record<string, StrategyWeights>;
+  };
+  const only = cbetTree({ turns: ["Ah"] });
+  const t1 = drill(only, weightsFor(only));
+  let h = startHand(t1, ids(only).flop.id, "BB", "r", { rand: seeded(1) })!;
+  h = answer(t1, answer(t1, h, 0, { rand: seeded(1) }), 1, { rand: seeded(1) });
+  assert.equal(h.end?.reason, "no_runout");
+
+  const two = cbetTree({ turns: ["Ah", "5c"] });
+  const t2 = drill(two, weightsFor(two));
+  for (let i = 0; i < 10; i++) {
+    let g = startHand(t2, ids(two).flop.id, "BB", "r2", { rand: seeded(i) })!;
+    g = answer(t2, answer(t2, g, 0, { rand: seeded(i) }), 1, { rand: seeded(i) });
+    assert.deepEqual(g.state.board.slice(3), ["5c"]);
+  }
+});
+
+test("play: stop at end of street; entry on an action starts facing the bet", () => {
+  const nodes = cbetTree();
+  const n = ids(nodes);
+  const weights: Record<string, StrategyWeights> = {
+    [n.bbFlop.id]: { hands: { "87s": pure(0, 2) }, combos: {} },
+    [n.btn.id]: { hands: { AA: pure(0, 2) }, combos: {} },
+    [n.bbFacing.id]: { hands: { "87s": [0, 100, 0] }, combos: {} },
+  };
+  const t = drill(nodes, weights);
+  let h = startHand(t, n.flop.id, "BB", "s", { rand: seeded(1), stopAtStreetEnd: true })!;
+  h = answer(t, h, 0, { rand: seeded(1), stopAtStreetEnd: true });
+  h = answer(t, h, 1, { rand: seeded(1), stopAtStreetEnd: true });
+  assert.equal(h.end?.reason, "end_of_street");
+
+  const betNode = nodes.find((x) => x.type === "action" && (x.data as { strategyActionId?: string }).strategyActionId === "bb")!;
+  const f = startHand(t, betNode.id, "BB", "e", { rand: seeded(2) })!;
+  assert.equal(f.pending?.nodeId, n.bbFacing.id);
+  assert.ok(Math.abs(f.pending!.state.bets.BTN - 1.815) < 1e-9);
+  assert.equal(f.steps.length, 0);
+});
+
+test("play: showdown draws villain's hand from the option he took", () => {
+  const setup: SpotSetup = { players: ["BTN", "BB"], street: "river", potBb: 20, stackBb: 80 };
+  const nodes = tree([
+    ["flop", { cards: ["Ks", "7d", "2c"] }, [
+      ["turn", { card: "5h" }, [
+        ["river", { card: "9s" }, [
+          ["strategy", { actions: [opt("x", "check", "Check")] }, [
+            ["action", act("x", "check", "Check"), [
+              ["strategy", { actions: [opt("b", "bet", "Bet 50%", 50), opt("k", "check", "Check")] }, [
+                ["action", act("b", "bet", "Bet 50%", 50), [
+                  ["strategy", { actions: [opt("f", "fold", "Fold"), opt("c", "call", "Call")] }, [
+                    ["action", act("f", "fold", "Fold")],
+                    ["action", act("c", "call", "Call")],
+                  ]],
+                ]],
+                ["action", act("k", "check", "Check")],
+              ]],
+            ]],
+          ]],
+        ]],
+      ]],
+    ]],
+  ]);
+  const [bb1, btn, bb2] = nodes.filter((x) => x.type === "strategy");
+  const weights: Record<string, StrategyWeights> = {
+    [bb1.id]: { hands: { QQ: [100] }, combos: {} },
+    // AA always bets, 33 always checks: after a bet, villain holds AA.
+    [btn.id]: { hands: { AA: [100, 0], "33": [0, 100] }, combos: {} },
+    [bb2.id]: { hands: { QQ: [0, 100] }, combos: {} },
+  };
+  const t = drill(nodes, weights, setup);
+  for (let i = 0; i < 10; i++) {
+    let h = startHand(t, nodes[0].id, "BB", "sd", { rand: seeded(i) })!;
+    h = answer(t, h, 0, { rand: seeded(i) });
+    if (h.pending) h = answer(t, h, 1, { rand: seeded(i + 50) });
+    assert.equal(h.end?.reason, "showdown");
+    const v = h.steps.find((s) => s.type === "villain");
+    const vHand = comboToHand(h.villainCombo!);
+    assert.equal(vHand, v && v.type === "villain" && v.label === "Check" ? "33" : "AA");
+  }
 });
 
 test("seatsFromHero rotates the table with hero first", () => {
@@ -374,6 +477,10 @@ function ans(combo: string, grade: TrainerAnswer["grade"], chosen: string, expec
     grade,
     answered_ms: 0,
     answered_at: "",
+    hand_id: null,
+    step: null,
+    line: null,
+    pot_bb: null,
   };
 }
 

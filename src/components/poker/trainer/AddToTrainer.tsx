@@ -3,36 +3,38 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fmtBb, effectiveStack, totalPot, type NodeState } from "@/lib/solver/gameState";
 import { SEATS, type Seat } from "@/lib/solver/seats";
-import type { PokerNode } from "@/lib/solver/types";
-import { compatibility, resolveNodeContext } from "@/lib/trainer/resolve";
-import { STREET_LABELS, type Trainer } from "@/lib/trainer/types";
+import { STREET_LABELS, type PokerNode, type SpotSetup } from "@/lib/solver/types";
+import { compatibility } from "@/lib/trainer/resolve";
+import type { Feedback, Trainer } from "@/lib/trainer/types";
 import { addNodeToTrainer, createTrainer, removeNodeFromTrainer } from "@/server/actions/trainers";
 import { BoardCards } from "@/components/poker/trainer/Cards";
 
-type TrainerRow = Pick<Trainer, "id" | "name" | "hero_seat" | "villain_seat" | "street" | "pot_bb">;
+type TrainerRow = Pick<Trainer, "id" | "name" | "hero_seat" | "villain_seat">;
 
 /**
- * "Add to trainer" for a strategy node in Solver notes. The tree walk runs
- * here on the loaded ancestors to preview the context and grey out trainers
- * that would refuse the node; the server walks the tree again on add, and its
- * answer is the one that counts.
+ * "Train from here" on any node of Solver notes: hands of a trainer start at
+ * this node and are played down the tree. The preview and the greyed-out
+ * trainers come from the canvas' own walk; the server walks the tree again on
+ * add, and its answer is the one that counts.
  */
-export function AddToTrainer({ node, path }: { node: PokerNode; path: PokerNode[] }) {
+export function TrainFromHere({ node, setup, ns }: { node: PokerNode; setup: SpotSetup; ns: NodeState }) {
   const supabase = useMemo(() => createClient(), []);
-  const resolved = useMemo(() => resolveNodeContext(path), [path]);
   const [open, setOpen] = useState(false);
   const [trainers, setTrainers] = useState<TrainerRow[] | null>(null);
   const [memberOf, setMemberOf] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [creating, setCreating] = useState(false);
+  const players = setup.players;
+  const over = ns.state.status === "over";
 
   function fetchAll() {
     return Promise.all([
       supabase
         .from("poker_trainers")
-        .select("id, name, hero_seat, villain_seat, street, pot_bb")
+        .select("id, name, hero_seat, villain_seat")
         .eq("archived", false)
         .order("updated_at", { ascending: false }),
       supabase.from("poker_trainer_nodes").select("trainer_id").eq("node_id", node.id),
@@ -74,42 +76,39 @@ export function AddToTrainer({ node, path }: { node: PokerNode; path: PokerNode[
   }
 
   const inCount = memberOf.size;
+  const s = ns.state;
 
   return (
     <div className="rounded border border-line p-2">
       <div className="flex items-center gap-2">
         <button
           type="button"
+          disabled={over || !players}
           onClick={() => setOpen((v) => !v)}
-          className="rounded border border-line px-2 py-1 text-xs hover:border-accent"
+          className="rounded border border-line px-2 py-1 text-xs hover:border-accent disabled:opacity-50"
         >
-          {open ? "Close" : "Add to trainer…"}
+          {open ? "Close" : "Train from here…"}
         </button>
         <span className="text-[11px] text-muted">
-          {inCount === 0 ? "In no trainer" : `In ${inCount} trainer${inCount > 1 ? "s" : ""}`}
+          {over ? "The hand is over here" : inCount === 0 ? "No hand starts here" : `Hands start here in ${inCount} trainer${inCount > 1 ? "s" : ""}`}
         </span>
       </div>
 
-      {open && (
+      {open && players && (
         <div className="mt-2 space-y-2">
-          {!resolved.ok ? (
-            <p className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
-              {resolved.error}
-            </p>
-          ) : (
-            <div className="space-y-1 text-[11px] text-muted">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-foreground">
-                  {resolved.context.seat} vs {resolved.context.vsSeat}
-                </span>
-                <span>{STREET_LABELS[resolved.context.street]}</span>
-                {resolved.context.board.length > 0 && <BoardCards cards={resolved.context.board} size="xs" />}
-              </div>
-              {resolved.context.line.length > 0 && (
-                <p>{resolved.context.line.map((a) => `${a.seat} ${a.label.toLowerCase()}`).join(" · ")}</p>
-              )}
+          <div className="space-y-1 text-[11px] text-muted">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-foreground">
+                {players[0]} vs {players[1]}
+              </span>
+              <span>{STREET_LABELS[s.street]}</span>
+              {s.board.length > 0 && <BoardCards cards={s.board} size="xs" />}
+              <span className="tabular-nums">
+                pot {fmtBb(totalPot(s))} · {fmtBb(effectiveStack(s))} behind
+              </span>
             </div>
-          )}
+            <p>Each hand starts here and is played down the tree until it ends or the tree stops.</p>
+          </div>
 
           {error && <p className="text-[11px] text-red-500">{error}</p>}
 
@@ -119,8 +118,8 @@ export function AddToTrainer({ node, path }: { node: PokerNode; path: PokerNode[
             <ul className="space-y-1">
               {trainers.map((t) => {
                 const member = memberOf.has(t.id);
-                const fit = resolved.ok ? compatibility(resolved.context, t) : null;
-                const disabled = pending || !resolved.ok || (!member && !fit?.ok);
+                const fit = compatibility(players, t);
+                const disabled = pending || (!member && !fit.ok);
                 return (
                   <li key={t.id} className="flex items-center gap-2 text-xs">
                     <div className="min-w-0 flex-1">
@@ -128,9 +127,8 @@ export function AddToTrainer({ node, path }: { node: PokerNode; path: PokerNode[
                         {t.name}
                       </Link>
                       <span className="text-[10px] text-muted">
-                        {t.hero_seat} vs {t.villain_seat}
-                        {t.street ? ` · ${STREET_LABELS[t.street]}` : ""}
-                        {!member && fit && !fit.ok ? ` · ${fit.reason}` : ""}
+                        hero {t.hero_seat} vs {t.villain_seat}
+                        {!member && !fit.ok ? ` · ${fit.reason}` : ""}
                       </span>
                     </div>
                     {member ? (
@@ -159,57 +157,60 @@ export function AddToTrainer({ node, path }: { node: PokerNode; path: PokerNode[
             </ul>
           )}
 
-          {resolved.ok &&
-            (creating ? (
-              <NewTrainerForm
-                seat={resolved.context.seat}
-                vsSeat={resolved.context.vsSeat}
-                pending={pending}
-                onCancel={() => setCreating(false)}
-                onSubmit={(v) =>
-                  run(async () => {
-                    const r = await createTrainer({ ...v, nodeId: node.id });
-                    if (r.ok) setCreating(false);
-                    return r;
-                  })
-                }
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                className="text-xs text-accent hover:underline"
-              >
-                ＋ New trainer…
-              </button>
-            ))}
+          {creating ? (
+            <NewTrainerForm
+              players={players}
+              pending={pending}
+              onCancel={() => setCreating(false)}
+              onSubmit={(v) =>
+                run(async () => {
+                  const r = await createTrainer({ ...v, nodeId: node.id });
+                  if (r.ok) setCreating(false);
+                  return r;
+                })
+              }
+            />
+          ) : (
+            <button type="button" onClick={() => setCreating(true)} className="text-xs text-accent hover:underline">
+              ＋ New trainer…
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+export type NewTrainerValues = {
+  name: string;
+  heroSeat: Seat;
+  villainSeat: Seat;
+  feedback: Feedback;
+  stopAtStreetEnd: boolean;
+};
+
+/**
+ * A trainer is a matchup and how hands are played. From a spot, the two
+ * seats are the spot's and only hero's side is chosen.
+ */
 export function NewTrainerForm({
-  seat,
-  vsSeat,
+  players,
   pending,
   onCancel,
   onSubmit,
   compact = true,
 }: {
-  seat: Seat | null;
-  vsSeat: Seat | null;
+  players: [Seat, Seat] | null;
   pending: boolean;
   onCancel?: () => void;
-  onSubmit: (v: { name: string; heroSeat: Seat; villainSeat: Seat; potBb: number; stackBb: number }) => void;
+  onSubmit: (v: NewTrainerValues) => void;
   compact?: boolean;
 }) {
-  const [name, setName] = useState(seat && vsSeat ? `${seat} vs ${vsSeat}` : "");
-  const [hero, setHero] = useState<Seat>(seat ?? "BTN");
-  const [villain, setVillain] = useState<Seat>(vsSeat ?? "BB");
-  const [pot, setPot] = useState("6");
-  const [stack, setStack] = useState("97");
-  const locked = !!seat && !!vsSeat;
+  const [hero, setHero] = useState<Seat>(players ? players[1] : "BB");
+  const [villain, setVillain] = useState<Seat>(players ? players[0] : "BTN");
+  const [name, setName] = useState(players ? `${players[1]} vs ${players[0]}` : "");
+  const [feedback, setFeedback] = useState<Feedback>("each");
+  const [stopAtStreetEnd, setStop] = useState(false);
 
   const input =
     "w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent";
@@ -217,7 +218,7 @@ export function NewTrainerForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ name, heroSeat: hero, villainSeat: villain, potBb: Number(pot), stackBb: Number(stack) });
+        onSubmit({ name, heroSeat: hero, villainSeat: villain, feedback, stopAtStreetEnd });
       }}
       className={compact ? "space-y-2 rounded border border-line p-2" : "space-y-3"}
     >
@@ -225,61 +226,46 @@ export function NewTrainerForm({
         Name
         <input value={name} onChange={(e) => setName(e.target.value)} required className={`mt-0.5 ${input}`} />
       </label>
-      <div className="grid grid-cols-2 gap-2">
+      {players ? (
         <label className="block text-xs text-muted">
-          Hero
+          Hero plays
           <select
             value={hero}
-            disabled={locked}
-            onChange={(e) => setHero(e.target.value as Seat)}
-            className={`mt-0.5 ${input} disabled:opacity-70`}
+            onChange={(e) => {
+              const h = e.target.value as Seat;
+              const v = h === players[0] ? players[1] : players[0];
+              setHero(h);
+              setVillain(v);
+              setName(`${h} vs ${v}`);
+            }}
+            className={`mt-0.5 ${input}`}
           >
-            {SEATS.map((s) => (
+            {players.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
         </label>
-        <label className="block text-xs text-muted">
-          Villain
-          <select
-            value={villain}
-            disabled={locked}
-            onChange={(e) => setVillain(e.target.value as Seat)}
-            className={`mt-0.5 ${input} disabled:opacity-70`}
-          >
-            {SEATS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-xs text-muted">
-          Pot (bb)
-          <input
-            type="number"
-            step="0.1"
-            min="0.1"
-            value={pot}
-            onChange={(e) => setPot(e.target.value)}
-            required
-            className={`mt-0.5 ${input}`}
-          />
-        </label>
-        <label className="block text-xs text-muted">
-          Stack behind (bb)
-          <input
-            type="number"
-            step="0.1"
-            min="0.1"
-            value={stack}
-            onChange={(e) => setStack(e.target.value)}
-            required
-            className={`mt-0.5 ${input}`}
-          />
-        </label>
-      </div>
-      <p className="text-[11px] text-muted">
-        Pot and stack at the start of the street. Preflop, the pot includes the blinds (1.5).
-      </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block text-xs text-muted">
+            Hero
+            <select value={hero} onChange={(e) => setHero(e.target.value as Seat)} className={`mt-0.5 ${input}`}>
+              {SEATS.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs text-muted">
+            Villain
+            <select value={villain} onChange={(e) => setVillain(e.target.value as Seat)} className={`mt-0.5 ${input}`}>
+              {SEATS.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+      <TrainerOptions feedback={feedback} stopAtStreetEnd={stopAtStreetEnd} onFeedback={setFeedback} onStop={setStop} />
       <div className="flex gap-2">
         <button
           type="submit"
@@ -295,5 +281,38 @@ export function NewTrainerForm({
         )}
       </div>
     </form>
+  );
+}
+
+/** How a hand is played: feedback after each decision or at the end, stop when a street's betting is over. */
+export function TrainerOptions({
+  feedback,
+  stopAtStreetEnd,
+  onFeedback,
+  onStop,
+}: {
+  feedback: Feedback;
+  stopAtStreetEnd: boolean;
+  onFeedback: (f: Feedback) => void;
+  onStop: (v: boolean) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs text-muted">
+        Feedback
+        <select
+          value={feedback}
+          onChange={(e) => onFeedback(e.target.value as Feedback)}
+          className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
+        >
+          <option value="each">After each decision</option>
+          <option value="hand_end">At the end of the hand</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-xs text-muted">
+        <input type="checkbox" checked={stopAtStreetEnd} onChange={(e) => onStop(e.target.checked)} />
+        Stop the hand when a street&apos;s betting is over
+      </label>
+    </div>
   );
 }

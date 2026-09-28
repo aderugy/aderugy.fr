@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { SEATS, type Seat } from "@/lib/solver/seats";
-import { STREET_LABELS, type Trainer } from "@/lib/trainer/types";
+import { fmtBb } from "@/lib/solver/gameState";
+import { STREET_LABELS, type Feedback, type Trainer } from "@/lib/trainer/types";
+import { TrainerOptions } from "@/components/poker/trainer/AddToTrainer";
 import { deleteTrainer, removeNodeFromTrainer, updateTrainer } from "@/server/actions/trainers";
 import type { TrainerPage } from "@/server/trainers";
 import { Segmented } from "@/components/poker/ui";
@@ -14,13 +16,9 @@ import { Practice } from "@/components/poker/trainer/Practice";
 
 type Tab = "practice" | "nodes" | "history" | "settings";
 
-const fmt = (x: number) => (Number.isInteger(x) ? String(x) : String(Math.round(x * 100) / 100));
-
-export function TrainerView({ trainer, nodes, sessions, answers }: TrainerPage) {
+export function TrainerView({ trainer, nodes, sessions, answers, hands, nodeInfo }: TrainerPage) {
   const [tab, setTab] = useState<Tab>("practice");
-  const usable = nodes.filter(
-    (n) => !n.missing && n.hero_seat === trainer.hero_seat && n.villain_seat === trainer.villain_seat,
-  );
+  const usable = nodes.filter((n) => !n.missing);
 
   return (
     <div className="mt-2 space-y-4">
@@ -28,9 +26,9 @@ export function TrainerView({ trainer, nodes, sessions, answers }: TrainerPage) 
         <div className="min-w-0">
           <h1 className="truncate text-lg font-semibold tracking-tight">{trainer.name}</h1>
           <p className="text-xs text-muted">
-            {trainer.hero_seat} vs {trainer.villain_seat}
-            {trainer.street ? ` · ${STREET_LABELS[trainer.street]}` : ""} · pot {fmt(Number(trainer.pot_bb))} bb ·{" "}
-            {fmt(Number(trainer.stack_bb))} bb behind
+            Hero {trainer.hero_seat} vs {trainer.villain_seat} · feedback{" "}
+            {trainer.feedback === "each" ? "after each decision" : "at the end of the hand"}
+            {trainer.stop_at_street_end ? " · stops at the end of a street" : ""}
           </p>
         </div>
         <Segmented
@@ -39,16 +37,18 @@ export function TrainerView({ trainer, nodes, sessions, answers }: TrainerPage) 
           onChange={setTab}
           options={[
             { id: "practice", label: "Practice" },
-            { id: "nodes", label: `Nodes (${nodes.length})` },
+            { id: "nodes", label: `Entries (${nodes.length})` },
             { id: "history", label: "History" },
             { id: "settings", label: "Settings" },
           ]}
         />
       </div>
 
-      {tab === "practice" && <Practice trainer={trainer} nodeCount={usable.length} />}
+      {tab === "practice" && <Practice trainer={trainer} entryCount={usable.length} />}
       {tab === "nodes" && <NodeList trainer={trainer} nodes={nodes} />}
-      {tab === "history" && <History trainer={trainer} nodes={nodes} sessions={sessions} answers={answers} />}
+      {tab === "history" && (
+        <History trainer={trainer} nodes={nodes} sessions={sessions} answers={answers} hands={hands} nodeInfo={nodeInfo} />
+      )}
       {tab === "settings" && <Settings trainer={trainer} />}
     </div>
   );
@@ -61,12 +61,12 @@ function NodeList({ trainer, nodes }: { trainer: Trainer; nodes: TrainerPage["no
   if (nodes.length === 0) {
     return (
       <div className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">
-        No node yet. In{" "}
+        No entry yet. In{" "}
         <Link href="/poker/spots" className="text-accent hover:underline">
           Solver notes
         </Link>
-        , select a strategy node set to {trainer.hero_seat} vs {trainer.villain_seat} and use “Add to trainer…”. The
-        board and the line are read from the tree above it.
+        , open a {trainer.hero_seat} vs {trainer.villain_seat} spot, select the node where hands should start (a flop,
+        a decision, a bet to face…) and use “Train from here…”. Each hand is then played down the tree.
       </div>
     );
   }
@@ -76,12 +76,7 @@ function NodeList({ trainer, nodes }: { trainer: Trainer; nodes: TrainerPage["no
       {error && <p className="text-sm text-red-500">{error}</p>}
       <ul className="space-y-2">
         {nodes.map((n) => {
-          const misfit =
-            n.missing
-              ? "node deleted"
-              : n.hero_seat !== trainer.hero_seat || n.villain_seat !== trainer.villain_seat
-                ? `node is ${n.hero_seat} vs ${n.villain_seat} — skipped`
-                : null;
+          const misfit = n.missing ? "node deleted" : null;
           return (
             <li key={n.node_id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2">
               <div className="min-w-0 flex-1 space-y-1">
@@ -92,7 +87,12 @@ function NodeList({ trainer, nodes }: { trainer: Trainer; nodes: TrainerPage["no
                 </div>
                 <p className="text-xs text-muted">
                   {STREET_LABELS[n.street]} ·{" "}
-                  {n.line.length > 0 ? n.line.map((a) => `${a.seat} ${a.label.toLowerCase()}`).join(" · ") : "first to act"}
+                  {n.line.length > 0
+                    ? n.line
+                        .filter((a) => !a.street || a.street === n.street)
+                        .map((a) => `${a.seat} ${a.label.toLowerCase()}${a.amountBb != null && a.kind !== "call" ? ` (${fmtBb(a.amountBb)})` : ""}`)
+                        .join(" · ") || "first to act"
+                    : "first to act"}
                 </p>
                 {misfit && <p className="text-xs text-amber-600">{misfit}</p>}
               </div>
@@ -122,7 +122,7 @@ function NodeList({ trainer, nodes }: { trainer: Trainer; nodes: TrainerPage["no
         })}
       </ul>
       <p className="text-[11px] text-muted">
-        Boards and lines are re-read from the trees at the start of each session.
+        Hands start at these nodes. Boards, lines and pots are re-read from the trees at the start of each session.
       </p>
     </div>
   );
@@ -136,8 +136,8 @@ function Settings({ trainer }: { trainer: Trainer }) {
   const [name, setName] = useState(trainer.name);
   const [hero, setHero] = useState<Seat>(trainer.hero_seat);
   const [villain, setVillain] = useState<Seat>(trainer.villain_seat);
-  const [pot, setPot] = useState(String(trainer.pot_bb));
-  const [stack, setStack] = useState(String(trainer.stack_bb));
+  const [feedback, setFeedback] = useState<Feedback>(trainer.feedback);
+  const [stop, setStop] = useState(trainer.stop_at_street_end);
   const seatsChanged = hero !== trainer.hero_seat || villain !== trainer.villain_seat;
 
   const input =
@@ -156,8 +156,8 @@ function Settings({ trainer }: { trainer: Trainer }) {
             name,
             heroSeat: hero,
             villainSeat: villain,
-            potBb: Number(pot),
-            stackBb: Number(stack),
+            feedback,
+            stopAtStreetEnd: stop,
           });
           if (!r.ok) setError(r.error);
           else setSaved(true);
@@ -185,18 +185,11 @@ function Settings({ trainer }: { trainer: Trainer }) {
             ))}
           </select>
         </label>
-        <label className="block text-xs text-muted">
-          Pot at street start (bb)
-          <input type="number" step="0.1" min="0.1" value={pot} onChange={(e) => setPot(e.target.value)} className={input} />
-        </label>
-        <label className="block text-xs text-muted">
-          Stack behind (bb)
-          <input type="number" step="0.1" min="0.1" value={stack} onChange={(e) => setStack(e.target.value)} className={input} />
-        </label>
       </div>
+      <TrainerOptions feedback={feedback} stopAtStreetEnd={stop} onFeedback={setFeedback} onStop={setStop} />
       {seatsChanged && (
         <p className="text-[11px] text-amber-600">
-          Nodes that are not {hero} vs {villain} will be skipped until removed.
+          Entries from spots that are not {hero} vs {villain} will be skipped until removed.
         </p>
       )}
       {error && <p className="text-xs text-red-500">{error}</p>}

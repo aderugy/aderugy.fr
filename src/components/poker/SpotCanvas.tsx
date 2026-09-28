@@ -10,6 +10,7 @@ import {
   deleteNode as deleteNodeAction,
   saveStrategy,
   updateNode,
+  updateSpotSetup,
 } from "@/server/actions/solver";
 import { CsvImportError, parseStrategyCsv } from "@/lib/solver/csvImport";
 import {
@@ -19,14 +20,24 @@ import {
   asStreet,
   emptyWeights,
   NODE_LABELS,
+  setupProblem,
   type NodeData,
   type NodeType,
   type PokerNode,
+  type SpotSetup,
   type StrategyAction,
-  type StrategyData,
   type StrategyWeights,
 } from "@/lib/solver/types";
-import { derivedPosition, isInPosition } from "@/lib/solver/seats";
+import {
+  childTypes as childTypesFor,
+  defaultOptions,
+  initialState,
+  walkTree,
+  type HandState,
+  type NodeState,
+} from "@/lib/solver/gameState";
+import type { Seat } from "@/lib/solver/seats";
+import { RootCard, RootInspector, ROOT_ID } from "@/components/poker/SpotRoot";
 import type { ImportResult } from "@/components/poker/NodeInspector";
 import { MiniNodeCard, NodeCard, type CanvasMode } from "@/components/poker/NodeCard";
 import { NotesView } from "@/components/poker/NodeNotes";
@@ -37,22 +48,15 @@ import { Segmented } from "@/components/poker/ui";
 
 const NODE_SELECT = "id, spot_id, parent_id, type, position, data, created_at, updated_at";
 
-/** Child types offered under each node type (permissive but guided). */
-const CHILD_SUGGESTIONS: Record<NodeType, NodeType[]> = {
-  text: ["flop", "strategy", "action", "turn", "river", "text"],
-  flop: ["strategy", "text"],
-  turn: ["strategy", "text"],
-  river: ["strategy", "text"],
-  strategy: ["action", "text"],
-  action: ["turn", "river", "strategy", "text"],
-};
-
 export function SpotCanvas({
   spotId,
+  initialSetup,
   initialNodes,
   focusPath,
 }: {
   spotId: string;
+  /** The root of the tree: who plays, where it starts, pot and stacks. */
+  initialSetup: SpotSetup;
   initialNodes: PokerNode[];
   /** Ids root → node to open on load (links from a trainer). */
   focusPath?: string[];
@@ -73,6 +77,15 @@ export function SpotCanvas({
   // Cache of strategy grids, loaded on demand for revision-mode previews.
   const [strategyWeights, setStrategyWeights] = useState<Record<string, StrategyWeights>>({});
   const [reviewNodeId, setReviewNodeId] = useState<string | null>(null);
+  const [setup, setSetup] = useState<SpotSetup>(initialSetup);
+
+  function saveSetup(next: SpotSetup) {
+    setSetup(next);
+    startTransition(async () => {
+      const r = await updateSpotSetup({ id: spotId, setup: next });
+      if (!r.ok) setError(r.error);
+    });
+  }
 
   function switchMode(next: CanvasMode) {
     setMode(next);
@@ -260,7 +273,18 @@ export function SpotCanvas({
   }, []);
   useEffect(() => () => observerRef.current?.disconnect(), []);
 
-  const layout = useMemo(() => layoutTree(visible, sizes), [visible, sizes]);
+  // The root card sits above the top-level nodes, which hang from it.
+  const layout = useMemo(
+    () =>
+      layoutTree(
+        [
+          { id: ROOT_ID, parent_id: null, position: 0, created_at: "" },
+          ...visible.map((n) => (n.parent_id ? n : { ...n, parent_id: ROOT_ID })),
+        ],
+        sizes,
+      ),
+    [visible, sizes],
+  );
 
   // Load the grid of every visible strategy node: revision-mode bubbles
   // preview it and action nodes show their global frequency from it. Empties
@@ -302,6 +326,41 @@ export function SpotCanvas({
     return out;
   }, [visible, strategyWeights, nodesById]);
 
+  /* ------------------------------------------------------------ hand state */
+
+  // The hand at every loaded node, walked from the setup. Null while the
+  // setup can't start a hand (seats or pot missing).
+  const setupReady = setupProblem(setup) === null;
+  const rootState: HandState | null = useMemo(
+    () => (setupReady ? initialState(setup as SpotSetup & { players: [Seat, Seat] }) : null),
+    [setup, setupReady],
+  );
+  const nodeStates: Map<string, NodeState> = useMemo(() => {
+    if (!setupReady) return new Map();
+    return walkTree(setup as SpotSetup & { players: [Seat, Seat] }, (id) =>
+      [...(childrenOf.get(id) ?? [])].sort((a, b) => a.position - b.position),
+    );
+  }, [setup, setupReady, childrenOf]);
+
+  /** What "+" offers under a node (or under the root). */
+  function childTypesOf(node: PokerNode | null): NodeType[] {
+    if (!rootState) return [];
+    return childTypesFor(node, node ? (nodeStates.get(node.id) ?? null) : null, rootState);
+  }
+
+  function childLabel(parent: PokerNode | null) {
+    return (type: NodeType) => {
+      if (type !== "strategy") return NODE_LABELS[type];
+      const s = parent ? nodeStates.get(parent.id)?.state : rootState;
+      return s?.toAct ? `Decision (${s.toAct})` : NODE_LABELS[type];
+    };
+  }
+
+  /** Decision nodes: ids of the options that already have a branch. */
+  function developedOf(node: PokerNode): Set<string> {
+    return linkedActionIds(node.id);
+  }
+
   /** The global frequency of the strategy action an action node represents. */
   function actionFrequency(node: PokerNode): number | null {
     if (node.type !== "action" || !node.parent_id) return null;
@@ -342,11 +401,9 @@ export function SpotCanvas({
     });
   }
 
-  async function addChild(parent: PokerNode | null, type: NodeType) {
-    const data = defaultData(type, parent);
-    if (type === "strategy" && parent) {
-      Object.assign(data, prefillSeats(pathTo(nodesById, parent.id)));
-    }
+  async function addChild(parent: PokerNode | null, type: NodeType, optionId?: string) {
+    const before = parent ? (nodeStates.get(parent.id)?.state ?? null) : rootState;
+    const data = defaultData(type, parent, before, optionId ?? firstUndeveloped(parent));
     const parentId = parent?.id ?? null;
     const r = await createNode({ spotId, parentId, type, data });
     if (!r.ok) {
@@ -460,9 +517,17 @@ export function SpotCanvas({
         d.label !== a.label ||
         d.color !== a.color ||
         d.kind !== a.kind ||
-        (d.sizePct ?? null) !== (a.sizePct ?? null)
+        (d.sizePct ?? null) !== (a.sizePct ?? null) ||
+        (d.sizeUnit ?? null) !== (a.sizeUnit ?? null)
       ) {
-        persistData(kid.id, { ...d, kind: a.kind, sizePct: a.sizePct ?? null, label: a.label, color: a.color });
+        persistData(kid.id, {
+          ...d,
+          kind: a.kind,
+          sizePct: a.sizePct ?? null,
+          sizeUnit: a.sizeUnit ?? null,
+          label: a.label,
+          color: a.color,
+        });
       }
     }
   }
@@ -488,6 +553,13 @@ export function SpotCanvas({
       const r = await deleteNodeAction(id);
       if (!r.ok) setError(r.error);
     });
+  }
+
+  /** The first option of a decision that has no branch yet. */
+  function firstUndeveloped(parent: PokerNode | null): string | undefined {
+    if (!parent || parent.type !== "strategy") return undefined;
+    const linked = linkedActionIds(parent.id);
+    return asStrategy(parent).actions.find((a) => !linked.has(a.id))?.id;
   }
 
   /** Strategy action ids that have a linked action node under `strategyId`. */
@@ -588,8 +660,14 @@ export function SpotCanvas({
         continue;
       }
       linked.add(a.id);
-      if (d.label !== a.label || d.color !== a.color || d.kind !== a.kind || (d.sizePct ?? null) !== (a.sizePct ?? null)) {
-        persistData(kid.id, { ...d, kind: a.kind, sizePct: a.sizePct ?? null, label: a.label, color: a.color });
+      if (
+        d.label !== a.label ||
+        d.color !== a.color ||
+        d.kind !== a.kind ||
+        (d.sizePct ?? null) !== (a.sizePct ?? null) ||
+        (d.sizeUnit ?? null) !== (a.sizeUnit ?? null)
+      ) {
+        persistData(kid.id, { ...d, kind: a.kind, sizePct: a.sizePct ?? null, sizeUnit: a.sizeUnit ?? null, label: a.label, color: a.color });
       }
     }
 
@@ -609,6 +687,7 @@ export function SpotCanvas({
         strategyActionId: a.id,
         kind: a.kind,
         sizePct: a.sizePct ?? null,
+        sizeUnit: a.sizeUnit ?? null,
         label: a.label,
         color: a.color,
       };
@@ -720,9 +799,9 @@ export function SpotCanvas({
     });
   }
 
-  const selected = selectedId ? nodesById[selectedId] : null;
+  const selected = selectedId && selectedId !== ROOT_ID ? nodesById[selectedId] : null;
   const selectedParent = selected?.parent_id ? nodesById[selected.parent_id] ?? null : null;
-  const reviewNode = reviewNodeId ? (nodesById[reviewNodeId] ?? null) : null;
+  const reviewNode = reviewNodeId && reviewNodeId !== ROOT_ID ? (nodesById[reviewNodeId] ?? null) : null;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -732,22 +811,6 @@ export function SpotCanvas({
           <button className="ml-2 underline" onClick={() => setError(null)}>
             dismiss
           </button>
-        </div>
-      )}
-
-      {/* Root toolbar (adding nodes only makes sense while editing) */}
-      {mode === "edit" && (
-        <div className="absolute left-2 top-2 z-20 flex flex-wrap gap-1">
-          {(["flop", "strategy", "text"] as NodeType[]).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => void addChild(null, type)}
-              className="rounded border border-line bg-surface px-2 py-1 text-xs text-muted shadow-sm hover:border-accent"
-            >
-              ＋ {NODE_LABELS[type]}
-            </button>
-          ))}
         </div>
       )}
 
@@ -809,6 +872,22 @@ export function SpotCanvas({
             })}
           </svg>
 
+          {layout.positions.get(ROOT_ID) && (
+            <MeasuredNode
+              key={ROOT_ID}
+              nodeId={ROOT_ID}
+              x={layout.positions.get(ROOT_ID)!.x}
+              y={layout.positions.get(ROOT_ID)!.y}
+              observer={getObserver}
+            >
+              <RootCard
+                setup={setup}
+                selected={selectedId === ROOT_ID || reviewNodeId === ROOT_ID}
+                onSelect={() => (mode === "revision" ? setReviewNodeId(ROOT_ID) : setSelectedId(ROOT_ID))}
+              />
+            </MeasuredNode>
+          )}
+
           {visible.map((node) => {
             const pos = layout.positions.get(node.id);
             if (!pos) return null;
@@ -836,6 +915,13 @@ export function SpotCanvas({
                   dead={node.type === "strategy" ? deadCardsFor(node.id) : undefined}
                   frequency={actionFrequency(node)}
                   trainerCount={trainerCounts[node.id] ?? 0}
+                  ns={setupReady ? (nodeStates.get(node.id) ?? null) : null}
+                  developed={
+                    node.type === "strategy" && (loaded.has(node.id) || !withChildren.has(node.id))
+                      ? developedOf(node)
+                      : undefined
+                  }
+                  onDevelop={(actionId) => void addChild(node, "action", actionId)}
                   onSelect={() => handleSelect(node)}
                   onToggle={() => toggle(node.id)}
                 />
@@ -848,10 +934,24 @@ export function SpotCanvas({
 
       {visible.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <p className="text-sm text-muted">
-            Empty spot — add a root node from the top-left toolbar.
+          <p className="mt-40 text-sm text-muted">
+            {setupReady
+              ? "Select the start card to add the first node."
+              : "Select the start card: set who plays and where the tree starts."}
           </p>
         </div>
+      )}
+
+      {/* Root inspector (edit mode) */}
+      {mode === "edit" && selectedId === ROOT_ID && (
+        <RootInspector
+          setup={setup}
+          childTypes={childTypesOf(null)}
+          childLabel={childLabel(null)}
+          onChange={saveSetup}
+          onAddChild={(type) => void addChild(null, type)}
+          onClose={() => setSelectedId(null)}
+        />
       )}
 
       {/* Inspector (edit mode) */}
@@ -859,10 +959,19 @@ export function SpotCanvas({
         <NodeInspector
           key={selected.id}
           node={selected}
-          path={pathTo(nodesById, selected.id)}
           parent={selectedParent}
           dead={deadCardsFor(selected.id)}
-          childSuggestions={CHILD_SUGGESTIONS[selected.type]}
+          ns={setupReady ? (nodeStates.get(selected.id) ?? null) : null}
+          before={
+            setupReady
+              ? selectedParent
+                ? (nodeStates.get(selectedParent.id)?.state ?? null)
+                : rootState
+              : null
+          }
+          setup={setup}
+          childTypes={childTypesOf(selected)}
+          childLabel={childLabel(selected)}
           onPatch={(data) => persistData(selected.id, data)}
           onAddChild={(type) => void addChild(selected, type)}
           onDelete={() => removeNode(selected.id)}
@@ -883,6 +992,21 @@ export function SpotCanvas({
           footer={<NotesView node={reviewNode} />}
           onClose={() => setReviewNodeId(null)}
         />
+      )}
+
+      {/* Root notes (revision mode) */}
+      {mode === "revision" && reviewNodeId === ROOT_ID && (
+        <aside className="absolute right-0 top-0 z-20 flex h-full w-[26rem] max-w-full flex-col border-l border-line bg-surface shadow-xl">
+          <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Start of the hand</span>
+            <button type="button" onClick={() => setReviewNodeId(null)} className="ml-auto text-xs text-muted hover:text-foreground">
+              Close
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <NotesView node={{ id: ROOT_ID, data: { summary: setup.summary, notes: setup.notes } } as unknown as PokerNode} />
+          </div>
+        </aside>
       )}
 
       {/* Notes drawer for any other node (revision mode) */}
@@ -971,41 +1095,6 @@ function MeasuredNode({
   );
 }
 
-/** Root → node, following parent_id through the loaded nodes. */
-function pathTo(nodesById: Record<string, PokerNode>, nodeId: string): PokerNode[] {
-  const out: PokerNode[] = [];
-  let cur: string | null = nodeId;
-  const seen = new Set<string>();
-  while (cur && nodesById[cur] && !seen.has(cur)) {
-    seen.add(cur);
-    out.push(nodesById[cur]);
-    cur = nodesById[cur].parent_id;
-  }
-  return out.reverse();
-}
-
-/**
- * Seats for a new strategy node under `path` (root → its parent). The next
- * decision is usually the opponent's, so the nearest seated strategy above is
- * swapped — unless a new street was dealt since, where the out-of-position
- * player acts first whoever acted last.
- */
-function prefillSeats(path: PokerNode[]): Partial<StrategyData> {
-  let newStreet = false;
-  for (let i = path.length - 1; i >= 0; i--) {
-    const n = path[i];
-    if (n.type === "flop" || n.type === "turn" || n.type === "river") newStreet = true;
-    if (n.type !== "strategy") continue;
-    const { seat, vsSeat } = asStrategy(n);
-    if (!seat || !vsSeat) continue;
-    const [next, other] = newStreet
-      ? isInPosition(seat, vsSeat) ? [vsSeat, seat] : [seat, vsSeat]
-      : [vsSeat, seat];
-    return { seat: next, vsSeat: other, position: derivedPosition(next, other) };
-  }
-  return {};
-}
-
 /** Board cards dealt above a node (its flop / turn / river ancestors). */
 function deadCardsIn(nodesById: Record<string, PokerNode>, nodeId: string): Set<string> {
   const dead = new Set<string>();
@@ -1030,33 +1119,39 @@ function normalizeWeights(raw: unknown): StrategyWeights {
   return { hands: w.hands ?? {}, combos: w.combos ?? {} };
 }
 
-function defaultData(type: NodeType, parent: PokerNode | null): NodeData {
+function defaultData(
+  type: NodeType,
+  parent: PokerNode | null,
+  before: HandState | null,
+  optionId: string | undefined,
+): NodeData {
   switch (type) {
-    case "text":
-      return { title: "Note", body: "" };
     case "flop":
       return { cards: [] };
     case "turn":
     case "river":
       return { card: null };
-    case "strategy":
+    case "strategy": {
+      // The options a player usually has here; a CSV import replaces them.
+      const options = before ? defaultOptions(before) : [];
       return {
-        position: null,
-        actions: recolorActions([
-          { id: crypto.randomUUID(), kind: "check", label: "Check", color: "" },
-          { id: crypto.randomUUID(), kind: "bet", sizePct: 75, label: "Bet 75%", color: "" },
-        ]),
+        actions: recolorActions(
+          options.map((o) => ({ id: crypto.randomUUID(), kind: o.kind, sizePct: o.sizePct, sizeUnit: o.sizeUnit ?? null, label: o.label, color: "" })),
+        ),
       };
+    }
     case "action": {
       if (parent && parent.type === "strategy") {
-        const first = asStrategy(parent).actions[0];
-        if (first) {
+        const actions = asStrategy(parent).actions;
+        const a = actions.find((x) => x.id === optionId) ?? actions[0];
+        if (a) {
           return {
-            strategyActionId: first.id,
-            kind: first.kind,
-            sizePct: first.sizePct ?? null,
-            label: first.label,
-            color: first.color,
+            strategyActionId: a.id,
+            kind: a.kind,
+            sizePct: a.sizePct ?? null,
+            sizeUnit: a.sizeUnit ?? null,
+            label: a.label,
+            color: a.color,
           };
         }
       }

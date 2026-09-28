@@ -20,9 +20,9 @@ export default async function TrainersPage() {
     <main className="mx-auto h-full w-full max-w-3xl overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-lg font-semibold tracking-tight">Trainers</h1>
       <p className="mt-1 text-sm text-muted">
-        A trainer drills strategy nodes from your Solver notes at one matchup. Add nodes from a
-        strategy node&apos;s inspector (“Add to trainer…”); each hand is scored against the solver in
-        RNG mode.
+        A trainer plays hands through your Solver notes trees at one matchup. Pick where hands start
+        with “Train from here…” on any node; each hand is played down the tree until it ends, and every
+        decision is scored against the solver in RNG mode.
       </p>
       <div className="mt-6">
         <TrainerList trainers={trainers} />
