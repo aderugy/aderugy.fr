@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Segmented } from "@/components/poker/ui";
 import { globalFrequencies } from "@/lib/solver/strategy";
 import {
   effectiveStack,
@@ -27,21 +28,53 @@ import {
   asAction,
   asFlop,
   asMeta,
+  asPio,
   asStrategy,
   asStreet,
   NODE_LABELS,
   STREET_LABELS,
+  type NodeMeta,
+  type NodeType,
   type PokerNode,
   type SpotSetup,
   type StrategyAction,
+  type StrategyStats,
   type StrategyWeights,
 } from "@/lib/solver/types";
+import type { Seat } from "@/lib/solver/seats";
 import { ROOT_ID, setupLine } from "@/components/poker/SpotRoot";
-import { formatFrequency, terminalText } from "@/components/poker/NodeCard";
+import { formatFrequency, terminalText } from "@/components/poker/format";
 import { StrategyDetail } from "@/components/poker/StrategyReview";
 import { StrategyGrid } from "@/components/poker/StrategyGrid";
+import { StatsDetail, rangeTotal, type StatsMode } from "@/components/poker/StatsGrid";
 import { BoardCards } from "@/components/poker/trainer/Cards";
 import { Markdown } from "@/components/poker/Markdown";
+import { NodeNotes } from "@/components/poker/NodeNotes";
+
+/** What the study layout can change, supplied by SpotView. */
+export type StudyEditing = {
+  /** Open a node's tools (the drawer); ROOT_ID opens the setup. */
+  editNode: (id: string) => void;
+  saveNotes: (id: string, patch: NodeMeta) => void;
+  /** Add the action node of an option (and on a solver line, what follows). */
+  develop: (decisionId: string, optionId: string) => void;
+  addChild: (parentId: string, type: NodeType) => void | Promise<void>;
+  childTypes: (id: string) => NodeType[];
+  childLabel: (id: string, type: NodeType) => string;
+  pasteCsv: (id: string) => void | Promise<void>;
+  pio: {
+    /** A save is linked on this node's line. */
+    linkedAbove: (id: string) => boolean;
+    importDecision: (id: string) => void;
+    continueFrom: (id: string) => void;
+    addFlop: () => void;
+    busy: boolean;
+  };
+  /** Solver stats by decision id; undefined = not loaded, null = none. */
+  stats: Record<string, StrategyStats | null>;
+  requestStats: (id: string) => void;
+  seats: { OOP: Seat; IP: Seat } | null;
+};
 
 /**
  * Where the last move came from, for the enter animation. The map reads left
@@ -70,7 +103,8 @@ export function SpotStudy({
   deadCards,
   focusId,
   onFocus,
-  toolbar,
+  header,
+  editing,
 }: {
   setup: SpotSetup;
   /** Every node of the spot (study mode loads the whole tree). */
@@ -84,8 +118,9 @@ export function SpotStudy({
   deadCards: (id: string) => Set<string>;
   focusId: string | null;
   onFocus: (id: string) => void;
-  /** Rendered at the end of the navigation bar (the mode switch). */
-  toolbar?: ReactNode;
+  /** Left of the navigation bar: back to the spots, the spot's name. */
+  header?: ReactNode;
+  editing: StudyEditing;
 }) {
   const tree = useMemo(() => studyTree(nodes, ROOT_ID), [nodes]);
   const focus = resolveStop(tree, focusId);
@@ -202,18 +237,21 @@ export function SpotStudy({
   /* ---------------------------------------------------------------- views */
 
   const ns = focus === ROOT_ID ? null : (nodeStates.get(focus) ?? null);
+  const focusNode = focus === ROOT_ID ? null : (tree.node(focus) ?? null);
   const state = focus === ROOT_ID ? rootState : (ns?.state ?? null);
-  const ctx: Ctx = { tree, nodeStates, weights, freqs, deadCards };
+  const ctx: Ctx = { tree, nodeStates, weights, freqs, deadCards, editing };
   const prevSib = siblingStop(tree, focus, -1);
   const nextSib = siblingStop(tree, focus, 1);
 
   return (
     <div className="flex h-full flex-col">
-      {/* Breadcrumb + navigation */}
-      <div className="shrink-0 border-b border-line bg-surface/60 px-3 py-2 sm:px-4">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* One bar: the spot, the line, the moves; the hand's state under it. */}
+      <div className="shrink-0 border-b border-line bg-surface/60 px-3 py-1.5 sm:px-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {header && <div className="flex min-w-0 max-w-full shrink-0 items-center sm:max-w-[40%]">{header}</div>}
+          {header && <span className="hidden h-4 w-px bg-line sm:block" />}
           <Breadcrumb ctx={ctx} setup={setup} focus={focus} onGo={(id) => go(id, "up")} />
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-1">
             <NavButton label="Back to the node above (←)" disabled={!up} onClick={() => go(up, "up")}>
               <Chevron dir="left" />
             </NavButton>
@@ -226,10 +264,9 @@ export function SpotStudy({
             <NavButton label="Go down the tree (→)" disabled={!firstNext} onClick={() => go(firstNext, "down")}>
               <Chevron dir="right" />
             </NavButton>
-            {toolbar && <span className="ml-1">{toolbar}</span>}
           </div>
         </div>
-        {state && <StateSummary state={state} ns={ns} kind={kind} />}
+        {state && <StateSummary state={state} ns={ns} kind={kind} pio={focusNode ? asPio(focusNode) : null} />}
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
@@ -238,7 +275,7 @@ export function SpotStudy({
         ) : (
           <div
             key={focus}
-            className={`study-enter study-enter-${motion} mx-auto grid max-w-[1560px] grid-cols-1 gap-5 p-3 sm:p-5 lg:grid-cols-[minmax(180px,230px)_minmax(0,1fr)_minmax(300px,390px)] lg:gap-6`}
+            className={`study-enter study-enter-${motion} mx-auto grid max-w-[1560px] grid-cols-1 gap-4 p-3 sm:p-4 lg:grid-cols-[minmax(180px,230px)_minmax(0,1fr)_minmax(300px,390px)] lg:gap-5`}
           >
             {/* ← Where you came from and the alternatives to here */}
             <aside className="study-col-from hidden lg:block">
@@ -319,6 +356,7 @@ type Ctx = {
   weights: Record<string, StrategyWeights>;
   freqs: Map<string, number[] | null>;
   deadCards: (id: string) => Set<string>;
+  editing: StudyEditing;
 };
 
 function actorOf(ctx: Ctx, id: string): string {
@@ -432,18 +470,40 @@ function Breadcrumb({
   );
 }
 
-function StateSummary({ state, ns, kind }: { state: HandState; ns: NodeState | null; kind: string }) {
-  if (ns?.error) return <p className="mt-1 text-[11px] text-red-500">⚠ {ns.error}</p>;
+function StateSummary({
+  state,
+  ns,
+  kind,
+  pio,
+}: {
+  state: HandState;
+  ns: NodeState | null;
+  kind: string;
+  pio: ReturnType<typeof asPio>;
+}) {
+  if (ns?.error) return <p className="mt-0.5 text-[11px] text-red-500">⚠ {ns.error}</p>;
   const call = ns?.actor ? toCall(state, ns.actor) : 0;
+  const pot = totalPot(state);
+  const eff = effectiveStack(state);
+  // The solver's numbers at an imported decision; flagged when the tree's differ.
+  const off = pio?.potBb != null && pio.stackBb != null && (Math.abs(pio.potBb - pot) > 0.06 || Math.abs(pio.stackBb - eff) > 0.06);
   return (
-    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] tabular-nums text-muted">
+    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] tabular-nums text-muted">
       <span className="font-medium text-foreground">{STREET_LABELS[state.street]}</span>
       {state.board.length > 0 && <BoardCards cards={state.board} size="xs" />}
-      <span>Pot {fmtBb(totalPot(state))}</span>
-      <span>Eff. {fmtBb(effectiveStack(state))}</span>
+      <span>Pot {fmtBb(pot)}</span>
+      <span>Eff. {fmtBb(eff)}</span>
       {kind === "decision" && ns?.actor && (
         <span>
           <b className="text-foreground">{ns.actor}</b> to act{call > 0 ? ` · ${fmtBb(call)} to call` : ""}
+        </span>
+      )}
+      {pio?.potBb != null && (
+        <span
+          title={`${pio.file} · ${pio.id}`}
+          className={off ? "rounded bg-amber-500/15 px-1 text-amber-700 dark:text-amber-400" : "text-muted/80"}
+        >
+          Pio{off ? `: pot ${fmtBb(pio.potBb)} · eff. ${fmtBb(pio.stackBb ?? 0)}` : " ✓"}
         </span>
       )}
       {ns?.overridden && <span className="rounded bg-amber-500/15 px-1 text-amber-700 dark:text-amber-400">manual</span>}
@@ -602,42 +662,125 @@ function FocusPanel({
   onIsolate: (i: number | null) => void;
   onGo: (id: string) => void;
 }) {
+  const ed = ctx.editing;
+  const isRoot = focus === ROOT_ID;
   const node = ctx.tree.node(focus);
-  const meta = focus === ROOT_ID ? { summary: setup.summary ?? "", notes: setup.notes ?? "" } : node ? asMeta(node) : null;
+  const meta = isRoot ? { summary: setup.summary ?? "", notes: setup.notes ?? "" } : node ? asMeta(node) : null;
   const ns = ctx.nodeStates.get(focus);
+  // The panel remounts on every move (keyed by the focus), so this resets.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const terminal = ns?.state.terminal ?? null;
+  const linked = ed.pio.linkedAbove(focus);
+  const addable = kind === "decision" || terminal ? [] : ed.childTypes(focus);
+  const nextStreet = ns?.state.status === "deal" ? ns.state.nextStreet : null;
+  const notesNode = isRoot
+    ? ({ id: ROOT_ID, data: { summary: setup.summary ?? "", notes: setup.notes ?? "" } } as unknown as PokerNode)
+    : node;
 
   return (
-    <div className="rounded-xl border border-line bg-surface p-3 shadow-sm sm:p-5">
-      <ColumnLabel>{focus === ROOT_ID ? "Start" : node ? NODE_LABELS[node.type] : ""}</ColumnLabel>
-      <h2 className="text-lg font-semibold leading-tight">{stopTitle(ctx, setup, focus)}</h2>
-      {focus === ROOT_ID && <p className="mt-0.5 text-sm tabular-nums text-muted">{setupLine(setup)}</p>}
-      {meta?.summary && <p className="mt-1 whitespace-pre-line text-sm text-muted">{meta.summary}</p>}
+    <div className="rounded-xl border border-line bg-surface p-3 shadow-sm sm:p-4">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold leading-tight">
+            <span className="shrink-0 rounded bg-foreground/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+              {isRoot ? "Start" : node ? NODE_LABELS[node.type] : ""}
+            </span>
+            <span className="min-w-0 truncate">{stopTitle(ctx, setup, focus)}</span>
+          </h2>
+          {isRoot && <p className="mt-0.5 text-xs tabular-nums text-muted">{setupLine(setup)}</p>}
+          {meta?.summary && !notesOpen && <p className="mt-1 whitespace-pre-line text-sm text-muted">{meta.summary}</p>}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {kind === "decision" && linked && (
+            <Tool primary disabled={ed.pio.busy} onClick={() => ed.pio.importDecision(focus)} title="Strategy, both players' equity, EV, pot and stacks from the save">
+              Import from Pio
+            </Tool>
+          )}
+          {kind === "decision" && (
+            <Tool onClick={() => void ed.pasteCsv(focus)} title="Import a CSV from the clipboard (or press Ctrl+V)">
+              Paste CSV
+            </Tool>
+          )}
+          {isRoot && (
+            <Tool primary disabled={ed.pio.busy} onClick={ed.pio.addFlop} title="Pick a .cfr: the flop, the spot's start and the first decision">
+              Add flop from Pio
+            </Tool>
+          )}
+          {!isRoot && kind !== "decision" && !terminal && linked && (
+            <Tool primary disabled={ed.pio.busy} onClick={() => ed.pio.continueFrom(focus)}>
+              {nextStreet === "turn" || nextStreet === "river" ? `Add ${nextStreet} cards from Pio` : "Continue from Pio"}
+            </Tool>
+          )}
+          {addable.map((type) => (
+            <Tool key={type} onClick={() => void ed.addChild(focus, type)}>
+              ＋ {ed.childLabel(focus, type)}
+            </Tool>
+          ))}
+          <Tool onClick={() => setNotesOpen((v) => !v)}>{notesOpen ? "Done" : meta?.notes.trim() || meta?.summary ? "Edit notes" : "Add notes"}</Tool>
+          <Tool onClick={() => ed.editNode(focus)} title={isRoot ? "Players, start, pot and stacks" : "Cards, options, grid, trainer, delete…"}>
+            {isRoot ? "Setup" : "✎ Edit"}
+          </Tool>
+        </div>
+      </div>
 
-      <div className="mt-4">
-        {kind === "decision" && node && (
-          <DecisionBody ctx={ctx} node={node} isolate={isolate} onIsolate={onIsolate} />
-        )}
+      <div className="mt-3">
+        {kind === "decision" && node && <DecisionBody ctx={ctx} node={node} isolate={isolate} onIsolate={onIsolate} />}
         {kind === "branches" && <BranchesOverview ctx={ctx} nexts={nexts} onGo={onGo} />}
         {kind === "leaf" && (
           <p className="rounded-md bg-foreground/5 px-3 py-2 text-sm font-medium tabular-nums">
-            {ns?.state.terminal ? `■ ${terminalText(ns.state.terminal)}` : "Nothing below — this branch isn't developed yet."}
+            {terminal ? `■ ${terminalText(terminal)}` : "Nothing below yet."}
           </p>
         )}
         {kind === "root" && nexts.length === 0 && (
-          <p className="text-sm text-muted">This tree is empty. Switch to Edit to build it.</p>
+          <p className="text-sm text-muted">This tree is empty: add a flop from a PioSOLVER save, or by hand.</p>
         )}
       </div>
 
-      {meta?.notes.trim() && (
-        <div className="mt-5 border-t border-line pt-4">
+      {notesOpen && notesNode ? (
+        <div className="mt-4">
+          <NodeNotes key={`notes-${focus}`} node={notesNode} startWriting onPatch={(patch) => ed.saveNotes(focus, patch)} />
+        </div>
+      ) : meta?.notes.trim() ? (
+        <div className="mt-4 border-t border-line pt-3">
           <Markdown source={meta.notes} />
         </div>
-      )}
+      ) : null}
 
       <AlongTheWay ctx={ctx} setup={setup} incoming={incoming} />
     </div>
   );
 }
+
+function Tool({
+  children,
+  onClick,
+  primary,
+  disabled,
+  title,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  primary?: boolean;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={[
+        "rounded-md px-2 py-1 text-xs transition-colors disabled:opacity-50",
+        primary ? "bg-accent text-white hover:bg-accent/90" : "border border-line text-muted hover:border-accent hover:text-foreground",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
+type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev";
 
 function DecisionBody({
   ctx,
@@ -653,6 +796,13 @@ function DecisionBody({
   const actions = asStrategy(node).actions;
   const w = ctx.weights[node.id];
   const f = ctx.freqs.get(node.id);
+  const { requestStats } = ctx.editing;
+  useEffect(() => {
+    requestStats(node.id);
+  }, [node.id, requestStats]);
+  const stats = ctx.editing.stats[node.id] ?? null;
+  const [mode, setMode] = useState<GridMode>("strategy");
+
   if (w === undefined) {
     return <div className="aspect-square w-full max-w-[560px] animate-pulse rounded-lg bg-foreground/5" />;
   }
@@ -670,16 +820,43 @@ function DecisionBody({
       </div>
     );
   }
+
+  const seats = stats?.seats ?? ctx.editing.seats;
+  const name = (p: "OOP" | "IP") => seats?.[p] ?? p;
+  const tabs: { id: GridMode; label: string }[] = [{ id: "strategy", label: "Strategy" }];
+  if (stats?.players.OOP) tabs.push({ id: "eq-OOP", label: `Equity ${name("OOP")}` });
+  if (stats?.players.IP) tabs.push({ id: "eq-IP", label: `Equity ${name("IP")}` });
+  if (stats?.ev) tabs.push({ id: "ev", label: `EV ${name(stats.actor)}` });
+  const statsMode: StatsMode | null =
+    mode === "eq-OOP" ? { kind: "equity", player: "OOP" } : mode === "eq-IP" ? { kind: "equity", player: "IP" } : mode === "ev" ? { kind: "ev" } : null;
+
   return (
     <div className="max-w-[560px]">
-      <StrategyDetail
-        actions={actions}
-        weights={w}
-        dead={ctx.deadCards(node.id)}
-        frequencies={f}
-        isolate={isolate}
-        onIsolate={onIsolate}
-      />
+      {stats && (
+        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <Segmented size="sm" value={mode} onChange={setMode} options={tabs} />
+          <span className="text-[11px] tabular-nums text-muted">
+            {(["OOP", "IP"] as const)
+              .filter((p) => stats.players[p])
+              .map((p) => `${name(p)} ${rangeTotal(stats, { kind: "equity", player: p })}`)
+              .join(" · ")}
+            {stats.ev?.total != null && ` · EV ${name(stats.actor)} ${rangeTotal(stats, { kind: "ev" })}`}
+          </span>
+        </div>
+      )}
+      {stats && statsMode ? (
+        <StatsDetail stats={stats} mode={statsMode} dead={ctx.deadCards(node.id)} />
+      ) : (
+        <StrategyDetail
+          actions={actions}
+          weights={w}
+          dead={ctx.deadCards(node.id)}
+          frequencies={f}
+          isolate={isolate}
+          onIsolate={onIsolate}
+          stats={stats}
+        />
+      )}
     </div>
   );
 }
@@ -760,24 +937,35 @@ function BranchesOverview({
   );
 }
 
-/** Notes of the nodes walked through to get here (the action taken, the card dealt). */
+/**
+ * The nodes walked through to get here (the action taken, the card dealt):
+ * their notes, and a way to edit them — they are never a stop of their own.
+ */
 function AlongTheWay({ ctx, setup, incoming }: { ctx: Ctx; setup: SpotSetup; incoming: StudyTarget | null }) {
-  const withNotes = (incoming?.folded ?? []).filter((n) => {
-    const m = asMeta(n);
-    return m.summary || m.notes.trim();
-  });
-  if (withNotes.length === 0) return null;
+  const folded = incoming?.folded ?? [];
+  if (folded.length === 0) return null;
   return (
-    <div className="mt-5 space-y-3 border-t border-line pt-4">
+    <div className="mt-4 space-y-2 border-t border-line pt-3">
       <ColumnLabel>On the way here</ColumnLabel>
-      {withNotes.map((n) => {
+      {folded.map((n) => {
         const m = asMeta(n);
+        const has = m.summary || m.notes.trim();
         return (
-          <div key={n.id} className="rounded-md bg-background p-3">
-            <p className="text-xs font-semibold">{stopTitle(ctx, setup, n.id)}</p>
+          <div key={n.id} className={has ? "rounded-md bg-background p-2.5" : "flex items-center"}>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold">{stopTitle(ctx, setup, n.id)}</p>
+              <button
+                type="button"
+                onClick={() => ctx.editing.editNode(n.id)}
+                className="text-[11px] text-muted hover:text-foreground"
+                title="Edit this node (notes, card, delete…)"
+              >
+                ✎
+              </button>
+            </div>
             {m.summary && <p className="mt-0.5 text-sm text-muted">{m.summary}</p>}
             {m.notes.trim() && (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <Markdown source={m.notes} />
               </div>
             )}
@@ -896,6 +1084,14 @@ function TargetCard({
       <div className="mt-2">
         {t.stop ? (
           <StopPreview ctx={ctx} stop={t.stop} />
+        ) : t.option ? (
+          <button
+            type="button"
+            onClick={() => ctx.editing.develop(from, t.option!.id)}
+            className="text-xs text-muted underline-offset-2 hover:text-foreground hover:underline"
+          >
+            ＋ Develop{ctx.editing.pio.linkedAbove(from) ? " from Pio" : ""}
+          </button>
         ) : (
           <p className="text-xs text-muted">Not developed</p>
         )}

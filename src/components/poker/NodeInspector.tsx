@@ -24,10 +24,11 @@ import {
   STREET_LABELS,
   type NodeData,
   type NodeType,
+  type PioLink,
   type PokerNode,
   type SpotSetup,
 } from "@/lib/solver/types";
-import { terminalText } from "@/components/poker/NodeCard";
+import { terminalText } from "@/components/poker/format";
 
 export type ImportResult =
   | { ok: true; message: string; warnings: string[] }
@@ -48,6 +49,8 @@ export function NodeInspector({
   onOpenStrategy,
   onImportCsv,
   onClose,
+  withNotes = true,
+  pio,
 }: {
   node: PokerNode;
   parent: PokerNode | null;
@@ -65,6 +68,10 @@ export function NodeInspector({
   onOpenStrategy: () => void;
   onImportCsv: (text: string) => Promise<ImportResult>;
   onClose: () => void;
+  /** The notes editor (off when the page shows it inline for this node). */
+  withNotes?: boolean;
+  /** Flop nodes: the PioSOLVER save the line below comes from. */
+  pio?: { link: PioLink | null; onLink: () => void };
 }) {
   return (
     <aside className="absolute right-0 top-0 z-20 flex h-full w-80 max-w-full flex-col border-l border-line bg-surface shadow-xl">
@@ -94,11 +101,25 @@ export function NodeInspector({
           onImportCsv={onImportCsv}
         />
 
+        {pio && (
+          <div className="rounded border border-line p-2 text-xs">
+            <p className="mb-1 font-medium text-muted">PioSOLVER save</p>
+            {pio.link ? (
+              <p className="break-all text-foreground">{pio.link.file}</p>
+            ) : (
+              <p className="text-muted">None: link one to import this flop&apos;s decisions from the solver.</p>
+            )}
+            <button type="button" onClick={pio.onLink} className="mt-1.5 rounded border border-line px-2 py-1 hover:border-accent">
+              {pio.link ? "Change…" : "Link a save…"}
+            </button>
+          </div>
+        )}
+
         {ns && !ns.error && <TrainFromHere node={node} setup={setup} ns={ns} />}
 
         {before && <OverrideField key={`override-${node.id}`} node={node} parent={parent} before={before} onPatch={onPatch} />}
 
-        <NodeNotes key={`notes-${node.id}`} node={node} onPatch={onPatch} />
+        {withNotes && <NodeNotes key={`notes-${node.id}`} node={node} onPatch={onPatch} />}
 
         <div>
           <p className="mb-1 text-xs font-medium text-muted">Add child</p>

@@ -16,7 +16,7 @@ type TrainerRow = Pick<Trainer, "id" | "name" | "hero_seat" | "villain_seat">;
 /**
  * "Train from here" on any node of Solver notes: hands of a trainer start at
  * this node and are played down the tree. The preview and the greyed-out
- * trainers come from the canvas' own walk; the server walks the tree again on
+ * trainers come from the spot page's own walk; the server walks the tree again on
  * add, and its answer is the one that counts.
  */
 export function TrainFromHere({ node, setup, ns }: { node: PokerNode; setup: SpotSetup; ns: NodeState }) {

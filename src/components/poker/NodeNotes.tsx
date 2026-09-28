@@ -7,22 +7,25 @@ import { Markdown } from "@/components/poker/Markdown";
 import { Segmented } from "@/components/poker/ui";
 
 /**
- * Summary + Markdown notes editor for any node, shown in the inspector.
- * The summary is a one-liner displayed on the canvas card; the notes are
+ * Summary + Markdown notes editor for any node (and the spot's start).
+ * The summary is a one-liner shown under the node's title; the notes are
  * free-form Markdown with a write/preview toggle and a full-screen editor.
  * Edits save on a short debounce and are flushed on unmount.
  */
 export function NodeNotes({
   node,
   onPatch,
+  startWriting,
 }: {
   node: PokerNode;
   onPatch: (patch: NodeMeta) => void;
+  /** Open on the editor even when there are notes (an explicit "Edit notes"). */
+  startWriting?: boolean;
 }) {
   const initial = asMeta(node);
   const [summary, setSummary] = useState(initial.summary);
   const [notes, setNotes] = useState(initial.notes);
-  const [tab, setTab] = useState<"write" | "preview">(initial.notes ? "preview" : "write");
+  const [tab, setTab] = useState<"write" | "preview">(initial.notes && !startWriting ? "preview" : "write");
   const [full, setFull] = useState(false);
 
   // Debounced save of whatever changed, flushed on unmount.
@@ -50,7 +53,7 @@ export function NodeNotes({
   return (
     <div className="space-y-3 border-t border-line pt-3">
       <label className="block text-xs text-muted">
-        Summary <span className="text-[10px]">(shown on the node)</span>
+        Summary <span className="text-[10px]">(shown under the title)</span>
         <textarea
           value={summary}
           rows={2}
@@ -181,7 +184,7 @@ function FullEditor({
   );
 }
 
-/** Read-only rendering of a node's summary and notes (revision mode). */
+/** Read-only rendering of a node's summary and notes. */
 export function NotesView({ node }: { node: PokerNode }) {
   const { summary, notes } = asMeta(node);
   if (!summary && !notes.trim()) {

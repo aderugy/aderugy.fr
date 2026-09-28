@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { NodeNotes } from "@/components/poker/NodeNotes";
 import { Segmented } from "@/components/poker/ui";
-import { NODE_W, NODE_H } from "@/lib/solver/layout";
 import { SEATS, isSeat, type Seat } from "@/lib/solver/seats";
 import { fmtBb } from "@/lib/solver/gameState";
 import {
@@ -16,7 +15,7 @@ import {
   type Street,
 } from "@/lib/solver/types";
 
-/** The id the canvas gives the spot's root card (it is not a stored node). */
+/** The id the study layout gives the spot's start (it is not a stored node). */
 export const ROOT_ID = "__root__";
 
 export function setupLine(setup: SpotSetup): string {
@@ -25,37 +24,6 @@ export function setupLine(setup: SpotSetup): string {
       ? `Preflop · ${fmtBb(setup.stackBb)} bb deep`
       : `${STREET_LABELS[setup.street]} · pot ${setup.potBb ? fmtBb(setup.potBb) : "?"} · ${fmtBb(setup.stackBb)} bb behind`;
   return start;
-}
-
-/** The root of the tree on the canvas: the setup every node's state starts from. */
-export function RootCard({
-  setup,
-  selected,
-  onSelect,
-}: {
-  setup: SpotSetup;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const problem = setupProblem(setup);
-  return (
-    <div
-      style={{ width: NODE_W, minHeight: NODE_H }}
-      onClick={onSelect}
-      className={[
-        "flex cursor-pointer flex-col rounded-lg border-2 bg-surface p-2.5 text-left shadow-sm transition-colors",
-        selected ? "border-accent ring-1 ring-accent" : "border-foreground/30 hover:border-accent",
-      ].join(" ")}
-    >
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">Start</span>
-      <p className="mt-1 text-sm font-medium">
-        {setup.players ? `${setup.players[0]} vs ${setup.players[1]}` : "Who plays?"}
-      </p>
-      <p className="text-[11px] tabular-nums text-muted">{setupLine(setup)}</p>
-      {setup.summary && <p className="mt-1.5 line-clamp-3 whitespace-pre-line text-xs text-muted">{setup.summary}</p>}
-      {problem && <p className="mt-1.5 text-[11px] text-amber-600">{problem}</p>}
-    </div>
-  );
 }
 
 /**
@@ -69,14 +37,20 @@ export function RootInspector({
   childLabel,
   onChange,
   onAddChild,
+  onAddFromPio,
   onClose,
+  withNotes = true,
 }: {
   setup: SpotSetup;
   childTypes: NodeType[];
   childLabel: (type: NodeType) => string;
   onChange: (setup: SpotSetup) => void;
   onAddChild: (type: NodeType) => void;
+  /** Add a flop from a PioSOLVER save (sets the start from it). */
+  onAddFromPio?: () => void;
   onClose: () => void;
+  /** The notes editor (off when the page edits them inline). */
+  withNotes?: boolean;
 }) {
   const [pot, setPot] = useState(setup.potBb ? String(setup.potBb) : "");
   const [stack, setStack] = useState(String(setup.stackBb));
@@ -176,16 +150,21 @@ export function RootInspector({
           </p>
         )}
 
-        <NodeNotes
+        {withNotes && <NodeNotes
           key="root-notes"
           node={notesNode}
           onPatch={(patch) => onChange({ ...setup, ...(patch.summary !== undefined ? { summary: patch.summary } : {}), ...(patch.notes !== undefined ? { notes: patch.notes } : {}) })}
-        />
+        />}
 
         <div>
           <p className="mb-1 text-xs font-medium text-muted">Add child</p>
+          {onAddFromPio && (
+            <button type="button" onClick={onAddFromPio} className="mb-1.5 rounded bg-accent px-2 py-1 text-xs text-white">
+              ＋ Flop from a PioSOLVER save
+            </button>
+          )}
           {childTypes.length === 0 ? (
-            <p className="text-[11px] text-muted">{problem ? "Finish the setup first." : "Nothing can follow here."}</p>
+            <p className="text-[11px] text-muted">{problem ? "Finish the setup first (or add a flop from Pio: it sets the start)." : "Nothing can follow here."}</p>
           ) : (
             <div className="flex flex-wrap gap-1">
               {childTypes.map((type) => (

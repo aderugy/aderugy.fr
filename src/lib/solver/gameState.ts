@@ -6,7 +6,7 @@
  * acts (it doesn't move chips), an action moves chips, a card node deals.
  * Walking a path from the root gives the pot, the stacks, whose turn it is,
  * whether the hand is over, and the first thing on the path that can't
- * happen in a real hand. The canvas, the server and the trainer all read the
+ * happen in a real hand. The spot page, the server and the trainer all read the
  * hand through this file. Pure functions only.
  *
  * Conventions (the tree stores sizes, not chips):
@@ -427,7 +427,7 @@ export function nodeState(before: HandState, node: PokerNode, parent: PokerNode 
 /**
  * The state after every node of `path` (root → node). Once a node is
  * invalid, every node below it reports INVALID_ABOVE and keeps the last good
- * state, so the canvas can still show something.
+ * state, so the spot page can still show something.
  */
 export function walkPath(setup: SpotSetup & { players: [Seat, Seat] }, path: PokerNode[]): NodeState[] {
   const out: NodeState[] = [];
