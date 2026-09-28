@@ -819,6 +819,9 @@ export function SpotCanvas({
   // Node cards stop propagation, so anything arriving here is empty canvas.
   function onViewportPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return;
+    // While the canvas is dragged, nothing on the page (the inspector included)
+    // gets text-selected.
+    document.body.classList.add("no-select");
     panning.current = {
       x: e.clientX - view.tx,
       y: e.clientY - view.ty,
@@ -835,12 +838,16 @@ export function SpotCanvas({
   function onViewportPointerUp(e: React.PointerEvent) {
     const p = panning.current;
     panning.current = null;
+    document.body.classList.remove("no-select");
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     // A click (not a drag) on empty canvas closes the drawer.
     if (p && Math.hypot(e.clientX - p.startX, e.clientY - p.startY) < 4) closeDrawers();
   }
+
+  // A drag cut short by leaving the canvas must not keep the page unselectable.
+  useEffect(() => () => document.body.classList.remove("no-select"), []);
 
   // Escape closes the drawer (the grid editor handles its own Escape).
   useEffect(() => {
@@ -943,12 +950,15 @@ export function SpotCanvas({
       {/* Canvas viewport */}
       <div
         ref={viewportRef}
-        className="h-full w-full touch-none"
+        className="h-full w-full touch-none select-none"
         onWheel={onWheel}
         onPointerDown={onViewportPointerDown}
         onPointerMove={onViewportPointerMove}
         onPointerUp={onViewportPointerUp}
-        onPointerCancel={() => (panning.current = null)}
+        onPointerCancel={() => {
+          panning.current = null;
+          document.body.classList.remove("no-select");
+        }}
       >
         <div
           className="relative h-full w-full"
