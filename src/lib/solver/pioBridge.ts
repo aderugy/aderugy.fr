@@ -7,7 +7,7 @@
  * only.
  */
 
-import type { PioDecision, PioNode, PioTree } from "./pio";
+import type { PioDecision, PioNode, PioRunouts, PioTree } from "./pio";
 
 export const PIO_BRIDGE_URL = (process.env.NEXT_PUBLIC_PIO_BRIDGE_URL ?? "http://127.0.0.1:7878").replace(/\/$/, "");
 
@@ -57,6 +57,8 @@ export const pioBridge = {
   node: (file: string, id: string) => call<{ file: string; node: PioNode; children: PioNode[] }>("/api/node", { file, id }),
   decision: (file: string, id: string) =>
     call<PioDecision>("/api/decision", { file, id, stats: "1", villain: "1" }),
+  /** Every card of a split node summed up (loads the whole save once: a few seconds). */
+  runouts: (file: string, id: string) => call<PioRunouts>("/api/runouts", { file, id }),
   /** The 1326 combos in solver order; fetched once per page. */
   handOrder: () => {
     handOrder ??= call<{ hands: string[] }>("/api/hand-order")

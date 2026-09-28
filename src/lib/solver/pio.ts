@@ -65,8 +65,28 @@ export type PioDecision = {
     villainEquity?: PioVector;
     villainEquityWeights?: PioVector;
     villainEquityTotal?: number;
+    villainEv?: PioVector;
+    villainEvWeights?: PioVector;
     notes: string[];
   };
+  ms: number;
+};
+
+/** A split node's cards summed up (bridge `/api/runouts`). */
+export type PioRunouts = {
+  file: string;
+  node: PioNode;
+  cards: {
+    card: string;
+    node: PioNode;
+    children: PioNode[];
+    /** Average frequency of each child over the actor's range (0–1). */
+    strategy?: PioVector;
+    /** Solver equity totals (0–1) and range EVs (chips), by player. */
+    equity: Partial<Record<PioPlayer, number | null>>;
+    ev: Partial<Record<PioPlayer, number | null>>;
+    notes: string[];
+  }[];
   ms: number;
 };
 
@@ -289,6 +309,9 @@ export type PlayerStats = {
   equity: Record<string, number>;
   /** The solver's range equity, in %. */
   equityTotal: number | null;
+  /** EV at this node, in bb (imports from 2026-09-29 on; the actor's is also in `ev.node`). */
+  ev?: Record<string, number>;
+  evTotal?: number | null;
 };
 
 /**
@@ -366,6 +389,28 @@ export function pioStats(
     actions[k] = st.childEv.map((c) => toBb(c?.[h]));
   }
   const total = weightedMean(st.ev, st.evWeights);
+  const evOf = (values: PioVector | undefined, range: PioVector | undefined) => {
+    const out: Record<string, number> = {};
+    if (!values || !range) return out;
+    for (let h = 0; h < keys.length; h++) {
+      const k = keys[h];
+      if (!k || (range[h] ?? 0) <= 0) continue;
+      const v = toBb(values[h]);
+      if (v != null) out[k] = v;
+    }
+    return out;
+  };
+  const actorStats = players[actor];
+  if (actorStats) {
+    actorStats.ev = node;
+    actorStats.evTotal = total == null ? null : round(total / CHIPS_PER_BB, 3);
+  }
+  const villainStats = players[other(actor)];
+  if (villainStats && st.villainEv) {
+    villainStats.ev = evOf(st.villainEv, d.villainRange);
+    const vt = st.villainEvWeights ? weightedMean(st.villainEv, st.villainEvWeights) : null;
+    villainStats.evTotal = vt == null ? null : round(vt / CHIPS_PER_BB, 3);
+  }
   const actionTotals = st.childEv.map((c, i) =>
     c ? weightedMean(c, st.evWeights, (h) => d.strategy[i]?.[h] ?? 0) : null,
   );

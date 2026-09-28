@@ -596,19 +596,21 @@ function CategoryGrid({
             data-hand={hand}
             title={hand}
             className={[
-              "relative aspect-square overflow-hidden rounded-sm border text-[9px] font-semibold",
+              "relative aspect-square overflow-hidden rounded-sm border bg-background text-[9px] font-semibold",
               painting ? "cursor-crosshair" : "",
               hovered === hand ? "border-accent ring-1 ring-accent" : "border-line",
               live.length === 0 ? "opacity-25" : filter && shown === 0 ? "opacity-30" : "",
             ].join(" ")}
           >
-            {/* Top: the categories, on grey (Other stays grey). */}
-            <span className="absolute inset-x-0 top-0 flex h-[30%] border-b border-black/20" style={{ backgroundColor: OTHER }}>
-              {shown > 0 &&
-                order.map((k) => (
-                  <span key={k} style={{ width: `${((parts.get(k) ?? 0) / shown) * 100}%`, backgroundColor: colorOf.get(k) }} />
-                ))}
-            </span>
+            {/* Top: the categories, on grey (Other stays grey); nothing on hands out of the node. */}
+            {inRange > 0 && (
+              <span className="absolute inset-x-0 top-0 flex h-[30%] border-b border-black/20" style={{ backgroundColor: OTHER }}>
+                {shown > 0 &&
+                  order.map((k) => (
+                    <span key={k} style={{ width: `${((parts.get(k) ?? 0) / shown) * 100}%`, backgroundColor: colorOf.get(k) }} />
+                  ))}
+              </span>
+            )}
             {/* Below: the strategy, height = share in range. */}
             <span className="absolute inset-x-0 bottom-0 top-[30%] flex flex-col justify-end bg-background">
               {stratTotal > 0 && (
