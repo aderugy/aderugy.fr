@@ -711,11 +711,6 @@ function FocusPanel({
               Import from Pio
             </Tool>
           )}
-          {kind === "decision" && (
-            <Tool onClick={() => void ed.pasteCsv(focus)} title="Import a CSV from the clipboard (or press Ctrl+V)">
-              Paste CSV
-            </Tool>
-          )}
           {isRoot && (
             <Tool primary disabled={ed.pio.busy} onClick={ed.pio.addFlop} title="Pick a .cfr: the flop, the spot's start and the first decision">
               Add flop from Pio
@@ -736,9 +731,15 @@ function FocusPanel({
             {isRoot ? "Setup" : "✎ Edit"}
           </Tool>
           {!isRoot && (
-            <Tool danger onClick={() => ed.deleteNode(focus)} title="Delete this node and everything under it (Delete key)">
-              Delete
-            </Tool>
+            <MoreMenu
+              label="More"
+              items={[
+                ...(kind === "decision"
+                  ? [{ label: "Paste CSV", hint: "or Ctrl+V", onSelect: () => void ed.pasteCsv(focus) }]
+                  : []),
+                { label: "Delete…", hint: "Delete key", danger: true, onSelect: () => ed.deleteNode(focus) },
+              ]}
+            />
           )}
         </div>
       </div>
@@ -775,14 +776,12 @@ function Tool({
   children,
   onClick,
   primary,
-  danger,
   disabled,
   title,
 }: {
   children: ReactNode;
   onClick: () => void;
   primary?: boolean;
-  danger?: boolean;
   disabled?: boolean;
   title?: string;
 }) {
@@ -794,11 +793,7 @@ function Tool({
       title={title}
       className={[
         "rounded-md px-2 py-1 text-xs transition-colors disabled:opacity-50",
-        primary
-          ? "bg-accent text-white hover:bg-accent/90"
-          : danger
-            ? "border border-line text-muted hover:border-red-500 hover:text-red-500"
-            : "border border-line text-muted hover:border-accent hover:text-foreground",
+        primary ? "bg-accent text-white hover:bg-accent/90" : "border border-line text-muted hover:border-accent hover:text-foreground",
       ].join(" ")}
     >
       {children}
@@ -956,7 +951,7 @@ function BranchesOverview({
                 );
               })}
               {columns.length === 0 && <td className="rounded-r-md border-y border-r border-line px-2" />}
-              <td className="w-6 pl-1">{t.via && <DeleteBranch ctx={ctx} t={t} />}</td>
+              <td className="w-6 pl-1">{t.via && <BranchMenu ctx={ctx} t={t} placement="left" />}</td>
             </tr>
           ))}
         </tbody>
@@ -982,22 +977,14 @@ function AlongTheWay({ ctx, setup, incoming }: { ctx: Ctx; setup: SpotSetup; inc
           <div key={n.id} className={has ? "rounded-md bg-background p-2.5" : "flex items-center"}>
             <div className="flex items-center gap-2">
               <p className="text-xs font-semibold">{stopTitle(ctx, setup, n.id)}</p>
-              <button
-                type="button"
-                onClick={() => ctx.editing.editNode(n.id)}
-                className="text-[11px] text-muted hover:text-foreground"
-                title="Edit this node (notes, card…)"
-              >
-                ✎
-              </button>
-              <button
-                type="button"
-                onClick={() => ctx.editing.deleteNode(n.id)}
-                className="text-[11px] text-muted hover:text-red-500"
-                title="Delete this node and everything under it"
-              >
-                Delete
-              </button>
+              <MoreMenu
+                compact
+                label={`More on ${stopTitle(ctx, setup, n.id)}`}
+                items={[
+                  { label: "✎ Edit…", onSelect: () => ctx.editing.editNode(n.id) },
+                  { label: "Delete…", danger: true, onSelect: () => ctx.editing.deleteNode(n.id) },
+                ]}
+              />
             </div>
             {m.summary && <p className="mt-0.5 text-sm text-muted">{m.summary}</p>}
             {m.notes.trim() && (
@@ -1044,7 +1031,7 @@ function NextColumn({
       <ColumnLabel>{kind === "decision" ? "Options" : kind === "branches" ? "Runouts" : "Next"}</ColumnLabel>
       <div className="study-rail study-rail-right space-y-2">
         {nexts.map((t, i) => (
-          <div key={t.via?.id ?? t.option?.id ?? i} className="study-tick study-stagger group/card relative" style={{ animationDelay: `${60 + i * 35}ms` }}>
+          <div key={t.via?.id ?? t.option?.id ?? i} className="study-tick study-stagger group/card relative has-[[aria-expanded=true]]:z-20" style={{ animationDelay: `${60 + i * 35}ms` }}>
             <TargetCard
               ctx={ctx}
               from={focus}
@@ -1055,7 +1042,7 @@ function NextColumn({
               onHover={onIsolate && t.optionIndex >= 0 ? (on) => onIsolate(on ? t.optionIndex : null) : undefined}
               onGo={onGo}
             />
-            {t.via && <DeleteBranch ctx={ctx} t={t} className="absolute right-1.5 top-2" />}
+            {t.via && <BranchMenu ctx={ctx} t={t} className="absolute right-1.5 top-1.5" />}
           </div>
         ))}
       </div>
@@ -1064,24 +1051,122 @@ function NextColumn({
 }
 
 /**
- * ✕ on a branch below the focus: deletes the node it goes through (an
- * option's branch — the option stays, undeveloped — or a runout).
+ * ⋯ on a branch below the focus (an option's branch, a runout): its delete,
+ * kept out of the way. Deleting an option's branch keeps the option.
  */
-function DeleteBranch({ ctx, t, className = "" }: { ctx: Ctx; t: StudyTarget; className?: string }) {
-  const what = t.option ? `the “${t.option.label}” branch` : "this runout";
+function BranchMenu({
+  ctx,
+  t,
+  className = "",
+  placement = "below",
+}: {
+  ctx: Ctx;
+  t: StudyTarget;
+  className?: string;
+  placement?: "below" | "left";
+}) {
+  const what = t.option ? "branch" : "runout";
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (t.via) ctx.editing.deleteNode(t.via.id);
-      }}
-      title={`Delete ${what} and everything under it`}
-      aria-label={`Delete ${what}`}
-      className={`flex size-5 items-center justify-center rounded text-[11px] text-muted transition-opacity hover:bg-red-500/10 hover:text-red-500 focus:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:group-hover/row:opacity-100 ${className}`}
-    >
-      ✕
-    </button>
+    <MoreMenu
+      compact
+      reveal
+      placement={placement}
+      className={className}
+      label={`More on this ${what}`}
+      items={[{ label: `Delete ${what}…`, danger: true, onSelect: () => t.via && ctx.editing.deleteNode(t.via.id) }]}
+    />
+  );
+}
+
+type MenuItem = { label: string; hint?: string; danger?: boolean; onSelect: () => void };
+
+/**
+ * A small disclosure menu for secondary actions: "More ▾" in a toolbar, "⋯"
+ * on a card. `reveal`: on a wide screen the ⋯ only shows while its card or
+ * row is hovered (or the menu is open).
+ */
+function MoreMenu({
+  items,
+  label,
+  compact,
+  reveal,
+  placement = "below",
+  className = "",
+}: {
+  items: MenuItem[];
+  label: string;
+  compact?: boolean;
+  reveal?: boolean;
+  placement?: "below" | "left";
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    // Positioned either way (the dropdown hangs from it): `absolute …` from the
+    // caller, or relative.
+    <div ref={ref} className={/\babsolute\b/.test(className) ? className : `relative ${className}`} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+        onClick={() => setOpen((v) => !v)}
+        className={
+          compact
+            ? `flex size-5 items-center justify-center rounded text-xs leading-none text-muted transition-opacity hover:bg-foreground/5 hover:text-foreground aria-expanded:bg-foreground/5 aria-expanded:opacity-100 ${
+                reveal ? "focus:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:group-hover/row:opacity-100" : ""
+              }`
+            : "rounded-md border border-line px-2 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-foreground aria-expanded:border-accent aria-expanded:text-foreground"
+        }
+      >
+        {compact ? "⋯" : "More ▾"}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className={[
+            "absolute z-30 min-w-36 rounded-md border border-line bg-surface p-1 shadow-lg",
+            placement === "left" ? "right-full top-1/2 mr-1 -translate-y-1/2" : "right-0 top-full mt-1",
+          ].join(" ")}
+        >
+          {items.map((it) => (
+            <button
+              key={it.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                it.onSelect();
+              }}
+              className={[
+                "flex w-full items-center gap-3 whitespace-nowrap rounded px-2 py-1.5 text-left text-xs hover:bg-background",
+                it.danger ? "text-red-600 dark:text-red-400" : "text-foreground",
+              ].join(" ")}
+            >
+              {it.label}
+              {it.hint && <span className="ml-auto text-[10px] text-muted">{it.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
