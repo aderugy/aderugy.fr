@@ -233,12 +233,40 @@ test("dealCards refuses the wrong street", () => {
   assert.equal(r.ok, false);
 });
 
-test("CSV headers keep their sizing unit", async () => {
+test("CSV headers: a unit is read as written, a bare size is NL1000 chips", async () => {
   const { parseActionHeader } = await import("./csvImport");
   assert.deepEqual(
-    [parseActionHeader("RAISE 18bb"), parseActionHeader("BET 33%"), parseActionHeader("BET 33"), parseActionHeader("CALL")].map(
-      (h) => h && [h.kind, h.sizePct, h.sizeUnit],
-    ),
-    [["raise", 18, "bb"], ["bet", 33, "pct"], ["bet", 33, null], ["call", null, null]],
+    ["RAISE 18bb", "BET 33%", "BET 45", "RAISE 180", "Bet 12.5", "CALL"].map((raw) => {
+      const h = parseActionHeader(raw);
+      return h && [h.kind, h.sizePct, h.sizeUnit, h.label];
+    }),
+    [
+      ["raise", 18, "bb", "Raise 18bb"],
+      ["bet", 33, "pct", "Bet 33%"],
+      ["bet", 4.5, "bb", "Bet 4.5bb"],
+      ["raise", 18, "bb", "Raise 18bb"],
+      ["bet", 1.25, "bb", "Bet 1.25bb"],
+      ["call", null, null, "Call"],
+    ],
   );
+});
+
+test("CSV import: chips become bb bets in the engine, older imports keep their ids", async () => {
+  const { parseStrategyCsv } = await import("./csvImport");
+  const old = { id: "old-bet", kind: "bet" as const, sizePct: 45, sizeUnit: null, label: "Bet 45", color: "" };
+  const { actions } = parseStrategyCsv("Hand,BET 45,CHECK\nAKs,50,50", [old]);
+  assert.deepEqual(
+    actions.map((a) => [a.id === "old-bet", a.kind, a.sizePct, a.sizeUnit, a.label]),
+    [
+      [true, "bet", 4.5, "bb", "Bet 4.5bb"],
+      [false, "check", null, null, "Check"],
+    ],
+  );
+  // Flop, pot 5.5: "BET 45" puts 4.5bb in, not 45% of the pot.
+  const flop = dealCards(initialState({ ...SRP, street: "flop", potBb: 5.5 }), "flop", ["Ks", "7d", "2c"]);
+  assert.ok(flop.ok);
+  if (!flop.ok) return;
+  const r = applyAction(flop.state, { kind: "bet", sizePct: 4.5, sizeUnit: "bb", label: "Bet 4.5bb" });
+  assert.ok(r.ok);
+  if (r.ok) assert.equal(totalPot(r.state), 10);
 });

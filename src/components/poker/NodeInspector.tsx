@@ -447,7 +447,8 @@ function StrategyMeta({
         </div>
         <p className="mt-1 text-[11px] text-muted">
           Or press <kbd>Ctrl</kbd>+<kbd>V</kbd> with this strategy selected. Header row <code>Hand,RAISE 180,CALL,FOLD…</code> sets the actions and creates one
-          action node each; rows are combos (<code>4c3c</code>) or hands (<code>AKs</code>).
+          action node each; rows are combos (<code>4c3c</code>) or hands (<code>AKs</code>). Bare sizes are NL1000
+          chips (<code>BET 45</code> = 4.5bb); <code>33%</code> or <code>18bb</code> are read as written.
         </p>
         {importResult && (
           <div

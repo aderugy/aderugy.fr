@@ -11,6 +11,11 @@
  * ("AKs", "QQ"); every other header names an action — a kind, optionally
  * followed by a sizing. The action set of the strategy node is generated from
  * those headers. Frequencies may be percentages (0–100) or fractions (0–1).
+ *
+ * A bare sizing is an amount in chips of the solver's NL1000 export (blinds
+ * 5/10), so ten chips make a big blind: "BET 45" is a 4.5bb bet, "RAISE 180"
+ * a raise to 18bb. A sizing with a unit is read as written ("BET 33%",
+ * "RAISE 18bb").
  * Pure functions only.
  */
 
@@ -31,13 +36,18 @@ export class CsvImportError extends Error {}
 
 /* ------------------------------------------------------------------ headers */
 
+/** Chips per big blind in the solver's export (NL1000: blinds 5/10). */
+export const CHIPS_PER_BB = 10;
+
 type ParsedHeader = {
   kind: ActionKind;
   sizePct: number | null;
-  /** "RAISE 18bb" → bb, "BET 33%" → pct, a bare number → the street's default. */
+  /** "RAISE 18bb" → bb, "BET 33%" → pct, a bare number (chips) → bb. */
   sizeUnit: SizeUnit | null;
   label: string;
   allIn: boolean;
+  /** The bare number as written, before chips → bb (to recognise older imports). */
+  chips: number | null;
 };
 
 const KIND_ALIASES: Record<string, ActionKind> = {
@@ -59,7 +69,7 @@ export function parseActionHeader(raw: string): ParsedHeader | null {
   const lower = text.toLowerCase().replace(/[\s_-]+/g, " ").trim();
 
   if (/^(all ?in|allin|jam|shove)\b/.test(lower)) {
-    return { kind: "raise", sizePct: null, sizeUnit: null, label: "All-in", allIn: true };
+    return { kind: "raise", sizePct: null, sizeUnit: null, label: "All-in", allIn: true, chips: null };
   }
 
   const m = lower.match(/^([a-z]+)\s*(\d+(?:[.,]\d+)?)?\s*(%|bb)?$/);
@@ -67,11 +77,16 @@ export function parseActionHeader(raw: string): ParsedHeader | null {
   const kind = KIND_ALIASES[m[1]];
   if (!kind) return null;
 
-  const size = m[2] !== undefined ? Number(m[2].replace(",", ".")) : null;
+  const written = m[2] !== undefined ? Number(m[2].replace(",", ".")) : null;
   const name = kind[0].toUpperCase() + kind.slice(1);
-  const label = size !== null ? `${name} ${formatNumber(size)}${m[3] === "bb" ? "bb" : ""}` : name;
-  const sizeUnit: SizeUnit | null = size === null ? null : m[3] === "bb" ? "bb" : m[3] === "%" ? "pct" : null;
-  return { kind, sizePct: size, sizeUnit, label: m[3] === "%" && size !== null ? `${label}%` : label, allIn: false };
+  if (written === null) return { kind, sizePct: null, sizeUnit: null, label: name, allIn: false, chips: null };
+  if (m[3] === "%") {
+    return { kind, sizePct: written, sizeUnit: "pct", label: `${name} ${formatNumber(written)}%`, allIn: false, chips: null };
+  }
+  // "18bb" as written; a bare number is chips, ten to the big blind.
+  const bare = m[3] !== "bb";
+  const bb = bare ? Math.round((written / CHIPS_PER_BB) * 1000) / 1000 : written;
+  return { kind, sizePct: bb, sizeUnit: "bb", label: `${name} ${formatNumber(bb)}bb`, allIn: false, chips: bare ? written : null };
 }
 
 function formatNumber(n: number): string {
@@ -87,14 +102,17 @@ function buildActions(headers: ParsedHeader[], existing: StrategyAction[]): Stra
   const colors = actionColors(headers);
   const taken = new Set<string>();
   return headers.map((h, i) => {
-    const match = existing.find(
-      (a) =>
-        !taken.has(a.id) &&
-        a.kind === h.kind &&
-        (a.sizePct ?? null) === h.sizePct &&
-        (a.sizeUnit ?? null) === h.sizeUnit &&
-        (!h.allIn || a.label === h.label),
-    );
+    const same = (a: StrategyAction) =>
+      !taken.has(a.id) &&
+      a.kind === h.kind &&
+      (a.sizePct ?? null) === h.sizePct &&
+      (a.sizeUnit ?? null) === h.sizeUnit &&
+      (!h.allIn || a.label === h.label);
+    // Imports made before chips were read as bb stored "BET 45" as 45 with no
+    // unit: re-importing converts that action in place, links included.
+    const legacy = (a: StrategyAction) =>
+      !taken.has(a.id) && h.chips !== null && a.kind === h.kind && a.sizePct === h.chips && !a.sizeUnit;
+    const match = existing.find(same) ?? existing.find(legacy);
     if (match) taken.add(match.id);
     return {
       id: match?.id ?? crypto.randomUUID(),
