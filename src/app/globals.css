@@ -105,3 +105,71 @@ body {
   .study-enter-prev,
   .study-enter .study-stagger { animation: study-fade 120ms ease-out both; }
 }
+
+/* Trainer table (/poker/trainers): what happens between two decisions is
+   played out — chips slide from a seat to its bet, bets are swept into the
+   pot when a round closes, cards are dealt, the pot goes to the winner. The
+   moving pieces are positioned with the same --tx/--ty (phones) and
+   --wx/--wy (from sm) anchors as the table; --s* are the seat's, --g* the
+   winner's. */
+.trn-from { --from-x: var(--stx); --from-y: var(--sty); }
+.trn-to { --to-x: var(--gtx); --to-y: var(--gty); }
+@media (min-width: 40rem) {
+  .trn-from { --from-x: var(--swx); --from-y: var(--swy); }
+  .trn-to { --to-x: var(--gwx); --to-y: var(--gwy); }
+}
+@keyframes trn-chip-in {
+  from { left: var(--from-x); top: var(--from-y); opacity: 0; transform: scale(0.6); }
+}
+@keyframes trn-sweep {
+  to { left: 50%; top: 47%; opacity: 0; transform: scale(0.7); }
+}
+@keyframes trn-pot-win {
+  0% { left: 50%; top: 47%; opacity: 0; transform: scale(0.8); }
+  15% { opacity: 1; transform: scale(1.1); }
+  80% { opacity: 1; }
+  100% { left: var(--to-x); top: var(--to-y); opacity: 0; transform: scale(0.9); }
+}
+@keyframes trn-deal {
+  from { opacity: 0; transform: translateY(-18px) rotateY(80deg) scale(0.9); }
+}
+@keyframes trn-deal-hole {
+  from { opacity: 0; transform: translateY(-40px) scale(0.8); }
+}
+@keyframes trn-flip {
+  from { transform: rotateY(90deg); }
+}
+@keyframes trn-muck {
+  to { opacity: 0; transform: translateY(10px) scale(0.85); }
+}
+@keyframes trn-pop {
+  0% { opacity: 0; transform: translateY(4px) scale(0.7); }
+  60% { opacity: 1; transform: translateY(0) scale(1.08); }
+}
+@keyframes trn-bump {
+  40% { transform: scale(1.15); }
+}
+@keyframes trn-turn {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@keyframes trn-rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
+.trn-chip-in { animation: trn-chip-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-sweep { animation: trn-sweep 420ms cubic-bezier(0.55, 0, 0.75, 0.3) forwards; }
+.trn-pot-win { animation: trn-pot-win 1300ms cubic-bezier(0.4, 0, 0.3, 1) forwards; }
+.trn-deal { animation: trn-deal 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-deal-hole { animation: trn-deal-hole 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-flip { animation: trn-flip 380ms ease-out both; }
+.trn-muck { animation: trn-muck 500ms ease-in forwards; }
+.trn-pop { animation: trn-pop 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trn-bump { animation: trn-bump 360ms ease-out; }
+.trn-turn { animation: trn-turn 1.4s ease-in-out infinite; }
+.trn-rise { animation: trn-rise 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .trn-chip-in, .trn-deal, .trn-deal-hole, .trn-flip, .trn-pop, .trn-rise { animation: study-fade 120ms ease-out both; }
+  .trn-sweep, .trn-muck, .trn-pot-win { animation: study-fade 120ms ease-out reverse forwards; }
+  .trn-bump, .trn-turn { animation: none; }
+}

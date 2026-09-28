@@ -12,6 +12,7 @@ import { Markdown } from "@/components/poker/Markdown";
 import { pickWeighted } from "@/lib/trainer/deal";
 import { answer, buildTree, handScore, startHand, type Decision, type Hand, type Tree } from "@/lib/trainer/play";
 import { sceneFromState, type Scene } from "@/lib/trainer/scene";
+import { framesAfter, type Frame } from "@/lib/trainer/replay";
 import { bands, normalize, playableFreqs, sessionScore } from "@/lib/trainer/score";
 import { entryLabel, streetLines, toLine } from "@/lib/trainer/labels";
 import { END_LABELS, GRADE_LABELS, type Drill, type Grade, type Trainer } from "@/lib/trainer/types";
@@ -40,8 +41,14 @@ const EMPTY_STATS: Stats = {
   perfect: 0,
 };
 
-/** `deciding`: hero must act. `feedback`: the answer's result. `over`: the hand's recap. */
-type View = "deciding" | "feedback" | "over";
+/**
+ * `replay`: the table plays out what happened since hero's last decision.
+ * `deciding`: hero must act. `feedback`: the answer's result. `over`: the hand's recap.
+ */
+type View = "replay" | "deciding" | "feedback" | "over";
+
+/** Frames being played on the table, then what comes after them. */
+type Replay = { frames: Frame[]; i: number; then: () => void };
 
 type Session = { id: string; drill: Drill; trees: Map<string, Tree> };
 
@@ -58,6 +65,7 @@ export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount
   const [session, setSession] = useState<Session | null>(null);
   const [hand, setHand] = useState<Hand | null>(null);
   const [view, setView] = useState<View>("deciding");
+  const [replay, setReplay] = useState<Replay | null>(null);
   const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [unsynced, setUnsynced] = useState(0);
   const writes = useRef<Promise<void>>(Promise.resolve());
@@ -110,6 +118,46 @@ export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount
     [rpc],
   );
 
+  // The replay's continuation lives in a ref: it must run once, however often React renders.
+  const replayRef = useRef<Replay | null>(null);
+
+  /** Play frames on the table, then `then` (right away when there is nothing to show). */
+  const play = useCallback((frames: Frame[], then: () => void) => {
+    if (frames.length === 0) {
+      replayRef.current = null;
+      setReplay(null);
+      then();
+      return;
+    }
+    const r = { frames, i: 0, then };
+    replayRef.current = r;
+    setView("replay");
+    setReplay(r);
+  }, []);
+
+  const finishReplay = useCallback(() => {
+    const r = replayRef.current;
+    if (!r) return;
+    replayRef.current = null;
+    setReplay(null);
+    r.then();
+  }, []);
+
+  useEffect(() => {
+    if (!replay) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const ms = replay.frames[replay.i].ms * (reduce ? 0.5 : 1);
+    const t = window.setTimeout(() => {
+      if (replayRef.current !== replay) return;
+      if (replay.i + 1 < replay.frames.length) {
+        const next = { ...replay, i: replay.i + 1 };
+        replayRef.current = next;
+        setReplay(next);
+      } else finishReplay();
+    }, ms);
+    return () => window.clearTimeout(t);
+  }, [replay, finishReplay]);
+
   const deal = useCallback(
     (sess: Session) => {
       let h: Hand | null = null;
@@ -124,16 +172,32 @@ export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount
         return;
       }
       setHand(h);
-      askedAt.current = performance.now();
-      if (h.end) {
-        // The tree ended before hero's first decision: still a hand, it says where the tree stops.
-        recordHand(sess, h);
-        setView("over");
-      } else {
-        setView("deciding");
-      }
+      // The tree ended before hero's first decision: still a hand, it says where the tree stops.
+      if (h.end) recordHand(sess, h);
+      const dealt = h;
+      play(framesAfter(dealt, -1), () => {
+        if (dealt.end) setView("over");
+        else {
+          setView("deciding");
+          askedAt.current = performance.now();
+        }
+      });
     },
-    [trainer.hero_seat, opts, recordHand],
+    [trainer.hero_seat, opts, recordHand, play],
+  );
+
+  /** Show what follows hero's last answer, then his next decision, the recap or the next hand. */
+  const playOn = useCallback(
+    (h: Hand, sess: Session) => {
+      play(framesAfter(h, h.decisions.length - 1), () => {
+        if (!h.end) {
+          setView("deciding");
+          askedAt.current = performance.now();
+        } else if (trainer.feedback === "each") deal(sess);
+        else setView("over");
+      });
+    },
+    [play, deal, trainer.feedback],
   );
 
   async function start() {
@@ -206,25 +270,21 @@ export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount
     if (next.end) recordHand(session, next);
     setHand(next);
     if (trainer.feedback === "each") setView("feedback");
-    else if (next.end) setView("over");
-    else {
-      setView("deciding");
-      askedAt.current = performance.now();
-    }
+    else playOn(next, session);
   }
 
   /** Continue after a result or a recap: the rest of the hand, or a new one. */
   const proceed = useCallback(() => {
     if (!session || !hand) return;
-    if (hand.end) deal(session);
-    else {
-      setView("deciding");
-      askedAt.current = performance.now();
-    }
-  }, [session, hand, deal]);
+    if (view === "feedback") playOn(hand, session);
+    else if (view === "replay") finishReplay();
+    else if (hand.end) deal(session);
+  }, [session, hand, view, deal, playOn, finishReplay]);
 
   async function end() {
     if (!session) return;
+    replayRef.current = null;
+    setReplay(null);
     setPhase("ending");
     await writes.current;
     const r = await endSession(session.id);
@@ -263,17 +323,18 @@ export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount
   const last = hand ? hand.decisions[hand.decisions.length - 1] : undefined;
 
   // The table: the decision being asked, the one just answered, or the end of the hand.
+  const frame = replay ? replay.frames[replay.i] : null;
   const scene: Scene | null = useMemo(() => {
     if (!hand || !tree) return null;
     const shown = view === "deciding" ? hand.pending : view === "feedback" ? last : null;
     return sceneFromState({
-      state: shown ? shown.state : hand.state,
+      state: frame ? frame.state : shown ? shown.state : hand.state,
       heroSeat: hand.heroSeat,
       villainSeat: hand.villainSeat,
       stackBb: tree.setup.stackBb,
-      heroActions: shown ? shown.actions : [],
+      heroActions: !frame && shown ? shown.actions : [],
     });
-  }, [hand, tree, view, last]);
+  }, [hand, tree, view, last, frame]);
 
   if (phase === "idle" || phase === "starting") {
     return (
@@ -332,7 +393,12 @@ export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount
     );
   }
 
-  const showdown = hand?.end && (hand.end.reason === "showdown" || hand.end.reason === "allin") ? hand.villainCombo : null;
+  const showdown =
+    hand?.end && (hand.end.reason === "showdown" || hand.end.reason === "allin") && (!frame || frame.end) ? hand.villainCombo : null;
+  // Who wins without showdown, once the table gets there.
+  const shownState = frame ? frame.state : view === "over" ? hand?.state : null;
+  const winner = shownState?.terminal?.kind === "fold" && (!frame || frame.end) ? shownState.terminal.winner : null;
+  const toAct = frame ? (frame.end ? null : frame.state.toAct) : view === "deciding" ? (hand?.heroSeat ?? null) : null;
 
   return (
     // Phones: the drill takes the whole screen (over the site header) and never
@@ -390,21 +456,39 @@ export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount
               {tree.byId.get(hand.entryId) ? ` · from ${entryLabel(tree.byId.get(hand.entryId) as PokerNode)}` : ""}
               {hand.decisions.length > 0 ? ` · decision ${hand.decisions.length + (view === "deciding" ? 1 : 0)}` : ""}
             </span>
-            <span className="min-w-0 truncate sm:shrink-0">{logLine(scene)}</span>
+            <span className="min-w-0 truncate sm:shrink-0">{frame ? "" : logLine(scene)}</span>
           </div>
 
-          <div className="flex items-center justify-center max-sm:min-h-0 max-sm:flex-1 max-sm:[container-type:size]">
-            <PokerTable scene={scene} combo={hand.combo} villainCombo={showdown} fit />
-          </div>
-
-          {/* RNG + actions */}
-          {(view === "deciding" && hand.pending) || (view === "feedback" && last) ? (
-            <ActionRow
-              decision={view === "deciding" ? (hand.pending as Decision) : (last as Decision)}
+          <div
+            className="flex cursor-default items-center justify-center max-sm:min-h-0 max-sm:flex-1 max-sm:[container-type:size]"
+            onClick={frame ? finishReplay : undefined}
+          >
+            <PokerTable
               scene={scene}
-              answered={view === "feedback"}
-              onChoose={choose}
+              combo={hand.combo}
+              villainCombo={showdown}
+              fit
+              handKey={hand.id}
+              bubble={frame?.bubble ?? null}
+              sweep={frame?.sweep ?? false}
+              dealt={frame?.dealt ?? []}
+              toAct={toAct}
+              winner={winner}
             />
+          </div>
+
+          {/* RNG + actions; while the table plays out, what is happening */}
+          {frame && replay ? (
+            <ReplayBar frame={frame} index={replay.i} count={replay.frames.length} onSkip={finishReplay} />
+          ) : (view === "deciding" && hand.pending) || (view === "feedback" && last) ? (
+            <div key={`${hand.id}-${hand.decisions.length}`} className={view === "deciding" ? "trn-rise" : ""}>
+              <ActionRow
+                decision={view === "deciding" ? (hand.pending as Decision) : (last as Decision)}
+                scene={scene}
+                answered={view === "feedback"}
+                onChoose={choose}
+              />
+            </div>
           ) : (
             <div className="shrink-0 py-3 text-center text-xs text-muted">{hand.end ? END_LABELS[hand.end.reason] : ""}</div>
           )}
@@ -485,6 +569,31 @@ function ActionRow({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Under the table while it plays out: what is happening, and a way to skip. Same height as the action row. */
+function ReplayBar({ frame, index, count, onSkip }: { frame: Frame; index: number; count: number; onSkip: () => void }) {
+  return (
+    <div className="flex h-[3.75rem] shrink-0 items-center gap-3 rounded-lg border border-line bg-surface px-3">
+      <div className="min-w-0 flex-1">
+        <p key={`${index}-${frame.caption}`} className="trn-pop truncate text-sm font-semibold">
+          {frame.caption}
+        </p>
+        <div className="mt-1 flex gap-1" aria-hidden>
+          {Array.from({ length: count }, (_, i) => (
+            <span key={i} className={`h-1 w-4 rounded-full transition-colors ${i <= index ? "bg-accent" : "bg-foreground/10"}`} />
+          ))}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onSkip}
+        className="shrink-0 rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-foreground"
+      >
+        Skip <span className="hidden opacity-70 sm:inline">(space)</span>
+      </button>
     </div>
   );
 }
