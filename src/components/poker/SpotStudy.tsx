@@ -47,11 +47,14 @@ import { formatFrequency, terminalText } from "@/components/poker/format";
 import { StrategyDetail } from "@/components/poker/StrategyReview";
 import { StrategyGrid } from "@/components/poker/StrategyGrid";
 import { StatsDetail, rangeTotal, type StatsMode } from "@/components/poker/StatsGrid";
+import { StatsGraph } from "@/components/poker/StatsGraph";
 import { BoardCards } from "@/components/poker/trainer/Cards";
 import { Markdown } from "@/components/poker/Markdown";
 import { NodeNotes } from "@/components/poker/NodeNotes";
 import { CategoryList, CategoryPanel } from "@/components/poker/CategoryPanel";
 import { asCategories, type HandCategory } from "@/lib/solver/categories";
+import { asRunoutGroups, asRunoutReport, type RunoutGroup } from "@/lib/solver/runouts";
+import { RunoutReportView } from "@/components/poker/RunoutReport";
 
 /** What the study layout can change, supplied by SpotView. */
 export type StudyEditing = {
@@ -60,6 +63,13 @@ export type StudyEditing = {
   saveNotes: (id: string, patch: NodeMeta) => void;
   /** A decision's hand categories (see CategoryPanel). */
   saveCategories: (id: string, categories: HandCategory[]) => void;
+  /** Where the next card is dealt: the report on every card, groups of cards. */
+  runouts: {
+    load: (id: string) => void;
+    /** Import one card's line from the solver, then go there. */
+    importCard: (id: string, card: string) => void;
+    saveGroups: (id: string, groups: RunoutGroup[]) => void;
+  };
   /** Add the action node of an option (and on a solver line, what follows). */
   develop: (decisionId: string, optionId: string) => void;
   /** Delete a node and its subtree (asks first). */
@@ -692,6 +702,7 @@ function FocusPanel({
   const linked = ed.pio.linkedAbove(focus);
   const addable = kind === "decision" || terminal ? [] : ed.childTypes(focus);
   const nextStreet = ns?.state.status === "deal" ? ns.state.nextStreet : null;
+  const dealStreet = !isRoot && (kind === "branches" || kind === "leaf") && (nextStreet === "turn" || nextStreet === "river") ? nextStreet : null;
   const notesNode = isRoot
     ? ({ id: ROOT_ID, data: { summary: setup.summary ?? "", notes: setup.notes ?? "" } } as unknown as PokerNode)
     : node;
@@ -750,8 +761,12 @@ function FocusPanel({
 
       <div className="mt-3">
         {kind === "decision" && node && <DecisionBody ctx={ctx} node={node} isolate={isolate} onIsolate={onIsolate} />}
-        {kind === "branches" && <BranchesOverview ctx={ctx} nexts={nexts} onGo={onGo} />}
-        {kind === "leaf" && (
+        {dealStreet && node && linked ? (
+          <DealBody ctx={ctx} node={node} street={dealStreet} kind={kind} nexts={nexts} onGo={onGo} />
+        ) : (
+          kind === "branches" && <BranchesOverview ctx={ctx} nexts={nexts} onGo={onGo} />
+        )}
+        {kind === "leaf" && !(dealStreet && node && linked) && (
           <p className="rounded-md bg-foreground/5 px-3 py-2 text-sm font-medium tabular-nums">
             {terminal ? `■ ${terminalText(terminal)}` : "Nothing below yet."}
           </p>
@@ -805,7 +820,7 @@ function Tool({
   );
 }
 
-type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev" | "categories";
+type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev" | "graph" | "categories";
 
 function DecisionBody({
   ctx,
@@ -854,6 +869,7 @@ function DecisionBody({
   if (stats?.players.OOP) tabs.push({ id: "eq-OOP", label: `Equity ${name("OOP")}` });
   if (stats?.players.IP) tabs.push({ id: "eq-IP", label: `Equity ${name("IP")}` });
   if (stats?.ev) tabs.push({ id: "ev", label: `EV ${name(stats.actor)}` });
+  if (stats) tabs.push({ id: "graph", label: "Graph" });
   const categories = asCategories((node.data as NodeMeta).categories);
   tabs.push({ id: "categories", label: categories.length ? `Categories (${categories.length})` : "Categories" });
   const handState = ctx.nodeStates.get(node.id)?.state ?? null;
@@ -885,6 +901,8 @@ function DecisionBody({
           categories={categories}
           onChange={(next) => ctx.editing.saveCategories(node.id, next)}
         />
+      ) : mode === "graph" && stats ? (
+        <StatsGraph stats={stats} dead={ctx.deadCards(node.id)} seats={{ OOP: name("OOP"), IP: name("IP") }} />
       ) : stats && statsMode ? (
         <StatsDetail stats={stats} mode={statsMode} dead={ctx.deadCards(node.id)} />
       ) : categories.length > 0 ? (
@@ -922,6 +940,77 @@ function DecisionBody({
           isolate={isolate}
           onIsolate={onIsolate}
           stats={stats}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Where the turn or river is dealt, on a solver line: the report on every
+ * card of the save (to pick what to study, with groups of cards), and the
+ * runouts already in the tree.
+ */
+function DealBody({
+  ctx,
+  node,
+  street,
+  kind,
+  nexts,
+  onGo,
+}: {
+  ctx: Ctx;
+  node: PokerNode;
+  street: "turn" | "river";
+  kind: ReturnType<typeof stopKind>;
+  nexts: StudyTarget[];
+  onGo: (id: string) => void;
+}) {
+  const ed = ctx.editing;
+  const data = node.data as NodeMeta;
+  const report = asRunoutReport(data.runouts);
+  const groups = asRunoutGroups(data.runoutGroups);
+  const cardStops = new Map<string, string | null>();
+  for (const t of nexts) {
+    if (t.via && (t.via.type === "turn" || t.via.type === "river")) {
+      const c = asStreet(t.via).card;
+      if (c) cardStops.set(c, t.stop);
+    }
+  }
+  const [tab, setTab] = useState<"report" | "tree">("report");
+  const seats = { OOP: ed.seats?.OOP ?? "OOP", IP: ed.seats?.IP ?? "IP" };
+  return (
+    <div>
+      {kind === "branches" && (
+        <div className="mb-3">
+          <Segmented
+            size="sm"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { id: "report", label: `Every ${street}` },
+              { id: "tree", label: `In the tree (${cardStops.size})` },
+            ]}
+          />
+        </div>
+      )}
+      {tab === "tree" && kind === "branches" ? (
+        <BranchesOverview ctx={ctx} nexts={nexts} onGo={onGo} />
+      ) : (
+        <RunoutReportView
+          report={report}
+          groups={groups}
+          seats={seats}
+          street={street}
+          inTree={new Set(cardStops.keys())}
+          busy={ed.pio.busy}
+          onCompute={() => ed.runouts.load(node.id)}
+          onGroups={(next) => ed.runouts.saveGroups(node.id, next)}
+          onOpen={(card) => {
+            const stop = cardStops.get(card);
+            if (stop) onGo(stop);
+            else if (!cardStops.has(card)) ed.runouts.importCard(node.id, card);
+          }}
         />
       )}
     </div>

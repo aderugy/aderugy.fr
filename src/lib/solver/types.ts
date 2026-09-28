@@ -16,6 +16,7 @@
 import { derivedPosition, isSeat, type Seat } from "./seats";
 import type { PioLink, PlayerStats, StrategyStats } from "./pio";
 import type { HandCategory } from "./categories";
+import type { RunoutGroup, RunoutReport } from "./runouts";
 
 export type Street = "preflop" | "flop" | "turn" | "river";
 
@@ -138,6 +139,9 @@ export type NodeMeta = {
   pio?: PioLink | null;
   /** On a decision: the user's split of the range into named groups. */
   categories?: HandCategory[];
+  /** Where the next card is dealt: every card of the save summed up, and the user's groups of cards. */
+  runouts?: RunoutReport | null;
+  runoutGroups?: RunoutGroup[];
 };
 
 /**

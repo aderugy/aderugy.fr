@@ -23,6 +23,7 @@ import {
   NODE_LABELS,
   setupProblem,
   type NodeData,
+  type NodeMeta,
   type NodeType,
   type PokerNode,
   type SpotSetup,
@@ -58,6 +59,7 @@ import {
   type PioPlayer,
   type PioTree,
 } from "@/lib/solver/pio";
+import { asRunoutReport, runoutReport } from "@/lib/solver/runouts";
 import { pioBridge, PioBridgeError } from "@/lib/solver/pioBridge";
 import type { Seat } from "@/lib/solver/seats";
 import { RootInspector, ROOT_ID } from "@/components/poker/SpotRoot";
@@ -743,6 +745,39 @@ export function SpotView({
     setNotice({ tone: warnings.length ? "warn" : "ok", text: `Imported ${done} ${street} card${done === 1 ? "" : "s"} from Pio`, detail: warnings.slice(0, 6) });
   }
 
+  /** The report on every card dealt below a node (turn or river), saved on the node. */
+  async function loadRunouts(id: string) {
+    const leaf = nodesRef.current[id];
+    if (!leaf) return;
+    try {
+      setNotice({ tone: "busy", text: "Reading every runout from Pio (the whole save is loaded once: a few seconds)…" });
+      const { file, pioId } = await resolvePio(id);
+      if (leaf.type === "action" && asPio(leaf)?.id !== pioId) persistData(id, { pio: { file, id: pioId } });
+      const [r, tree] = await Promise.all([pioBridge.runouts(file, pioId), pioTree(file)]);
+      const report = runoutReport(r, tree.effectiveStack, new Date().toISOString());
+      persistData(id, { runouts: report });
+      setNotice({
+        tone: report.missing.length ? "warn" : "ok",
+        text: `${report.rows.length} runouts read from Pio · ${(r.ms / 1000).toFixed(1)} s`,
+        detail: report.missing.length ? [`Not in the save: ${report.missing.join(" ")}`] : [],
+      });
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  /** One card of the report into the tree (card + its decision from Pio), then go there. */
+  async function importRunoutCard(id: string, card: string) {
+    const report = asRunoutReport((nodesRef.current[id]?.data as NodeMeta | undefined)?.runouts);
+    const ns = stateAt(id);
+    if (!report || !ns) return;
+    const street = ns.state.nextStreet === "river" ? "river" : "turn";
+    await importRunouts(id, report.file, report.pioId, street, [card]);
+    const cardNode = kidsOf(id).find((k) => k.type === street && asStreet(k).card === card);
+    const dec = cardNode ? kidsOf(cardNode.id).find((k) => k.type === "strategy") : undefined;
+    if (dec) setFocus(dec.id);
+  }
+
   /** Develop an option of a decision; on a solver line, import what follows. */
   async function develop(decisionId: string, optionId: string) {
     const dec = nodesRef.current[decisionId];
@@ -861,6 +896,11 @@ export function SpotView({
       } else persistData(id, patch);
     },
     saveCategories: (id, categories) => persistData(id, { categories }),
+    runouts: {
+      load: (id) => void loadRunouts(id),
+      importCard: (id, card) => void importRunoutCard(id, card),
+      saveGroups: (id, runoutGroups) => persistData(id, { runoutGroups }),
+    },
     develop: (decisionId, optionId) => void develop(decisionId, optionId),
     deleteNode: confirmDelete,
     addChild: async (parentId, type) => {
