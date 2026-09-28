@@ -147,9 +147,7 @@ export function NodeInspector({
       <div className="shrink-0 border-t border-line p-3">
         <button
           type="button"
-          onClick={() => {
-            if (confirm("Delete this node and everything under it?")) onDelete();
-          }}
+          onClick={onDelete}
           className="w-full rounded border border-line px-2 py-1 text-xs text-muted hover:border-red-500 hover:text-red-500"
         >
           Delete node

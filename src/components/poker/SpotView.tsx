@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { colorForKind, recolorActions } from "@/lib/solver/colors";
-import { globalFrequencies, remapWeights } from "@/lib/solver/strategy";
+import { globalFrequencies } from "@/lib/solver/strategy";
 import {
   createNode,
   deleteNode as deleteNodeAction,
@@ -340,6 +340,10 @@ export function SpotView({
     });
   }
 
+  /**
+   * Delete a node and everything under it. Deleting the branch of an option
+   * keeps the option (and its grid column): it just goes back to undeveloped.
+   */
   function removeNode(id: string) {
     const node = nodesRef.current[id];
     const doomed = descendantsOf(id);
@@ -351,33 +355,24 @@ export function SpotView({
       const r = await deleteNodeAction(id);
       if (!r.ok) fail(r.error);
     });
-    // A linked action under a decision *is* that option: deleting the node
-    // removes the option (and its grid column) from the decision.
-    const actionId = node?.type === "action" ? asAction(node).strategyActionId : null;
-    if (parent?.type === "strategy" && actionId) void removeStrategyAction(parent, actionId, doomed);
   }
 
-  async function removeStrategyAction(parent: PokerNode, actionId: string, skip: Set<string>) {
-    const data = asStrategy(parent);
-    const index = data.actions.findIndex((a) => a.id === actionId);
-    if (index < 0) return;
-    const len = data.actions.length;
-    const actions = recolorActions(data.actions.filter((a) => a.id !== actionId));
-    persistData(parent.id, { ...data, actions });
-    syncLinkedChildren(parent.id, actions, skip);
-
-    let weights = weightsRef.current[parent.id];
-    if (!weights) {
-      const { data: row, error } = await supabase.from("poker_strategies").select("weights").eq("node_id", parent.id).maybeSingle();
-      if (error) return fail(error.message);
-      if (!row) return;
-      weights = normalizeWeights(row.weights);
-    }
-    const next = remapWeights(weights, len, len - 1, index);
-    setStrategyWeights((prev) => ({ ...prev, [parent.id]: next }));
-    setStatsById((prev) => ({ ...prev, [parent.id]: null }));
-    const r = await saveStrategy({ nodeId: parent.id, weights: next, stats: null });
-    if (!r.ok) fail(r.error);
+  /** Ask, naming the node and how much goes with it, then delete. */
+  function confirmDelete(id: string) {
+    const node = nodesRef.current[id];
+    if (!node) return;
+    const below = descendantsOf(id).size - 1;
+    const actor = stateAt(id)?.actor;
+    const name =
+      node.type === "strategy"
+        ? `the ${actor ? `${actor} ` : ""}decision`
+        : node.type === "action"
+          ? `“${asAction(node).label}”`
+          : node.type === "flop"
+            ? `the flop ${asFlop(node).cards.join(" ")}`
+            : `the ${node.type} ${asStreet(node).card ?? ""}`.trim();
+    const rest = below > 0 ? ` and the ${below} node${below === 1 ? "" : "s"} under it` : "";
+    if (confirm(`Delete ${name}${rest}?`)) removeNode(id);
   }
 
   /** Keep a decision's linked action children in step with its options. */
@@ -866,6 +861,7 @@ export function SpotView({
       } else persistData(id, patch);
     },
     develop: (decisionId, optionId) => void develop(decisionId, optionId),
+    deleteNode: confirmDelete,
     addChild: async (parentId, type) => {
       const node = await addChild(parentId === ROOT_ID ? null : parentId, type);
       if (!node) return;
@@ -966,7 +962,7 @@ export function SpotView({
           }
           onPatch={(data) => persistData(drawerNode.id, data)}
           onAddChild={(type) => void editing.addChild(drawerNode.id, type)}
-          onDelete={() => removeNode(drawerNode.id)}
+          onDelete={() => confirmDelete(drawerNode.id)}
           onOpenStrategy={() => void openGridEditor(drawerNode)}
           onImportCsv={(text) => importStrategyCsv(drawerNode, text)}
           onClose={() => setDrawer(null)}

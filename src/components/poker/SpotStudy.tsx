@@ -58,6 +58,8 @@ export type StudyEditing = {
   saveNotes: (id: string, patch: NodeMeta) => void;
   /** Add the action node of an option (and on a solver line, what follows). */
   develop: (decisionId: string, optionId: string) => void;
+  /** Delete a node and its subtree (asks first). */
+  deleteNode: (id: string) => void;
   addChild: (parentId: string, type: NodeType) => void | Promise<void>;
   childTypes: (id: string) => NodeType[];
   childLabel: (id: string, type: NodeType) => string;
@@ -224,6 +226,10 @@ export function SpotStudy({
         case "ArrowUp":
           go(siblingStop(tree, focus, -1), "prev");
           break;
+        case "Delete":
+          if (focus === ROOT_ID) handled = false;
+          else editing.deleteNode(focus);
+          break;
         default:
           if (/^[1-9]$/.test(e.key)) go(nexts[Number(e.key) - 1]?.stop ?? null, "down");
           else handled = false;
@@ -232,7 +238,7 @@ export function SpotStudy({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, up, firstNext, tree, focus, nexts]);
+  }, [go, up, firstNext, tree, focus, nexts, editing]);
 
   /* ---------------------------------------------------------------- views */
 
@@ -726,9 +732,14 @@ function FocusPanel({
             </Tool>
           ))}
           <Tool onClick={() => setNotesOpen((v) => !v)}>{notesOpen ? "Done" : meta?.notes.trim() || meta?.summary ? "Edit notes" : "Add notes"}</Tool>
-          <Tool onClick={() => ed.editNode(focus)} title={isRoot ? "Players, start, pot and stacks" : "Cards, options, grid, trainer, delete…"}>
+          <Tool onClick={() => ed.editNode(focus)} title={isRoot ? "Players, start, pot and stacks" : "Cards, options, grid, trainer…"}>
             {isRoot ? "Setup" : "✎ Edit"}
           </Tool>
+          {!isRoot && (
+            <Tool danger onClick={() => ed.deleteNode(focus)} title="Delete this node and everything under it (Delete key)">
+              Delete
+            </Tool>
+          )}
         </div>
       </div>
 
@@ -764,12 +775,14 @@ function Tool({
   children,
   onClick,
   primary,
+  danger,
   disabled,
   title,
 }: {
   children: ReactNode;
   onClick: () => void;
   primary?: boolean;
+  danger?: boolean;
   disabled?: boolean;
   title?: string;
 }) {
@@ -781,7 +794,11 @@ function Tool({
       title={title}
       className={[
         "rounded-md px-2 py-1 text-xs transition-colors disabled:opacity-50",
-        primary ? "bg-accent text-white hover:bg-accent/90" : "border border-line text-muted hover:border-accent hover:text-foreground",
+        primary
+          ? "bg-accent text-white hover:bg-accent/90"
+          : danger
+            ? "border border-line text-muted hover:border-red-500 hover:text-red-500"
+            : "border border-line text-muted hover:border-accent hover:text-foreground",
       ].join(" ")}
     >
       {children}
@@ -908,6 +925,7 @@ function BranchesOverview({
                 </span>
               </th>
             ))}
+            <th className="w-6" aria-label="Delete" />
           </tr>
         </thead>
         <tbody>
@@ -915,7 +933,7 @@ function BranchesOverview({
             <tr
               key={t.via?.id ?? i}
               onClick={() => t.stop && onGo(t.stop)}
-              className={t.stop ? "cursor-pointer" : ""}
+              className={`group/row ${t.stop ? "cursor-pointer" : ""}`}
             >
               <td className="rounded-l-md border-y border-l border-line bg-background px-2 py-1.5 hover:border-accent">
                 <TargetLabel ctx={ctx} t={t} />
@@ -938,6 +956,7 @@ function BranchesOverview({
                 );
               })}
               {columns.length === 0 && <td className="rounded-r-md border-y border-r border-line px-2" />}
+              <td className="w-6 pl-1">{t.via && <DeleteBranch ctx={ctx} t={t} />}</td>
             </tr>
           ))}
         </tbody>
@@ -967,9 +986,17 @@ function AlongTheWay({ ctx, setup, incoming }: { ctx: Ctx; setup: SpotSetup; inc
                 type="button"
                 onClick={() => ctx.editing.editNode(n.id)}
                 className="text-[11px] text-muted hover:text-foreground"
-                title="Edit this node (notes, card, delete…)"
+                title="Edit this node (notes, card…)"
               >
                 ✎
+              </button>
+              <button
+                type="button"
+                onClick={() => ctx.editing.deleteNode(n.id)}
+                className="text-[11px] text-muted hover:text-red-500"
+                title="Delete this node and everything under it"
+              >
+                Delete
               </button>
             </div>
             {m.summary && <p className="mt-0.5 text-sm text-muted">{m.summary}</p>}
@@ -1017,20 +1044,44 @@ function NextColumn({
       <ColumnLabel>{kind === "decision" ? "Options" : kind === "branches" ? "Runouts" : "Next"}</ColumnLabel>
       <div className="study-rail study-rail-right space-y-2">
         {nexts.map((t, i) => (
-          <div key={t.via?.id ?? t.option?.id ?? i} className="study-tick study-stagger" style={{ animationDelay: `${60 + i * 35}ms` }}>
+          <div key={t.via?.id ?? t.option?.id ?? i} className="study-tick study-stagger group/card relative" style={{ animationDelay: `${60 + i * 35}ms` }}>
             <TargetCard
               ctx={ctx}
               from={focus}
               t={t}
               n={i + 1}
               visited={!!t.stop && t.stop === trail}
+              deletable={!!t.via}
               onHover={onIsolate && t.optionIndex >= 0 ? (on) => onIsolate(on ? t.optionIndex : null) : undefined}
               onGo={onGo}
             />
+            {t.via && <DeleteBranch ctx={ctx} t={t} className="absolute right-1.5 top-2" />}
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * ✕ on a branch below the focus: deletes the node it goes through (an
+ * option's branch — the option stays, undeveloped — or a runout).
+ */
+function DeleteBranch({ ctx, t, className = "" }: { ctx: Ctx; t: StudyTarget; className?: string }) {
+  const what = t.option ? `the “${t.option.label}” branch` : "this runout";
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (t.via) ctx.editing.deleteNode(t.via.id);
+      }}
+      title={`Delete ${what} and everything under it`}
+      aria-label={`Delete ${what}`}
+      className={`flex size-5 items-center justify-center rounded text-[11px] text-muted transition-opacity hover:bg-red-500/10 hover:text-red-500 focus:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:group-hover/row:opacity-100 ${className}`}
+    >
+      ✕
+    </button>
   );
 }
 
@@ -1041,6 +1092,7 @@ function TargetCard({
   t,
   n,
   visited,
+  deletable,
   onHover,
   onGo,
 }: {
@@ -1049,6 +1101,8 @@ function TargetCard({
   t: StudyTarget;
   n: number;
   visited: boolean;
+  /** Leave room for the ✕ in the top-right corner. */
+  deletable?: boolean;
   onHover?: (on: boolean) => void;
   onGo: (id: string) => void;
 }) {
@@ -1071,7 +1125,7 @@ function TargetCard({
         visited ? "ring-1 ring-accent/50" : "",
       ].join(" ")}
     >
-      <div className="flex items-center gap-2 text-sm">
+      <div className={`flex items-center gap-2 text-sm ${deletable ? "pr-5" : ""}`}>
         {n <= 9 && t.stop && (
           <kbd className="hidden rounded border border-line px-1 text-[10px] text-muted sm:inline">{n}</kbd>
         )}
