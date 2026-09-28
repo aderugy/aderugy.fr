@@ -122,7 +122,21 @@ export function StatsGrid({
 /** Equity / EV of the whole range, for the legend. */
 export function rangeTotal(stats: StrategyStats, mode: StatsMode): string | null {
   if (mode.kind === "equity") {
-    const t = stats.players[mode.player]?.equityTotal;
+    const p = stats.players[mode.player];
+    let t = p?.equityTotal ?? null;
+    if (t == null && p) {
+      // Older imports: the solver's total is missing, the per-combo equities aren't.
+      let sum = 0;
+      let w = 0;
+      for (const [c, e] of Object.entries(p.equity)) {
+        const r = p.range[c] ?? 0;
+        if (r > 0 && e != null) {
+          sum += e * r;
+          w += r;
+        }
+      }
+      t = w > 0 ? sum / w : null;
+    }
     return t == null ? null : `${t.toFixed(1)}%`;
   }
   return stats.ev?.total == null ? null : `${fmtBb(stats.ev.total)} bb`;

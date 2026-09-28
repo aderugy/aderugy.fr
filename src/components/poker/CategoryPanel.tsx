@@ -284,6 +284,86 @@ export function CategoryPanel({
   );
 }
 
+/* ============================================= beside the strategy grid */
+
+const OTHER_ID = "__other";
+
+/**
+ * The decision's categories next to its strategy: each with its share of the
+ * range and strategy. Clicking one shows only its combos in colour on the
+ * grid (the rest of the range in grey); again to see everything.
+ */
+export function CategoryList({
+  actions,
+  weights,
+  dead,
+  stats,
+  categories,
+  selected,
+  onSelect,
+}: {
+  actions: StrategyAction[];
+  weights: StrategyWeights;
+  dead: Set<string>;
+  stats: StrategyStats | null;
+  categories: HandCategory[];
+  selected: string | null;
+  onSelect: (next: { id: string; combos: Set<string> } | null) => void;
+}) {
+  const len = actions.length;
+  const range = useMemo(() => rangeCombos(weights, len, dead), [weights, len, dead]);
+  const index = useMemo(() => categoryIndex(categories), [categories]);
+  const rows = useMemo(() => {
+    const list = categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      combos: new Set(range.filter((x) => index.get(x.combo) === c.id).map((x) => x.combo)),
+    }));
+    const rest = new Set(range.filter((x) => !index.has(x.combo)).map((x) => x.combo));
+    if (rest.size > 0) list.push({ id: OTHER_ID, name: "Other", color: OTHER, combos: rest });
+    return list.map((r) => ({ ...r, summary: summarize(range, (x) => r.combos.has(x.combo), len, stats) }));
+  }, [categories, index, range, len, stats]);
+
+  return (
+    <div>
+      <p className="mb-1.5 hidden text-[11px] font-medium uppercase tracking-wide text-muted xl:block">Categories</p>
+      <div className="flex flex-wrap gap-1.5 xl:flex-col xl:flex-nowrap">
+        {rows.map((r) => {
+          const on = selected === r.id;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onSelect(on ? null : { id: r.id, combos: r.combos })}
+              className={[
+                "min-w-0 rounded-md border px-2 py-1.5 text-left text-xs transition-colors xl:w-full",
+                on ? "border-foreground/50 bg-foreground/[0.06]" : "border-line hover:border-accent",
+                selected && !on ? "opacity-55" : "",
+              ].join(" ")}
+            >
+              <span className="flex items-center gap-1.5">
+                <span className="size-3 shrink-0 rounded-sm" style={{ backgroundColor: r.color }} />
+                <span className="min-w-0 flex-1 truncate font-medium">{r.name}</span>
+                <span className="shrink-0 tabular-nums text-muted">{formatFrequency(r.summary.share)}</span>
+              </span>
+              <span className="mt-1 hidden xl:block">
+                <StrategyBar actions={actions} strategy={r.summary.strategy} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {selected && (
+        <button type="button" onClick={() => onSelect(null)} className="mt-1.5 text-[11px] text-muted hover:text-foreground">
+          Show every hand
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ================================================================== rows */
 
 function CategoryRow({

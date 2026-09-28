@@ -50,7 +50,7 @@ import { StatsDetail, rangeTotal, type StatsMode } from "@/components/poker/Stat
 import { BoardCards } from "@/components/poker/trainer/Cards";
 import { Markdown } from "@/components/poker/Markdown";
 import { NodeNotes } from "@/components/poker/NodeNotes";
-import { CategoryPanel } from "@/components/poker/CategoryPanel";
+import { CategoryList, CategoryPanel } from "@/components/poker/CategoryPanel";
 import { asCategories, type HandCategory } from "@/lib/solver/categories";
 
 /** What the study layout can change, supplied by SpotView. */
@@ -827,6 +827,8 @@ function DecisionBody({
   }, [node.id, requestStats]);
   const stats = ctx.editing.stats[node.id] ?? null;
   const [mode, setMode] = useState<GridMode>("strategy");
+  // A category picked beside the strategy: only its combos in colour.
+  const [looked, setLooked] = useState<{ id: string; combos: Set<string> } | null>(null);
 
   if (w === undefined) {
     return <div className="aspect-square w-full max-w-[560px] animate-pulse rounded-lg bg-foreground/5" />;
@@ -859,13 +861,13 @@ function DecisionBody({
     mode === "eq-OOP" ? { kind: "equity", player: "OOP" } : mode === "eq-IP" ? { kind: "equity", player: "IP" } : mode === "ev" ? { kind: "ev" } : null;
 
   return (
-    <div className={mode === "categories" ? "" : "max-w-[560px]"}>
+    <div className={mode === "categories" || (mode === "strategy" && categories.length > 0) ? "" : "max-w-[560px]"}>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <Segmented size="sm" value={mode} onChange={setMode} options={tabs} />
         {stats && (
           <span className="text-[11px] tabular-nums text-muted">
             {(["OOP", "IP"] as const)
-              .filter((p) => stats.players[p])
+              .filter((p) => stats.players[p] && rangeTotal(stats, { kind: "equity", player: p }) != null)
               .map((p) => `${name(p)} ${rangeTotal(stats, { kind: "equity", player: p })}`)
               .join(" · ")}
             {stats.ev?.total != null && ` · EV ${name(stats.actor)} ${rangeTotal(stats, { kind: "ev" })}`}
@@ -885,6 +887,32 @@ function DecisionBody({
         />
       ) : stats && statsMode ? (
         <StatsDetail stats={stats} mode={statsMode} dead={ctx.deadCards(node.id)} />
+      ) : categories.length > 0 ? (
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:gap-4">
+          <div className="min-w-0 xl:order-2 xl:w-52 xl:shrink-0">
+            <CategoryList
+              actions={actions}
+              weights={w}
+              dead={ctx.deadCards(node.id)}
+              stats={stats}
+              categories={categories}
+              selected={looked?.id ?? null}
+              onSelect={setLooked}
+            />
+          </div>
+          <div className="min-w-0 xl:order-1 xl:w-[560px] xl:shrink">
+            <StrategyDetail
+              actions={actions}
+              weights={w}
+              dead={ctx.deadCards(node.id)}
+              frequencies={f}
+              isolate={isolate}
+              onIsolate={onIsolate}
+              stats={stats}
+              focus={looked?.combos ?? null}
+            />
+          </div>
+        </div>
       ) : (
         <StrategyDetail
           actions={actions}

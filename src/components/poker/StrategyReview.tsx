@@ -22,6 +22,7 @@ export function StrategyDetail({
   isolate,
   onIsolate,
   stats,
+  focus = null,
 }: {
   actions: StrategyAction[];
   weights: StrategyWeights;
@@ -32,6 +33,8 @@ export function StrategyDetail({
   onIsolate?: (index: number | null) => void;
   /** Solver equity / EV (Pio imports): shown per combo on hover. */
   stats?: StrategyStats | null;
+  /** Only these combos in colour (a category), the rest of the range in grey. */
+  focus?: Set<string> | null;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   if (actions.length === 0) return <p className="text-sm text-muted">This decision has no options yet.</p>;
@@ -71,6 +74,7 @@ export function StrategyDetail({
         hovered={hovered}
         onHoverHand={setHovered}
         isolate={isolate}
+        focus={focus}
       />
 
       <HoverDetail hand={hovered} actions={actions} weights={weights} dead={dead} stats={stats ?? null} />

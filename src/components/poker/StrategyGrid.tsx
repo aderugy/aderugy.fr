@@ -1,7 +1,7 @@
 "use client";
 
 import { GRID_HANDS, RANKS, comboBlocked, handCombos } from "@/lib/solver/cards";
-import { handDisplayVector, vectorTotal } from "@/lib/solver/strategy";
+import { comboVector, handDisplayVector, vectorTotal } from "@/lib/solver/strategy";
 import type { StrategyAction, StrategyWeights } from "@/lib/solver/types";
 
 /**
@@ -35,6 +35,29 @@ export function CellBars({
   );
 }
 
+/** Combos of the range outside the category looked at. */
+const OUTSIDE = "#c9c6c0";
+
+/**
+ * A hand's cell when only some combos are looked at (a category): their
+ * strategy, then the hand's other combos in range in grey, all out of the
+ * hand's combos like `handDisplayVector`. The extra last entry is the grey.
+ */
+function focusVector(weights: StrategyWeights, hand: string, len: number, focus: Set<string>): number[] | null {
+  const combos = handCombos(hand);
+  const out = new Array<number>(len + 1).fill(0);
+  let any = false;
+  for (const c of combos) {
+    const v = comboVector(weights, c, hand, len);
+    const total = vectorTotal(v);
+    if (total <= 0) continue;
+    any = true;
+    if (focus.has(c)) for (let i = 0; i < len; i++) out[i] += v[i];
+    else out[len] += total;
+  }
+  return any ? out.map((x) => x / combos.length) : null;
+}
+
 /**
  * A read-only 13×13 strategy grid. `mini` drops labels and borders for the tiny
  * in-bubble preview; the full variant shows hand labels and reports the hovered
@@ -49,6 +72,7 @@ export function StrategyGrid({
   hovered,
   onHoverHand,
   isolate = null,
+  focus = null,
 }: {
   actions: StrategyAction[];
   weights: StrategyWeights;
@@ -58,8 +82,11 @@ export function StrategyGrid({
   onHoverHand?: (hand: string | null) => void;
   /** Show only this action's share of each hand (index in `actions`). */
   isolate?: number | null;
+  /** Only these combos in colour; the rest of the range in grey. */
+  focus?: Set<string> | null;
 }) {
   const len = actions.length;
+  const shown: StrategyAction[] = focus ? [...actions, { id: "__outside", kind: "check", label: "Other", color: OUTSIDE }] : actions;
   const mini = variant === "mini";
   return (
     <div
@@ -68,9 +95,9 @@ export function StrategyGrid({
       onPointerLeave={() => onHoverHand?.(null)}
     >
       {GRID_HANDS.map((hand) => {
-        const full = handDisplayVector(weights, hand, len);
+        const full = focus ? focusVector(weights, hand, len, focus) : handDisplayVector(weights, hand, len);
         const vec =
-          full && isolate != null ? full.map((x, i) => (i === isolate ? x : 0)) : full;
+          full && isolate != null ? full.map((x, i) => (i === isolate || i === len ? x : 0)) : full;
         const blocked = handCombos(hand).every((c) => comboBlocked(c, dead));
         return (
           <div
@@ -84,9 +111,9 @@ export function StrategyGrid({
               blocked ? "opacity-25" : "",
             ].join(" ")}
           >
-            <CellBars actions={actions} vector={vec} />
+            <CellBars actions={shown} vector={vec} />
             {!mini && (
-              <span className="absolute inset-0 flex items-center justify-center text-white mix-blend-difference">
+              <span className="absolute inset-0 flex items-center justify-center text-black">
                 {hand}
               </span>
             )}
