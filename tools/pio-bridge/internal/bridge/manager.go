@@ -51,6 +51,9 @@ type Manager struct {
 	board     []string
 	handOrder []string
 	lastUse   time.Time
+	// allNodes: load_all_nodes ran on the loaded save (whole-tree reads are
+	// safe and every turn is in memory).
+	allNodes bool
 
 	cfgMu sync.RWMutex
 	cfg   Config
@@ -282,7 +285,7 @@ func (m *Manager) ensureLocked(file string) error {
 			return err
 		}
 	}
-	m.file, m.board = "", nil
+	m.file, m.board, m.allNodes = "", nil, false
 	if _, err := s.Raw(`load_tree "` + file + `" fast`); err != nil {
 		return err
 	}
@@ -517,6 +520,19 @@ func (s *Session) EffectiveStack() (float64, error) {
 		return 0, err
 	}
 	return strconv.ParseFloat(strings.TrimSpace(lines[0]), 64)
+}
+
+// LoadAll reads every node of the loaded save into memory once (1.5 s on a
+// flop save), so a pass over all the runouts doesn't read each turn from disk.
+func (s *Session) LoadAll() error {
+	if s.m.allNodes {
+		return nil
+	}
+	if _, err := s.Raw("load_all_nodes"); err != nil {
+		return err
+	}
+	s.m.allNodes = true
+	return nil
 }
 
 // Board is the loaded save's real board (from the root node; the tree info's

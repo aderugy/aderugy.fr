@@ -153,6 +153,58 @@ func TestVillainEquity(t *testing.T) {
 	}
 }
 
+func TestVillainEV(t *testing.T) {
+	a := newTestApp(t, "REPLAY_SYNTH", "1")
+	rec, body := get(t, a, "/api/decision?"+q(saveRel, "r:0:c:c:Kh", "stats", "1", "villain", "1"))
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	st := body["stats"].(map[string]any)
+	if len(floats(t, st["villainEv"])) != 1326 || len(floats(t, st["villainEvWeights"])) != 1326 {
+		t.Fatalf("villain EV: %v", st["notes"])
+	}
+}
+
+func TestRunouts(t *testing.T) {
+	a := newTestApp(t, "REPLAY_SYNTH", "1")
+	rec, body := get(t, a, "/api/runouts?"+q(saveRel, "r:0:c:c"))
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	cards := body["cards"].([]any)
+	if len(cards) != 49 {
+		t.Fatalf("%d cards, want 49", len(cards))
+	}
+	seen := map[float64]bool{}
+	for _, x := range cards {
+		c := x.(map[string]any)
+		eq := c["equity"].(map[string]any)
+		ev := c["ev"].(map[string]any)
+		if eq["OOP"] == nil || eq["IP"] == nil || ev["OOP"] == nil || ev["IP"] == nil {
+			t.Fatalf("%v: missing totals (%v)", c["card"], c["notes"])
+		}
+		strat := floats(t, c["strategy"])
+		if len(strat) != len(c["children"].([]any)) || len(strat) == 0 {
+			t.Fatalf("%v: strategy %v", c["card"], strat)
+		}
+		sum := 0.0
+		for _, f := range strat {
+			sum += f
+		}
+		if math.Abs(sum-1) > 1e-3 {
+			t.Errorf("%v: strategy sums to %f", c["card"], sum)
+		}
+		seen[eq["OOP"].(float64)] = true
+	}
+	if len(seen) < 10 {
+		t.Errorf("runouts all alike: %d distinct equities", len(seen))
+	}
+	// Not a split node.
+	if rec, _ := get(t, a, "/api/runouts?"+q(saveRel, "r:0")); rec.Code != 400 {
+		t.Errorf("runouts on a decision: status %d", rec.Code)
+	}
+}
+
 func TestDecisionLabelsAndPots(t *testing.T) {
 	a := newTestApp(t)
 	rec, body := get(t, a, "/api/node?"+q(saveRel, "r:0:b45:c:2c"))

@@ -40,6 +40,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/hand-order", a.handOrder)
 	mux.HandleFunc("GET /api/node", a.node)
 	mux.HandleFunc("GET /api/decision", a.decision)
+	mux.HandleFunc("GET /api/runouts", a.runouts)
 	mux.HandleFunc("GET /api/status", a.sameOrigin(a.statusJSON))
 	mux.HandleFunc("GET /{$}", a.sameOrigin(a.statusPage))
 	mux.HandleFunc("POST /settings", a.sameOrigin(a.formGuard(a.saveSettings)))
@@ -379,7 +380,10 @@ type decisionStats struct {
 	VillainEquity        Floats   `json:"villainEquity,omitempty"`
 	VillainEquityWeights Floats   `json:"villainEquityWeights,omitempty"`
 	VillainEquityTotal   *float64 `json:"villainEquityTotal,omitempty"`
-	Notes                []string `json:"notes"`
+	// And the other player's EV at this node.
+	VillainEV        Floats   `json:"villainEv,omitempty"`
+	VillainEVWeights Floats   `json:"villainEvWeights,omitempty"`
+	Notes            []string `json:"notes"`
 }
 
 type decisionResp struct {
@@ -470,6 +474,15 @@ func (a *App) decision(w http.ResponseWriter, r *http.Request) {
 			default:
 				return err
 			}
+			ev, w, err := s.EV(other, id)
+			switch {
+			case err == nil:
+				st.VillainEV, st.VillainEVWeights = ev, w
+			case isSolverErr(err):
+				st.Notes = append(st.Notes, "villain EV: "+err.Error())
+			default:
+				return err
+			}
 		}
 		st.ChildEV = make([]Floats, len(kids))
 		for i, k := range kids {
@@ -494,6 +507,133 @@ func (a *App) decision(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		resp.Stats = st
+		return nil
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	resp.Millis = time.Since(t0).Milliseconds()
+	writeJSON(w, 200, resp)
+}
+
+/* --------------------------------------------------------------- runouts */
+
+// One card dealt at a split node, summed up: both players' equity and EV
+// over their ranges there, and how often the player to act takes each option.
+type runoutCard struct {
+	Card     string     `json:"card"`
+	Node     NodeInfo   `json:"node"`
+	Children []NodeInfo `json:"children"`
+	// Average frequency of each child (option) over the actor's range.
+	Strategy Floats `json:"strategy,omitempty"`
+	// Solver's equity total (0–1) and EV averaged with calc_ev's weights
+	// (chips), by player: "OOP", "IP".
+	Equity map[string]*float64 `json:"equity"`
+	EV     map[string]*float64 `json:"ev"`
+	Notes  []string            `json:"notes"`
+}
+
+type runoutsResp struct {
+	File   string       `json:"file"`
+	Node   NodeInfo     `json:"node"`
+	Cards  []runoutCard `json:"cards"`
+	Millis int64        `json:"ms"`
+}
+
+// mean averages values over weights, skipping NaN values; nil when nothing counts.
+func mean(values, weights Floats) *float64 {
+	sum, w := 0.0, 0.0
+	for h, v := range values {
+		if h >= len(weights) || v != v || weights[h] != weights[h] || weights[h] <= 0 {
+			continue
+		}
+		sum += v * weights[h]
+		w += weights[h]
+	}
+	if w <= 0 {
+		return nil
+	}
+	x := sum / w
+	return &x
+}
+
+// runouts sums up every card of a split node (the turn or river cards after
+// a betting round): the aggregated report used to pick the runouts to study.
+func (a *App) runouts(w http.ResponseWriter, r *http.Request) {
+	t0 := time.Now()
+	abs, rel, err := a.cfrParam(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	id, err := idParam(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var resp runoutsResp
+	err = a.m.Do(abs, func(s *Session) error {
+		n, err := s.Node(id)
+		if err != nil {
+			return err
+		}
+		if n.Type != "SPLIT_NODE" {
+			return &apiError{http.StatusBadRequest, "not_a_split", id + " is a " + n.Type + ", not where cards are dealt"}
+		}
+		if err := s.LoadAll(); err != nil {
+			return err
+		}
+		kids, err := s.Children(id)
+		if err != nil {
+			return err
+		}
+		resp = runoutsResp{File: rel, Node: n, Cards: []runoutCard{}}
+		for _, k := range kids {
+			c := runoutCard{Card: k.Last, Node: k, Children: []NodeInfo{}, Equity: map[string]*float64{}, EV: map[string]*float64{}, Notes: []string{}}
+			if !k.Solved {
+				c.Notes = append(c.Notes, "not in the save")
+				resp.Cards = append(resp.Cards, c)
+				continue
+			}
+			for _, p := range []string{"OOP", "IP"} {
+				if _, _, total, err := s.Equity(p, k.ID); err == nil {
+					t := total
+					c.Equity[p] = &t
+				} else if isSolverErr(err) {
+					c.Notes = append(c.Notes, p+" equity: "+err.Error())
+				} else {
+					return err
+				}
+				if ev, wts, err := s.EV(p, k.ID); err == nil {
+					c.EV[p] = mean(ev, wts)
+				} else if isSolverErr(err) {
+					c.Notes = append(c.Notes, p+" EV: "+err.Error())
+				} else {
+					return err
+				}
+			}
+			if k.Player != "" && k.Children > 0 {
+				if c.Children, err = s.Children(k.ID); err != nil {
+					return err
+				}
+				strat, err := s.Strategy(k.ID, len(c.Children))
+				if err != nil {
+					return err
+				}
+				rng, err := s.Range(k.Player, k.ID)
+				if err != nil {
+					return err
+				}
+				c.Strategy = make(Floats, len(c.Children))
+				for i := range c.Children {
+					if f := mean(strat[i], rng); f != nil {
+						c.Strategy[i] = *f
+					}
+				}
+			}
+			resp.Cards = append(resp.Cards, c)
+		}
 		return nil
 	})
 	if err != nil {

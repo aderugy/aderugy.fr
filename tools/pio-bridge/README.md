@@ -37,7 +37,8 @@ Go, one `.exe`, nothing to install. The bridge stays thin: it runs the solver an
 | `/api/tree?file=` | board (from the root: the tree info `#Board#` can be wrong → `infoBoardMatches`), root, first decision, effective stack, tree info, starting ranges |
 | `/api/hand-order` | the 1326 combos in solver order (`2d2c … AsAh`); every vector follows it |
 | `/api/node?file=&id=` | node + children |
-| `/api/decision?file=&id=&stats=1&villain=1` | node, children (= actions, in strategy row order), `strategy` (rows × 1326), `range`, `villainRange`, `globalFreq`, and with `stats`: `equity`, `equityWeights`, `equityTotal`, `ev`, `evWeights`, `childEv` (EV of each action), `notes` |
+| `/api/decision?file=&id=&stats=1&villain=1` | node, children (= actions, in strategy row order), `strategy` (rows × 1326), `range`, `villainRange`, `globalFreq`, and with `stats`: `equity`, `equityWeights`, `equityTotal`, `ev`, `evWeights`, `childEv` (EV of each action), with `villain` also `villainEquity*` and `villainEv` / `villainEvWeights` (the other player's equity and EV), `notes` |
+| `/api/runouts?file=&id=` | `id` = a split node (where the turn or river is dealt). Per card: the decision after it (`node`, `children`), `strategy` (each option's average frequency over the actor's range), `equity` and `ev` by player (solver's equity total 0–1, EV in chips averaged with `calc_ev`'s weights), `notes`. Runs `load_all_nodes` once per save first. |
 
 A node is `{id, type, player, last, board, pot: {oop, ip, start}, children, flags, solved}`.
 - `last` is the action token: `c`, `f`, `b495`, or a card.

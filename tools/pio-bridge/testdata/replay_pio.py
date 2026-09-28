@@ -115,7 +115,29 @@ def synth_answer(cmd):
         n = len(kids)
         return [" ".join([f"{1/n:.4f}"] * 1326) for _ in range(n)]
     if name in ("show_range", "calc_eq_node", "calc_ev") and len(args) == 2:
-        return answers.get(f"{name} OOP r:0")
+        base = answers.get(f"{name} OOP r:0")
+        cards = [t for t in args[1].split(":") if is_card(t)]
+        if not base or not cards or name == "show_range":
+            return base
+        # A different (fake) value on every runout, opposite for the two
+        # players, so a runout report has something to show.
+        k = sum(ord(ch) * (i + 7) for i, ch in enumerate(cards[-1])) % 41
+        f = 0.8 + k / 100
+        if args[0] == "IP": f = 2 - f
+        def scale(line, clamp):
+            outv = []
+            for x in line.split():
+                try: v = float(x)
+                except ValueError: outv.append(x); continue
+                if v != v: outv.append(x); continue
+                v = v * f
+                if clamp: v = min(1.0, v)
+                outv.append(f"{v:.6f}")
+            return " ".join(outv)
+        res = list(base)
+        res[0] = scale(res[0], name == "calc_eq_node")
+        if name == "calc_eq_node" and len(res) > 2: res[2] = scale(res[2], True)
+        return res
     if name == "calc_global_freq":
         return ["0.5"]
     return None
@@ -130,7 +152,7 @@ for raw in sys.stdin:
         open(marker, "w").close(); sys.stdout.flush(); os._exit(5)
     if name == "set_end_string":
         end = cmd.split(" ", 1)[1]; out("set_end_string ok!"); done(); continue
-    if name in ("load_tree", "free_tree", "set_threads", "is_ready"):
+    if name in ("load_tree", "free_tree", "set_threads", "is_ready") or (name == "load_all_nodes" and cmd not in answers):
         out(name + " ok!"); done(); continue
     if cmd in answers:
         out(*answers[cmd])
