@@ -5,7 +5,7 @@
 
 import { comboToHand, handShape } from "../solver/cards";
 import { playableFreqs } from "./score";
-import type { TrainerAnswer } from "./types";
+import { TREE_ENDS, type EndReason, type TrainerAnswer, type TrainerHand } from "./types";
 
 export type Tally = { key: string; label: string; hands: number; correct: number; blunders: number };
 
@@ -98,4 +98,32 @@ export function mixDiscipline(answers: TrainerAnswer[]): { label: string; solver
   return [...m.entries()]
     .map(([label, r]) => ({ label, solver: r.solver / r.hands, chosen: r.chosen / r.hands, hands: r.hands }))
     .sort((a, b) => b.solver - a.solver);
+}
+
+/** Hands played, perfect ones (every decision correct), decisions per hand. */
+export function handStats(hands: TrainerHand[]): { hands: number; perfect: number; decisionsPerHand: number | null } {
+  const played = hands.length;
+  const perfect = hands.filter((h) => h.decisions > 0 && h.correct === h.decisions).length;
+  const decisions = hands.reduce((a, h) => a + h.decisions, 0);
+  return { hands: played, perfect, decisionsPerHand: played ? decisions / played : null };
+}
+
+/**
+ * C12: the nodes where hands stop because the tree does (no solution, branch
+ * not developed, off range, no runout), most frequent first — what to build
+ * next in Solver notes.
+ */
+export function treeStops(
+  hands: TrainerHand[],
+  limit = 8,
+): { nodeId: string; count: number; reasons: Partial<Record<EndReason, number>> }[] {
+  const m = new Map<string, { nodeId: string; count: number; reasons: Partial<Record<EndReason, number>> }>();
+  for (const h of hands) {
+    if (!h.end_node_id || !TREE_ENDS.includes(h.end_reason)) continue;
+    const row = m.get(h.end_node_id) ?? { nodeId: h.end_node_id, count: 0, reasons: {} };
+    row.count++;
+    row.reasons[h.end_reason] = (row.reasons[h.end_reason] ?? 0) + 1;
+    m.set(h.end_node_id, row);
+  }
+  return [...m.values()].sort((a, b) => b.count - a.count).slice(0, limit);
 }

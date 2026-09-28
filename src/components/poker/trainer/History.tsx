@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { byHandClass, byNode, confusions, mixDiscipline, type Tally } from "@/lib/trainer/history";
-import type { Trainer, TrainerAnswer, TrainerSession } from "@/lib/trainer/types";
-import type { TrainerNodeView } from "@/server/trainers";
+import { byHandClass, byNode, confusions, handStats, mixDiscipline, treeStops, type Tally } from "@/lib/trainer/history";
+import { END_LABELS, type EndReason, type Trainer, type TrainerAnswer, type TrainerHand, type TrainerSession } from "@/lib/trainer/types";
+import type { TrainerNodeView, TrainerPage } from "@/server/trainers";
 
 const pct = (x: number) => `${Math.round(x)}%`;
 
@@ -17,13 +17,17 @@ export function History({
   nodes,
   sessions,
   answers,
+  hands,
+  nodeInfo,
 }: {
   trainer: Trainer;
   nodes: TrainerNodeView[];
   sessions: TrainerSession[];
   answers: TrainerAnswer[];
+  hands: TrainerHand[];
+  nodeInfo: TrainerPage["nodeInfo"];
 }) {
-  const played = sessions.filter((s) => s.hands > 0);
+  const played = sessions.filter((s) => s.hands > 0 || s.played_hands > 0);
   const totals = played.reduce(
     (a, s) => ({ hands: a.hands + s.hands, correct: a.correct + s.correct, blunders: a.blunders + s.blunders }),
     { hands: 0, correct: 0, blunders: 0 },
@@ -31,12 +35,15 @@ export function History({
 
   const nodeLabel = useMemo(() => {
     const m = new Map(nodes.map((n) => [n.node_id, `${n.spotName}${n.label ? ` · ${n.label}` : ""}${n.board.length ? ` · ${n.board.join("")}` : ""}`]));
-    return (id: string) => m.get(id) ?? "Removed node";
-  }, [nodes]);
+    return (id: string) => m.get(id) ?? (nodeInfo[id] ? `${nodeInfo[id].spotName} · ${nodeInfo[id].label}` : "Removed node");
+  }, [nodes, nodeInfo]);
   const worstNodes = useMemo(() => byNode(answers, nodeLabel).slice(0, 5), [answers, nodeLabel]);
   const worstClasses = useMemo(() => byHandClass(answers).slice(0, 5), [answers]);
   const swaps = useMemo(() => confusions(answers), [answers]);
   const mix = useMemo(() => mixDiscipline(answers), [answers]);
+  const hs = useMemo(() => handStats(hands), [hands]);
+  const stops = useMemo(() => treeStops(hands), [hands]);
+  const scored = played.filter((s) => s.hands > 0);
 
   if (played.length === 0) {
     return (
@@ -48,19 +55,57 @@ export function History({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Stat label="Sessions" value={String(played.length)} />
-        <Stat label="Hands" value={String(totals.hands)} />
-        <Stat label="Correct" value={pct((totals.correct / totals.hands) * 100)} />
-        <Stat label="Blunder rate" value={pct((totals.blunders / totals.hands) * 100)} />
+        <Stat label="Hands" value={String(hs.hands)} />
+        <Stat label="Decisions" value={String(totals.hands)} />
+        <Stat label="Correct decisions" value={totals.hands ? pct((totals.correct / totals.hands) * 100) : "—"} />
+        <Stat label="Perfect hands" value={hs.hands ? pct((hs.perfect / hs.hands) * 100) : "—"} />
+        <Stat label="Blunder rate" value={totals.hands ? pct((totals.blunders / totals.hands) * 100) : "—"} />
       </div>
+      {hs.decisionsPerHand !== null && (
+        <p className="text-[11px] text-muted">{hs.decisionsPerHand.toFixed(1)} decisions per hand on average.</p>
+      )}
 
-      {played.length >= 2 && (
+      {scored.length >= 2 && (
         <section className="rounded-lg border border-line bg-surface p-3">
           <h2 className="text-sm font-medium">% correct per session</h2>
-          <ScoreChart sessions={played} />
+          <ScoreChart sessions={scored} />
         </section>
       )}
+
+      <section className="rounded-lg border border-line bg-surface p-3">
+        <h2 className="text-sm font-medium">Where hands stop</h2>
+        <p className="text-[11px] text-muted">Nodes where the tree ran out before the hand did — what to develop next.</p>
+        {stops.length === 0 ? (
+          <p className="mt-2 text-xs text-muted">No hand stopped for lack of a solution.</p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-xs">
+            {stops.map((st) => {
+              const n = nodeInfo[st.nodeId];
+              return (
+                <li key={st.nodeId} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">
+                    {n ? (
+                      <Link href={`/poker/spots/${n.spotId}?node=${st.nodeId}`} className="hover:text-accent hover:underline">
+                        {n.spotName} · {n.label}
+                      </Link>
+                    ) : (
+                      "Removed node"
+                    )}
+                    <span className="ml-1 text-muted">
+                      {Object.entries(st.reasons)
+                        .map(([r, c]) => `${END_LABELS[r as EndReason].toLowerCase()} ×${c}`)
+                        .join(", ")}
+                    </span>
+                  </span>
+                  <span className="shrink-0 tabular-nums text-muted">×{st.count}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Leaks title="Weakest nodes" rows={worstNodes} empty="Needs 5+ hands on a node." />
@@ -115,6 +160,7 @@ export function History({
             <tr>
               <th className="text-left font-normal">Started</th>
               <th className="text-right font-normal">Hands</th>
+              <th className="text-right font-normal">Decisions</th>
               <th className="text-right font-normal">Correct</th>
               <th className="text-right font-normal">Blunders</th>
               <th />
@@ -127,8 +173,9 @@ export function History({
                   {when(s.started_at)}
                   {!s.ended_at && <span className="ml-1 text-amber-600">open</span>}
                 </td>
+                <td className="py-1 text-right tabular-nums">{s.played_hands || "—"}</td>
                 <td className="py-1 text-right tabular-nums">{s.hands}</td>
-                <td className="py-1 text-right tabular-nums">{pct((s.correct / s.hands) * 100)}</td>
+                <td className="py-1 text-right tabular-nums">{s.hands ? pct((s.correct / s.hands) * 100) : "—"}</td>
                 <td className="py-1 text-right tabular-nums">{s.blunders}</td>
                 <td className="py-1 text-right">
                   <Link href={`/poker/trainers/${trainer.id}/sessions/${s.id}`} className="text-accent hover:underline">

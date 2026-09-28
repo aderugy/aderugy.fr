@@ -19,6 +19,7 @@ import {
   ACTION_KINDS,
   kindHasSize,
   type ActionKind,
+  type SizeUnit,
   type StrategyAction,
   type StrategyWeights,
 } from "@/lib/solver/types";
@@ -140,7 +141,7 @@ export function StrategyEditor({
   function updateAction(index: number, patch: Partial<StrategyAction>) {
     const next = actions.map((a, i) => (i === index ? { ...a, ...patch } : a));
     // A kind or sizing change re-ranks the bets, so re-apply the palette.
-    const reorders = patch.kind !== undefined || patch.sizePct !== undefined;
+    const reorders = patch.kind !== undefined || patch.sizePct !== undefined || patch.sizeUnit !== undefined;
     commitActions(reorders ? recolorActions(next) : next);
   }
 
@@ -374,18 +375,35 @@ function ActionEditor({
         </select>
       </label>
       {kindHasSize(action.kind) && (
-        <label className="block text-xs text-muted">
-          Size (% pot)
-          <input
-            type="number"
-            min={0}
-            value={action.sizePct ?? ""}
-            onChange={(e) =>
-              onUpdate({ sizePct: e.target.value === "" ? null : Number(e.target.value) })
-            }
-            className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
-          />
-        </label>
+        <div className="text-xs text-muted">
+          Size <span className="text-[10px]">(empty = all-in)</span>
+          <div className="mt-0.5 flex gap-1">
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={action.sizePct ?? ""}
+              onChange={(e) =>
+                onUpdate({ sizePct: e.target.value === "" ? null : Number(e.target.value) })
+              }
+              aria-label="Size"
+              className="min-w-0 flex-1 rounded border border-line bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-accent"
+            />
+            <select
+              value={action.sizeUnit ?? ""}
+              onChange={(e) =>
+                onUpdate({ sizeUnit: e.target.value === "" ? null : (e.target.value as SizeUnit) })
+              }
+              aria-label="Unit"
+              title="Default: bb preflop, % of the pot postflop"
+              className="rounded border border-line bg-background px-1 py-1 text-xs text-foreground outline-none focus:border-accent"
+            >
+              <option value="">default</option>
+              <option value="pct">% pot</option>
+              <option value="bb">bb</option>
+            </select>
+          </div>
+        </div>
       )}
       <div>
         <span className="text-xs text-muted">Colour</span>

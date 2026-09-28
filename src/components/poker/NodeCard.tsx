@@ -6,13 +6,12 @@ import {
   asMeta,
   asFlop,
   asStrategy,
-  strategyPositionText,
   asStreet,
-  asText,
   NODE_LABELS,
   type PokerNode,
   type StrategyWeights,
 } from "@/lib/solver/types";
+import { effectiveStack, fmtBb, toCall, totalPot, type NodeState, type Terminal } from "@/lib/solver/gameState";
 import { NODE_W, NODE_H } from "@/lib/solver/layout";
 import { StrategyGrid } from "@/components/poker/StrategyGrid";
 
@@ -30,6 +29,9 @@ export function NodeCard({
   onSelect,
   onToggle,
   trainerCount = 0,
+  ns,
+  developed,
+  onDevelop,
 }: {
   node: PokerNode;
   mode: CanvasMode;
@@ -40,8 +42,14 @@ export function NodeCard({
   dead?: Set<string>;
   /** Action nodes: global frequency (%) of the action in its parent strategy. */
   frequency?: number | null;
-  /** Strategy nodes: how many trainers drill this node. */
+  /** How many trainers start hands at this node. */
   trainerCount?: number;
+  /** The hand's state after this node (null while the spot isn't set up). */
+  ns?: NodeState | null;
+  /** Decision nodes: ids of the options that already have a branch. */
+  developed?: Set<string>;
+  /** Decision nodes, edit mode: grow a branch for an undeveloped option. */
+  onDevelop?: (actionId: string) => void;
   onSelect: () => void;
   onToggle: () => void;
 }) {
@@ -64,9 +72,14 @@ export function NodeCard({
             <NotesIcon />
           </span>
         )}
+        {ns?.overridden && (
+          <span title="Pot and stack set by hand here" className="rounded bg-amber-500/15 px-1 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+            manual
+          </span>
+        )}
         {trainerCount > 0 && (
           <span
-            title={`In ${trainerCount} trainer${trainerCount > 1 ? "s" : ""}`}
+            title={`Hands start here in ${trainerCount} trainer${trainerCount > 1 ? "s" : ""}`}
             className="rounded bg-accent/10 px-1 text-[10px] font-medium text-accent"
           >
             ▶ {trainerCount}
@@ -87,12 +100,78 @@ export function NodeCard({
         )}
       </div>
       <div className="mt-1 min-h-0 flex-1 text-sm">
-        <NodeBody node={node} mode={mode} weights={weights} dead={dead} frequency={frequency} />
+        <NodeBody
+          node={node}
+          mode={mode}
+          weights={weights}
+          dead={dead}
+          frequency={frequency}
+          ns={ns}
+          developed={developed}
+          onDevelop={onDevelop}
+        />
       </div>
       {summary && (
         <p className="mt-1.5 line-clamp-3 whitespace-pre-line text-xs text-muted">{summary}</p>
       )}
+      {ns && <StateLine node={node} ns={ns} />}
     </div>
+  );
+}
+
+/**
+ * The hand at this node in one line: who acts and what it costs on a
+ * decision, the pot and stacks on a card, how the hand ended on the action
+ * that ends it, or why the node can't happen.
+ */
+function StateLine({ node, ns }: { node: PokerNode; ns: NodeState }) {
+  if (ns.error) {
+    return <p className="mt-1.5 line-clamp-2 text-[11px] text-red-500">⚠ {ns.error}</p>;
+  }
+  const s = ns.state;
+  if (node.type === "strategy") {
+    const call = ns.actor ? toCall(s, ns.actor) : 0;
+    return (
+      <p className="mt-1.5 text-[11px] tabular-nums text-muted">
+        <b className="text-foreground">{ns.actor}</b> to act{call > 0 ? ` · ${fmtBb(call)} to call` : ""} · pot {fmtBb(totalPot(s))}
+      </p>
+    );
+  }
+  if (s.terminal) return <TerminalBadge terminal={s.terminal} />;
+  if (node.type === "action") {
+    const last = s.log[s.log.length - 1];
+    const put = last && last.amountBb != null && last.kind !== "call" ? ` to ${fmtBb(last.amountBb)}` : "";
+    return (
+      <p className="mt-1.5 text-[11px] tabular-nums text-muted">
+        <b className="text-foreground">{last?.seat}</b>
+        {put}
+        {s.status === "deal" ? " · round closed" : ""} · pot {fmtBb(totalPot(s))}
+      </p>
+    );
+  }
+  return (
+    <p className="mt-1.5 text-[11px] tabular-nums text-muted">
+      Pot {fmtBb(totalPot(s))} · Eff. {fmtBb(effectiveStack(s))}
+    </p>
+  );
+}
+
+export function terminalText(t: Terminal): string {
+  switch (t.kind) {
+    case "fold":
+      return `Hand over — ${t.winner} wins ${fmtBb(t.potBb)} bb`;
+    case "showdown":
+      return `Showdown · pot ${fmtBb(t.potBb)} bb`;
+    case "allin":
+      return `All-in — runout · pot ${fmtBb(t.potBb)} bb`;
+  }
+}
+
+function TerminalBadge({ terminal }: { terminal: Terminal }) {
+  return (
+    <p className="mt-1.5 rounded bg-foreground/5 px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
+      ■ {terminalText(terminal)}
+    </p>
   );
 }
 
@@ -102,23 +181,20 @@ function NodeBody({
   weights,
   dead,
   frequency,
+  ns,
+  developed,
+  onDevelop,
 }: {
   node: PokerNode;
   mode: CanvasMode;
   weights?: StrategyWeights | null;
   dead?: Set<string>;
   frequency?: number | null;
+  ns?: NodeState | null;
+  developed?: Set<string>;
+  onDevelop?: (actionId: string) => void;
 }) {
   switch (node.type) {
-    case "text": {
-      const { title, body } = asText(node);
-      return (
-        <div>
-          <p className="font-medium">{title || "Untitled"}</p>
-          {body && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{body}</p>}
-        </div>
-      );
-    }
     case "flop": {
       const { cards } = asFlop(node);
       return <Cards cards={cards} placeholder="Pick 3 cards" />;
@@ -131,7 +207,7 @@ function NodeBody({
     case "strategy": {
       const data = asStrategy(node);
       const { actions, label } = data;
-      const position = strategyPositionText(data);
+      const position = ns?.actor ?? null;
       // Revision mode: show a tiny live grid preview instead of the chips.
       if (mode === "revision" && weights && actions.length > 0) {
         return (
@@ -164,15 +240,39 @@ function NodeBody({
             </p>
           )}
           <div className="mt-1 flex flex-wrap gap-1">
-            {actions.map((a) => (
-              <span
-                key={a.id}
-                className="flex items-center gap-1 rounded-sm px-1 text-[10px] text-white"
-                style={{ backgroundColor: a.color }}
-              >
-                {a.label}
-              </span>
-            ))}
+            {actions.map((a) => {
+              const open = developed && !developed.has(a.id);
+              if (open && onDevelop && mode === "edit") {
+                // A11: an option with no branch yet, one click grows it.
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    title="Not developed — click to add its branch"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDevelop(a.id);
+                    }}
+                    className="flex items-center gap-1 rounded-sm border border-dashed px-1 text-[10px] hover:bg-background"
+                    style={{ borderColor: a.color, color: a.color }}
+                  >
+                    ＋ {a.label}
+                  </button>
+                );
+              }
+              return (
+                <span
+                  key={a.id}
+                  className={[
+                    "flex items-center gap-1 rounded-sm px-1 text-[10px] text-white",
+                    open ? "opacity-50" : "",
+                  ].join(" ")}
+                  style={{ backgroundColor: a.color }}
+                >
+                  {a.label}
+                </span>
+              );
+            })}
             {actions.length === 0 && (
               <span className="text-xs text-muted">No actions yet</span>
             )}
@@ -184,7 +284,7 @@ function NodeBody({
       const a = asAction(node);
       return (
         <span
-          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-white"
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs text-white"
           style={{ backgroundColor: a.color }}
         >
           {a.label}
@@ -235,9 +335,7 @@ function MiniBody({ node }: { node: PokerNode }) {
     }
     case "strategy": {
       const data = asStrategy(node);
-      const position = strategyPositionText(data);
-      const text = [position, data.label].filter(Boolean).join(" · ");
-      return <span className="truncate font-medium">{text || "Strategy"}</span>;
+      return <span className="truncate font-medium">{data.label || "Decision"}</span>;
     }
     case "flop": {
       const { cards } = asFlop(node);
@@ -248,8 +346,6 @@ function MiniBody({ node }: { node: PokerNode }) {
       const { card } = asStreet(node);
       return card ? <MiniCards cards={[card]} /> : <span className="text-muted">{NODE_LABELS[node.type]}</span>;
     }
-    case "text":
-      return <span className="truncate">{asText(node).title || "Note"}</span>;
     default:
       return <span className="text-muted">{NODE_LABELS[node.type]}</span>;
   }

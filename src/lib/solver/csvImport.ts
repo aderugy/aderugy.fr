@@ -16,7 +16,7 @@
 
 import { RANKS, SUITS, comboToHand, handCombos } from "./cards";
 import { actionColors } from "./colors";
-import type { ActionKind, StrategyAction, StrategyWeights } from "./types";
+import type { ActionKind, SizeUnit, StrategyAction, StrategyWeights } from "./types";
 
 export type CsvStrategy = {
   actions: StrategyAction[];
@@ -31,7 +31,14 @@ export class CsvImportError extends Error {}
 
 /* ------------------------------------------------------------------ headers */
 
-type ParsedHeader = { kind: ActionKind; sizePct: number | null; label: string; allIn: boolean };
+type ParsedHeader = {
+  kind: ActionKind;
+  sizePct: number | null;
+  /** "RAISE 18bb" → bb, "BET 33%" → pct, a bare number → the street's default. */
+  sizeUnit: SizeUnit | null;
+  label: string;
+  allIn: boolean;
+};
 
 const KIND_ALIASES: Record<string, ActionKind> = {
   check: "check",
@@ -52,7 +59,7 @@ export function parseActionHeader(raw: string): ParsedHeader | null {
   const lower = text.toLowerCase().replace(/[\s_-]+/g, " ").trim();
 
   if (/^(all ?in|allin|jam|shove)\b/.test(lower)) {
-    return { kind: "raise", sizePct: null, label: "All-in", allIn: true };
+    return { kind: "raise", sizePct: null, sizeUnit: null, label: "All-in", allIn: true };
   }
 
   const m = lower.match(/^([a-z]+)\s*(\d+(?:[.,]\d+)?)?\s*(%|bb)?$/);
@@ -63,7 +70,8 @@ export function parseActionHeader(raw: string): ParsedHeader | null {
   const size = m[2] !== undefined ? Number(m[2].replace(",", ".")) : null;
   const name = kind[0].toUpperCase() + kind.slice(1);
   const label = size !== null ? `${name} ${formatNumber(size)}${m[3] === "bb" ? "bb" : ""}` : name;
-  return { kind, sizePct: size, label, allIn: false };
+  const sizeUnit: SizeUnit | null = size === null ? null : m[3] === "bb" ? "bb" : m[3] === "%" ? "pct" : null;
+  return { kind, sizePct: size, sizeUnit, label: m[3] === "%" && size !== null ? `${label}%` : label, allIn: false };
 }
 
 function formatNumber(n: number): string {
@@ -84,6 +92,7 @@ function buildActions(headers: ParsedHeader[], existing: StrategyAction[]): Stra
         !taken.has(a.id) &&
         a.kind === h.kind &&
         (a.sizePct ?? null) === h.sizePct &&
+        (a.sizeUnit ?? null) === h.sizeUnit &&
         (!h.allIn || a.label === h.label),
     );
     if (match) taken.add(match.id);
@@ -91,6 +100,7 @@ function buildActions(headers: ParsedHeader[], existing: StrategyAction[]): Stra
       id: match?.id ?? crypto.randomUUID(),
       kind: h.kind,
       sizePct: h.sizePct,
+      sizeUnit: h.sizeUnit,
       label: h.label,
       color: colors[i],
     };

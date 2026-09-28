@@ -32,13 +32,16 @@ export type Layout = {
   height: number;
 };
 
+/** What the layout reads of a node (the canvas also lays out the spot's root card). */
+export type LayoutNode = Pick<PokerNode, "id" | "parent_id" | "position" | "created_at">;
+
 export function layoutTree(
-  nodes: PokerNode[],
+  nodes: LayoutNode[],
   sizes: Record<string, Size> = {},
 ): Layout {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const children = new Map<string, PokerNode[]>();
-  const roots: PokerNode[] = [];
+  const children = new Map<string, LayoutNode[]>();
+  const roots: LayoutNode[] = [];
 
   for (const n of nodes) {
     if (n.parent_id && byId.has(n.parent_id)) {
@@ -49,7 +52,7 @@ export function layoutTree(
       roots.push(n);
     }
   }
-  const sortSiblings = (list: PokerNode[]) =>
+  const sortSiblings = (list: LayoutNode[]) =>
     list.sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
   sortSiblings(roots);
   for (const list of children.values()) sortSiblings(list);
@@ -62,7 +65,7 @@ export function layoutTree(
   const subtreeW = new Map<string, number>();
   const kidsW = new Map<string, number>();
 
-  const measure = (node: PokerNode, depth: number): number => {
+  const measure = (node: LayoutNode, depth: number): number => {
     depthOf.set(node.id, depth);
     const { w, h } = sizeOf(node.id);
     rowH[depth] = Math.max(rowH[depth] ?? 0, h);
@@ -89,7 +92,7 @@ export function layoutTree(
   const positions = new Map<string, Placement>();
   const edges: { from: string; to: string }[] = [];
 
-  const place = (node: PokerNode, left: number) => {
+  const place = (node: LayoutNode, left: number) => {
     const { w, h } = sizeOf(node.id);
     const band = subtreeW.get(node.id)!;
     const center = left + band / 2;

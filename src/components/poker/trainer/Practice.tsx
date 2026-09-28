@@ -5,83 +5,135 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { comboCards, comboToHand } from "@/lib/solver/cards";
+import { fmtBb, totalPot } from "@/lib/solver/gameState";
+import { asMeta, type PokerNode, STREET_LABELS } from "@/lib/solver/types";
 import { StrategyGrid } from "@/components/poker/StrategyGrid";
-import { comboPool, pickWeighted, type ComboEntry } from "@/lib/trainer/deal";
-import { buildScene, type Scene } from "@/lib/trainer/scene";
-import { bands, normalize, playableFreqs, rollRng, scoreAnswer, sessionScore, type Scored } from "@/lib/trainer/score";
-import { GRADE_LABELS, type DrillNode, type Grade, type Trainer } from "@/lib/trainer/types";
+import { Markdown } from "@/components/poker/Markdown";
+import { pickWeighted } from "@/lib/trainer/deal";
+import { answer, buildTree, handScore, startHand, type Decision, type Hand, type Tree } from "@/lib/trainer/play";
+import { sceneFromState, type Scene } from "@/lib/trainer/scene";
+import { bands, normalize, playableFreqs, sessionScore } from "@/lib/trainer/score";
+import { entryLabel, streetLines, toLine } from "@/lib/trainer/labels";
+import { END_LABELS, GRADE_LABELS, type Drill, type Grade, type Trainer } from "@/lib/trainer/types";
 import { endSession, startSession } from "@/server/actions/trainers";
 import { PokerTable } from "@/components/poker/trainer/PokerTable";
-import { BoardCards } from "@/components/poker/trainer/Cards";
+import { BoardCards, PlayingCard } from "@/components/poker/trainer/Cards";
+import { GRADE_STYLES } from "@/components/poker/trainer/grades";
 
-type Hand = {
-  drill: DrillNode;
-  entry: ComboEntry;
-  rng: number;
-  scene: Scene;
-  dealtAt: number;
+type Stats = {
+  /** Decisions answered. */
+  decisions: number;
+  correct: number;
+  counts: Record<Grade, number>;
+  ms: number;
+  /** Hands finished, and those with every decision correct. */
+  hands: number;
+  perfect: number;
 };
 
-type Answer = { chosenIndex: number; scored: Scored };
-
-type Stats = { hands: number; correct: number; counts: Record<Grade, number>; ms: number };
-
 const EMPTY_STATS: Stats = {
-  hands: 0,
+  decisions: 0,
   correct: 0,
   counts: { correct: 0, wrong_band: 0, mistake: 0, blunder: 0 },
   ms: 0,
+  hands: 0,
+  perfect: 0,
 };
 
-export const GRADE_STYLES: Record<Grade, string> = {
-  correct: "bg-emerald-600 text-white",
-  wrong_band: "bg-amber-500 text-white",
-  mistake: "bg-orange-600 text-white",
-  blunder: "bg-red-600 text-white",
-};
+/** `deciding`: hero must act. `feedback`: the answer's result. `over`: the hand's recap. */
+type View = "deciding" | "feedback" | "over";
+
+type Session = { id: string; drill: Drill; trees: Map<string, Tree> };
+
 
 const fmt = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(x < 10 ? 2 : 1).replace(/\.?0+$/, ""));
 
-export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: number }) {
+export function Practice({ trainer, entryCount }: { trainer: Trainer; entryCount: number }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   const [phase, setPhase] = useState<"idle" | "starting" | "playing" | "ending" | "ended">("idle");
   const [error, setError] = useState<string | null>(null);
   const [notices, setNotices] = useState<string[]>([]);
-  const [session, setSession] = useState<{ id: string; drill: DrillNode[] } | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [hand, setHand] = useState<Hand | null>(null);
-  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [view, setView] = useState<View>("deciding");
   const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [unsynced, setUnsynced] = useState(0);
   const writes = useRef<Promise<void>>(Promise.resolve());
+  const askedAt = useRef(0);
 
-  // Combo pools are the expensive part of a deal; built once per session.
-  const [pools, setPools] = useState<Map<string, ComboEntry[]>>(new Map());
+  const opts = useMemo(() => ({ stopAtStreetEnd: trainer.stop_at_street_end }), [trainer.stop_at_street_end]);
+
+  /**
+   * Straight to Supabase from the browser (RLS applies), chained so writes
+   * land in order — a hand after its answers; a failure is retried.
+   */
+  const rpc = useCallback(
+    (fn: "record_answer" | "record_hand", payload: Record<string, unknown>) => {
+      setUnsynced((u) => u + 1);
+      const send = async (attempt = 0): Promise<void> => {
+        const { error: rpcError } = await supabase.rpc(fn, payload);
+        if (!rpcError) {
+          setUnsynced((u) => u - 1);
+          return;
+        }
+        if (attempt < 3) {
+          await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+          return send(attempt + 1);
+        }
+        setError(`${fn === "record_hand" ? "A hand" : "An answer"} could not be saved: ${rpcError.message}`);
+      };
+      writes.current = writes.current.then(() => send());
+    },
+    [supabase],
+  );
+
+  const recordHand = useCallback(
+    (sess: Session, h: Hand) => {
+      const { decisions, correct } = handScore(h);
+      setStats((s) => ({ ...s, hands: s.hands + 1, perfect: s.perfect + (decisions > 0 && correct === decisions ? 1 : 0) }));
+      rpc("record_hand", {
+        p_id: h.id,
+        p_session_id: sess.id,
+        p_entry_node_id: h.entryId,
+        p_end_node_id: h.end?.nodeId ?? null,
+        p_combo: h.combo,
+        p_villain_combo: h.villainCombo,
+        p_board: h.state.board,
+        p_line: toLine(h.state.log),
+        p_end_reason: h.end?.reason ?? "end_of_solution",
+        p_decisions: decisions,
+        p_correct: correct,
+      });
+    },
+    [rpc],
+  );
 
   const deal = useCallback(
-    (drill: DrillNode[], pools: Map<string, ComboEntry[]>) => {
-      const live = drill.filter((d) => (pools.get(d.nodeId)?.length ?? 0) > 0);
-      const d = pickWeighted(live, (x) => x.weight);
-      if (!d) {
-        setError("None of this trainer's nodes has a live combo to deal.");
+    (sess: Session) => {
+      let h: Hand | null = null;
+      // An entry can fail to start a hand (the tree changed mid-session): try others.
+      for (let attempt = 0; attempt < 20 && !h; attempt++) {
+        const entry = pickWeighted(sess.drill.entries, (e) => e.weight);
+        const tree = entry ? sess.trees.get(entry.spotId) : undefined;
+        if (entry && tree) h = startHand(tree, entry.nodeId, trainer.hero_seat, crypto.randomUUID(), opts);
+      }
+      if (!h) {
+        setError("No hand could be dealt from this trainer's entries.");
         return;
       }
-      const entry = pickWeighted(pools.get(d.nodeId)!, (e) => e.weight)!;
-      const scene = buildScene({
-        heroSeat: trainer.hero_seat,
-        villainSeat: trainer.villain_seat,
-        potBb: Number(trainer.pot_bb),
-        stackBb: Number(trainer.stack_bb),
-        street: d.context.street,
-        board: d.context.board,
-        line: d.context.line,
-        heroActions: d.actions,
-      });
-      setHand({ drill: d, entry, rng: rollRng(), scene, dealtAt: performance.now() });
-      setAnswer(null);
+      setHand(h);
+      askedAt.current = performance.now();
+      if (h.end) {
+        // The tree ended before hero's first decision: still a hand, it says where the tree stops.
+        recordHand(sess, h);
+        setView("over");
+      } else {
+        setView("deciding");
+      }
     },
-    [trainer],
+    [trainer.hero_seat, opts, recordHand],
   );
 
   async function start() {
@@ -95,64 +147,81 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
       return;
     }
     const n: string[] = [];
-    if (r.updated > 0) n.push(`${r.updated} node${r.updated > 1 ? "s" : ""} updated from the tree.`);
-    for (const s of r.skipped) n.push(`Skipped a node: ${s.reason}`);
+    if (r.updated > 0) n.push(`${r.updated} entr${r.updated > 1 ? "ies" : "y"} updated from the tree.`);
+    for (const s of r.skipped) n.push(`Skipped an entry: ${s.reason}`);
     setNotices(n);
     setStats(EMPTY_STATS);
-    setHand(null);
-    setAnswer(null);
-    const built = buildPools(r.drill);
-    setPools(built);
-    setSession({ id: r.sessionId, drill: r.drill });
+    const trees = new Map<string, Tree>();
+    for (const spot of Object.values(r.drill.spots)) {
+      const t = buildTree(spot, r.drill.weights);
+      if (t) trees.set(spot.spotId, t);
+    }
+    const sess: Session = { id: r.sessionId, drill: r.drill, trees };
+    setSession(sess);
     setPhase("playing");
-    deal(r.drill, built);
+    deal(sess);
   }
 
   function choose(index: number) {
-    if (!hand || answer || !session) return;
-    const scored = scoreAnswer(hand.entry.vector, hand.rng, index);
-    if (!scored) return;
-    const ms = Math.round(performance.now() - hand.dealtAt);
-    setAnswer({ chosenIndex: index, scored });
+    if (view !== "deciding" || !hand?.pending || !session) return;
+    const tree = session.trees.get(hand.spotId);
+    if (!tree) return;
+    const next = answer(tree, hand, index, opts);
+    const d = next.decisions[next.decisions.length - 1];
+    if (!d?.scored) return;
+    const ms = Math.round(performance.now() - askedAt.current);
+    const grade = d.scored.grade;
     setStats((s) => ({
-      hands: s.hands + 1,
-      correct: s.correct + (scored.grade === "correct" ? 1 : 0),
-      counts: { ...s.counts, [scored.grade]: s.counts[scored.grade] + 1 },
+      ...s,
+      decisions: s.decisions + 1,
+      correct: s.correct + (grade === "correct" ? 1 : 0),
+      counts: { ...s.counts, [grade]: s.counts[grade] + 1 },
       ms: s.ms + ms,
     }));
-
-    const actions = hand.drill.actions;
-    const payload = {
+    rpc("record_answer", {
       p_session_id: session.id,
-      p_node_id: hand.drill.nodeId,
-      p_combo: hand.entry.combo,
-      p_board: hand.drill.context.board,
-      p_actions: actions.map(({ id, label, kind, sizePct, color }) => ({ id, label, kind, sizePct: sizePct ?? null, color })),
-      p_freqs: hand.entry.vector,
-      p_rng: hand.rng,
-      p_expected_action_id: actions[scored.expectedIndex]?.id ?? "",
-      p_chosen_action_id: actions[index].id,
-      p_chosen_freq: Math.round(scored.chosenFreq * 1000) / 1000,
-      p_grade: scored.grade,
+      p_node_id: d.nodeId,
+      p_combo: next.combo,
+      p_board: d.state.board,
+      p_actions: d.actions.map(({ id, label, kind, sizePct, sizeUnit, color }) => ({
+        id,
+        label,
+        kind,
+        sizePct: sizePct ?? null,
+        sizeUnit: sizeUnit ?? null,
+        color,
+      })),
+      p_freqs: d.vector,
+      p_rng: d.rng,
+      p_expected_action_id: d.actions[d.scored.expectedIndex]?.id ?? "",
+      p_chosen_action_id: d.actions[index].id,
+      p_chosen_freq: Math.round(d.scored.chosenFreq * 1000) / 1000,
+      p_grade: grade,
       p_answered_ms: ms,
-    };
-    // Straight to Supabase from the browser (RLS applies), one call per hand,
-    // chained so answers land in order; a failure is retried on the next one.
-    setUnsynced((u) => u + 1);
-    const send = async (attempt = 0): Promise<void> => {
-      const { error: rpcError } = await supabase.rpc("record_answer", payload);
-      if (!rpcError) {
-        setUnsynced((u) => u - 1);
-        return;
-      }
-      if (attempt < 3) {
-        await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
-        return send(attempt + 1);
-      }
-      setError(`An answer could not be saved: ${rpcError.message}`);
-    };
-    writes.current = writes.current.then(() => send());
+      p_hand_id: next.id,
+      p_step: next.decisions.length - 1,
+      p_line: toLine(d.state.log),
+      p_pot_bb: Math.round(totalPot(d.state) * 1000) / 1000,
+    });
+    if (next.end) recordHand(session, next);
+    setHand(next);
+    if (trainer.feedback === "each") setView("feedback");
+    else if (next.end) setView("over");
+    else {
+      setView("deciding");
+      askedAt.current = performance.now();
+    }
   }
+
+  /** Continue after a result or a recap: the rest of the hand, or a new one. */
+  const proceed = useCallback(() => {
+    if (!session || !hand) return;
+    if (hand.end) deal(session);
+    else {
+      setView("deciding");
+      askedAt.current = performance.now();
+    }
+  }, [session, hand, deal]);
 
   async function end() {
     if (!session) return;
@@ -164,7 +233,7 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
     router.refresh();
   }
 
-  // Keyboard: 1…n answer, Space / Enter / → next hand.
+  // Keyboard: 1…n answer, Space / Enter / → continue.
   const chooseRef = useRef(choose);
   useEffect(() => {
     chooseRef.current = choose;
@@ -173,43 +242,59 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
     if (phase !== "playing") return;
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
-      if (!answer) {
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.tagName === "SUMMARY")) return;
+      if (view === "deciding") {
         const n = Number(e.key);
-        if (n >= 1 && hand && n <= hand.drill.actions.length) {
+        if (n >= 1 && hand?.pending && n <= hand.pending.actions.length) {
           e.preventDefault();
           chooseRef.current(n - 1);
         }
       } else if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") {
         e.preventDefault();
-        if (session) deal(session.drill, pools);
+        proceed();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, answer, hand, session, deal, pools]);
+  }, [phase, view, hand, proceed]);
 
-  const score = sessionScore(stats.hands, stats.correct);
+  const score = sessionScore(stats.decisions, stats.correct);
+  const tree = hand && session ? session.trees.get(hand.spotId) : undefined;
+  const last = hand ? hand.decisions[hand.decisions.length - 1] : undefined;
+
+  // The table: the decision being asked, the one just answered, or the end of the hand.
+  const scene: Scene | null = useMemo(() => {
+    if (!hand || !tree) return null;
+    const shown = view === "deciding" ? hand.pending : view === "feedback" ? last : null;
+    return sceneFromState({
+      state: shown ? shown.state : hand.state,
+      heroSeat: hand.heroSeat,
+      villainSeat: hand.villainSeat,
+      stackBb: tree.setup.stackBb,
+      heroActions: shown ? shown.actions : [],
+    });
+  }, [hand, tree, view, last]);
 
   if (phase === "idle" || phase === "starting") {
     return (
       <div className="rounded-lg border border-line bg-surface p-6 text-center">
         <p className="text-sm text-muted">
-          {nodeCount === 0
-            ? "No node yet. Open Solver notes, select a strategy node and use “Add to trainer…”."
-            : `${nodeCount} node${nodeCount > 1 ? "s" : ""} · ${trainer.hero_seat} vs ${trainer.villain_seat} · pot ${fmt(Number(trainer.pot_bb))} bb`}
+          {entryCount === 0
+            ? "No entry yet. Open Solver notes, select a node and use “Train from here…”."
+            : `${entryCount} entr${entryCount > 1 ? "ies" : "y"} · hero ${trainer.hero_seat} vs ${trainer.villain_seat}`}
         </p>
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
         <button
           type="button"
-          disabled={nodeCount === 0 || phase === "starting"}
+          disabled={entryCount === 0 || phase === "starting"}
           onClick={() => void start()}
           className="mt-4 rounded bg-accent px-5 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {phase === "starting" ? "Dealing…" : "Start a session"}
         </button>
         <p className="mt-3 text-[11px] text-muted">
-          Each hand shows a number 0–99. Play the action whose band holds it: bands follow the buttons left to right.
+          Each hand is played down the tree until it ends. Every decision shows a number 0–99: play the action whose
+          band holds it — bands follow the buttons left to right.
         </p>
       </div>
     );
@@ -221,7 +306,8 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
         <p className="text-xs uppercase tracking-wide text-muted">Session over</p>
         <p className="mt-1 text-3xl font-semibold tabular-nums">{score === null ? "—" : `${Math.round(score)}%`}</p>
         <p className="mt-1 text-sm text-muted">
-          {stats.correct} / {stats.hands} correct · {stats.counts.blunder} blunder{stats.counts.blunder === 1 ? "" : "s"}
+          {stats.correct} / {stats.decisions} decisions correct · {stats.perfect} / {stats.hands} perfect hands ·{" "}
+          {stats.counts.blunder} blunder{stats.counts.blunder === 1 ? "" : "s"}
         </p>
         <GradeCounts counts={stats.counts} />
         <div className="mt-4 flex justify-center gap-3">
@@ -233,7 +319,7 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
           >
             New session
           </button>
-          {session && stats.hands > 0 && (
+          {session && stats.hands + stats.decisions > 0 && (
             <Link
               href={`/poker/trainers/${trainer.id}/sessions/${session.id}`}
               className="rounded border border-line px-4 py-2 text-sm hover:border-accent"
@@ -245,6 +331,8 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
       </div>
     );
   }
+
+  const showdown = hand?.end && (hand.end.reason === "showdown" || hand.end.reason === "allin") ? hand.villainCombo : null;
 
   return (
     // Phones: the drill takes the whole screen (over the site header) and never
@@ -261,18 +349,12 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
           <b className="tabular-nums">{score === null ? "—" : `${Math.round(score)}%`}</b>
         </span>
         <span>
-          <span className="text-muted">
-            <span className="sm:hidden">Blund.</span>
-            <span className="hidden sm:inline">Blunders</span>
-          </span>{" "}
-          <b className="tabular-nums">{stats.counts.blunder}</b>
+          <span className="text-muted">Perfect</span>{" "}
+          <b className="tabular-nums">{stats.hands ? `${Math.round((stats.perfect / stats.hands) * 100)}%` : "—"}</b>
         </span>
-        {stats.hands > 0 && (
-          <span className="hidden sm:inline">
-            <span className="text-muted">Avg</span>{" "}
-            <b className="tabular-nums">{(stats.ms / stats.hands / 1000).toFixed(1)}s</b>
-          </span>
-        )}
+        <span className="hidden sm:inline">
+          <span className="text-muted">Blunders</span> <b className="tabular-nums">{stats.counts.blunder}</b>
+        </span>
         {unsynced > 0 && <span className="hidden text-amber-600 sm:inline">saving…</span>}
         <button
           type="button"
@@ -300,73 +382,46 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
       )}
       {error && <p className="shrink-0 text-xs text-red-500">{error}</p>}
 
-      {hand && (
+      {hand && scene && tree && (
         <>
           <div className="flex shrink-0 flex-col gap-x-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
             <span className="min-w-0 truncate">
-              {hand.drill.spotName}
-              {hand.drill.label ? ` · ${hand.drill.label}` : ""}
+              {session?.drill.spots[hand.spotId]?.spotName}
+              {tree.byId.get(hand.entryId) ? ` · from ${entryLabel(tree.byId.get(hand.entryId) as PokerNode)}` : ""}
+              {hand.decisions.length > 0 ? ` · decision ${hand.decisions.length + (view === "deciding" ? 1 : 0)}` : ""}
             </span>
-            <span className="min-w-0 truncate sm:shrink-0">
-              {hand.scene.line.length > 0
-                ? hand.scene.line
-                    .map((a) => `${a.seat} ${a.label.toLowerCase()}${a.amountBb != null ? ` (${fmt(a.amountBb)})` : ""}`)
-                    .join(" · ")
-                : "First to act"}
-            </span>
+            <span className="min-w-0 truncate sm:shrink-0">{logLine(scene)}</span>
           </div>
 
           <div className="flex items-center justify-center max-sm:min-h-0 max-sm:flex-1 max-sm:[container-type:size]">
-            <PokerTable scene={hand.scene} combo={hand.entry.combo} fit />
+            <PokerTable scene={scene} combo={hand.combo} villainCombo={showdown} fit />
           </div>
 
           {/* RNG + actions */}
-          <div className="flex shrink-0 gap-2">
-            <RngBadge value={hand.rng} />
-            <div
-              className="grid flex-1 gap-2"
-              style={{ gridTemplateColumns: `repeat(${Math.min(hand.scene.actions.length, 4)}, minmax(0, 1fr))` }}
-            >
-              {hand.scene.actions.map((a, i) => {
-                const picked = answer?.chosenIndex === i;
-                const expected = answer?.scored.expectedIndex === i;
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    disabled={!!answer}
-                    onClick={() => choose(i)}
-                    className={[
-                      "relative touch-manipulation rounded-lg px-2 py-3 text-sm font-semibold text-white shadow transition",
-                      answer && !picked && !expected ? "opacity-40" : "",
-                      expected ? "ring-4 ring-emerald-400" : "",
-                      picked && !expected ? "ring-4 ring-red-500" : "",
-                    ].join(" ")}
-                    style={{ backgroundColor: a.color }}
-                  >
-                    <span className="absolute left-1.5 top-1 hidden text-[10px] font-normal opacity-70 sm:inline">{i + 1}</span>
-                    {a.label}
-                    {a.amountBb != null && (
-                      <span className="block text-[11px] font-normal opacity-90">
-                        {a.allIn ? "all-in " : ""}
-                        {fmt(a.amountBb)} bb
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {(view === "deciding" && hand.pending) || (view === "feedback" && last) ? (
+            <ActionRow
+              decision={view === "deciding" ? (hand.pending as Decision) : (last as Decision)}
+              scene={scene}
+              answered={view === "feedback"}
+              onChoose={choose}
+            />
+          ) : (
+            <div className="shrink-0 py-3 text-center text-xs text-muted">{hand.end ? END_LABELS[hand.end.reason] : ""}</div>
+          )}
 
-          {answer && (
-            <ResultModal
+          {view === "feedback" && last && (
+            <DecisionModal
               hand={hand}
-              answer={answer}
+              decision={last}
+              tree={tree}
               stats={stats}
               saving={unsynced > 0}
-              onNext={() => session && deal(session.drill, pools)}
+              onNext={proceed}
               onQuit={() => void end()}
             />
+          )}
+          {view === "over" && (
+            <HandModal hand={hand} tree={tree} stats={stats} saving={unsynced > 0} onNext={proceed} onQuit={() => void end()} />
           )}
         </>
       )}
@@ -374,15 +429,64 @@ export function Practice({ trainer, nodeCount }: { trainer: Trainer; nodeCount: 
   );
 }
 
-function buildPools(drill: DrillNode[]): Map<string, ComboEntry[]> {
-  const m = new Map<string, ComboEntry[]>();
-  for (const d of drill) {
-    const pool = comboPool(d.weights, d.actions.length, new Set(d.context.board)).filter(
-      (e) => playableFreqs(e.vector) !== null,
-    );
-    m.set(d.nodeId, pool);
-  }
-  return m;
+/** "BB check · BTN bet 1.82" for the current street, with earlier streets folded in front. */
+function logLine(scene: Scene): string {
+  const current = scene.line.filter((l) => l.street === scene.street);
+  if (current.length === 0) return scene.line.length > 0 ? `${STREET_LABELS[scene.street]}: first to act` : "First to act";
+  return current
+    .map((a) => `${a.seat} ${a.label.toLowerCase()}${a.amountBb != null ? ` (${fmt(a.amountBb)})` : ""}`)
+    .join(" · ");
+}
+
+function ActionRow({
+  decision,
+  scene,
+  answered,
+  onChoose,
+}: {
+  decision: Decision;
+  scene: Scene;
+  answered: boolean;
+  onChoose: (i: number) => void;
+}) {
+  return (
+    <div className="flex shrink-0 gap-2">
+      <RngBadge value={decision.rng} />
+      <div
+        className="grid flex-1 gap-2"
+        style={{ gridTemplateColumns: `repeat(${Math.min(scene.actions.length, 4)}, minmax(0, 1fr))` }}
+      >
+        {scene.actions.map((a, i) => {
+          const picked = answered && decision.chosenIndex === i;
+          const expected = answered && decision.scored?.expectedIndex === i;
+          return (
+            <button
+              key={a.id}
+              type="button"
+              disabled={answered}
+              onClick={() => onChoose(i)}
+              className={[
+                "relative touch-manipulation rounded-lg px-2 py-3 text-sm font-semibold text-white shadow transition",
+                answered && !picked && !expected ? "opacity-40" : "",
+                expected ? "ring-4 ring-emerald-400" : "",
+                picked && !expected ? "ring-4 ring-red-500" : "",
+              ].join(" ")}
+              style={{ backgroundColor: a.color }}
+            >
+              <span className="absolute left-1.5 top-1 hidden text-[10px] font-normal opacity-70 sm:inline">{i + 1}</span>
+              {a.label}
+              {a.amountBb != null && (
+                <span className="block text-[11px] font-normal opacity-90">
+                  {a.allIn ? "all-in " : ""}
+                  {fmt(a.amountBb)} bb
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function RngBadge({ value }: { value: number }) {
@@ -446,125 +550,316 @@ export function BandBar({
   );
 }
 
+/** How the hand ended, in one sentence. */
+export function endSentence(hand: Hand): string {
+  const end = hand.end;
+  if (!end) return "";
+  const t = hand.state.terminal;
+  switch (end.reason) {
+    case "fold":
+      if (t?.kind === "fold") {
+        const loser = t.winner === hand.heroSeat ? hand.villainSeat : hand.heroSeat;
+        return `${loser === hand.heroSeat ? "You fold" : `${loser} folds`} — ${t.winner === hand.heroSeat ? "you win" : `${t.winner} wins`} ${fmtBb(t.potBb)} bb.`;
+      }
+      return "Hand over.";
+    case "showdown":
+      return `Showdown — pot ${fmtBb(t?.potBb ?? totalPot(hand.state))} bb.`;
+    case "allin":
+      return `All-in and called — pot ${fmtBb(t?.potBb ?? totalPot(hand.state))} bb.`;
+    case "end_of_solution":
+      return "End of solution: the tree has nothing after this point.";
+    case "branch_not_developed":
+      return "Branch not developed: your option has no branch in the tree.";
+    case "off_range":
+      return "Off range: the solution has no strategy for this hand here.";
+    case "no_runout":
+      return "No runout in the tree is possible with your cards.";
+    case "end_of_street":
+      return "End of street: the betting round is over.";
+  }
+}
+
+/** A node's summary and notes, as written in Solver notes. */
+function NodeNotesBlock({ node, open = false }: { node: PokerNode | undefined; open?: boolean }) {
+  if (!node) return null;
+  const { summary, notes } = asMeta(node);
+  if (!summary && !notes.trim()) return null;
+  return (
+    <div className="rounded border border-line bg-background/50 px-2.5 py-2 text-xs">
+      {summary && <p className="whitespace-pre-line font-medium">{summary}</p>}
+      {notes.trim() && (
+        <details open={open} className="mt-1">
+          <summary className="cursor-pointer text-[11px] text-muted">Notes</summary>
+          <div className="mt-1 text-xs">
+            <Markdown source={notes} />
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function DecisionResult({ decision, tree, compact = false }: { decision: Decision; tree: Tree; compact?: boolean }) {
+  const { actions, vector, rng } = decision;
+  const scored = decision.scored!;
+  const norm = normalize(vector) ?? [];
+  const play = playableFreqs(vector) ?? [];
+  const b = bands(play);
+  const expected = actions[scored.expectedIndex];
+  const chosen = decision.chosenIndex ?? -1;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm">
+        <span className={`mr-2 rounded px-1.5 py-0.5 text-xs font-semibold ${GRADE_STYLES[scored.grade]}`}>
+          {GRADE_LABELS[scored.grade]}
+        </span>
+        Roll <b className="tabular-nums">{rng}</b> → <b>{expected?.label}</b>.
+        {scored.grade !== "correct" && chosen >= 0 && (
+          <span className="text-muted">
+            {" "}
+            You played {actions[chosen].label} ({fmt(Math.round(scored.chosenFreq * 10) / 10)}%).
+          </span>
+        )}
+      </p>
+      <BandBar vector={vector} colors={actions.map((a) => a.color)} labels={actions.map((a) => a.label)} rng={rng} />
+      {!compact && (
+        <table className="w-full text-xs">
+          <tbody>
+            {actions.map((a, i) => (
+              <tr key={a.id} className={i === scored.expectedIndex ? "font-semibold" : ""}>
+                <td className="py-0.5">
+                  <span className="mr-1.5 inline-block size-2.5 rounded-sm align-middle" style={{ backgroundColor: a.color }} />
+                  {a.label}
+                  {i === chosen && i !== scored.expectedIndex && <span className="ml-1 font-normal text-red-500">· you</span>}
+                </td>
+                <td className="py-0.5 text-right tabular-nums">{fmt(Math.round((norm[i] ?? 0) * 10) / 10)}%</td>
+                <td className="py-0.5 pl-3 text-right tabular-nums text-muted">
+                  {b[i] && b[i].end > b[i].start ? `${b[i].start}–${b[i].end - 1}` : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <NodeNotesBlock node={tree.byId.get(decision.nodeId)} open={!compact} />
+    </div>
+  );
+}
+
+function ModalShell({
+  label,
+  children,
+  footer,
+}: {
+  label: string;
+  children: React.ReactNode;
+  footer: React.ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+    >
+      <div className="flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:max-h-[90dvh] sm:max-w-2xl sm:rounded-2xl">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        <div className="shrink-0 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>
+      </div>
+    </div>
+  );
+}
+
+function ModalFooter({
+  stats,
+  saving,
+  next,
+  onNext,
+  onQuit,
+}: {
+  stats: Stats;
+  saving: boolean;
+  next: string;
+  onNext: () => void;
+  onQuit: () => void;
+}) {
+  const score = sessionScore(stats.decisions, stats.correct);
+  return (
+    <>
+      <p className="mb-2 text-center text-[11px] text-muted tabular-nums">
+        Session: {stats.correct} / {stats.decisions} correct
+        {score !== null ? ` · ${Math.round(score)}%` : ""} · {stats.hands} hand{stats.hands === 1 ? "" : "s"}
+        {saving ? " · saving…" : ""}
+      </p>
+      <div className="grid grid-cols-[auto_1fr] gap-2">
+        <button
+          type="button"
+          onClick={onQuit}
+          className="rounded-lg border border-line px-4 py-2.5 text-sm hover:border-red-500 hover:text-red-500"
+        >
+          Quit
+        </button>
+        <button type="button" onClick={onNext} className="rounded-lg bg-accent py-2.5 text-sm font-medium text-white">
+          {next} <span className="hidden opacity-70 sm:inline">(space)</span>
+        </button>
+      </div>
+    </>
+  );
+}
+
 /**
- * The one popup after an answer: grade, the combo's bands with the roll, the
- * frequencies, the node's range, and Next hand / Quit. A bottom sheet on
- * phones, a centred dialog from `sm`.
+ * After each answer (feedback "each"): the grade, the combo's bands with the
+ * roll, the frequencies, the node's notes and range, then Continue — or Next
+ * hand when that answer ended it.
  */
-function ResultModal({
+function DecisionModal({
   hand,
-  answer,
+  decision,
+  tree,
   stats,
   saving,
   onNext,
   onQuit,
 }: {
   hand: Hand;
-  answer: Answer;
+  decision: Decision;
+  tree: Tree;
   stats: Stats;
   saving: boolean;
   onNext: () => void;
   onQuit: () => void;
 }) {
-  const { actions, weights, context } = hand.drill;
-  const norm = normalize(hand.entry.vector) ?? [];
-  const play = playableFreqs(hand.entry.vector) ?? [];
-  const b = bands(play);
-  const grade = answer.scored.grade;
-  const expected = actions[answer.scored.expectedIndex];
-  const hand169 = comboToHand(hand.entry.combo);
-  const cards = [...comboCards(hand.entry.combo)];
-  const score = sessionScore(stats.hands, stats.correct);
-
+  const weights = tree.weights[decision.nodeId];
+  const hand169 = hand.combo ? comboToHand(hand.combo) : "";
+  const cards = hand.combo ? [...comboCards(hand.combo)] : [];
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={GRADE_LABELS[grade]}
+    <ModalShell
+      label={decision.scored ? GRADE_LABELS[decision.scored.grade] : "Result"}
+      footer={
+        <ModalFooter stats={stats} saving={saving} next={hand.end ? "Next hand" : "Continue"} onNext={onNext} onQuit={onQuit} />
+      }
     >
-      <div className="flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:max-h-[90dvh] sm:max-w-2xl sm:rounded-2xl">
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="grid gap-4 sm:grid-cols-[1fr_15rem]">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className={`rounded-md px-2.5 py-1 text-sm font-semibold ${GRADE_STYLES[grade]}`}>
-                  {GRADE_LABELS[grade]}
-                </span>
-                <BoardCards cards={cards} size="xs" />
-                <span className="text-xs text-muted">{hand169}</span>
-              </div>
-              <p className="text-sm">
-                Roll <b className="tabular-nums">{hand.rng}</b> → <b>{expected?.label}</b>.
-                {grade !== "correct" && (
-                  <span className="text-muted">
-                    {" "}
-                    You played {actions[answer.chosenIndex].label} (
-                    {fmt(Math.round(answer.scored.chosenFreq * 10) / 10)}%).
-                  </span>
-                )}
-              </p>
-              <BandBar
-                vector={hand.entry.vector}
-                colors={actions.map((a) => a.color)}
-                labels={actions.map((a) => a.label)}
-                rng={hand.rng}
-              />
-              <table className="w-full text-xs">
-                <tbody>
-                  {actions.map((a, i) => (
-                    <tr key={a.id} className={i === answer.scored.expectedIndex ? "font-semibold" : ""}>
-                      <td className="py-0.5">
-                        <span
-                          className="mr-1.5 inline-block size-2.5 rounded-sm align-middle"
-                          style={{ backgroundColor: a.color }}
-                        />
-                        {a.label}
-                        {i === answer.chosenIndex && i !== answer.scored.expectedIndex && (
-                          <span className="ml-1 font-normal text-red-500">· you</span>
-                        )}
-                      </td>
-                      <td className="py-0.5 text-right tabular-nums">{fmt(Math.round((norm[i] ?? 0) * 10) / 10)}%</td>
-                      <td className="py-0.5 pl-3 text-right tabular-nums text-muted">
-                        {b[i] && b[i].end > b[i].start ? `${b[i].start}–${b[i].end - 1}` : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Capped by the screen height on phones so the sheet fits without scrolling. */}
-            <div className="mx-auto w-full max-w-[min(100%,32dvh)] sm:max-w-none">
-              <p className="mb-1 text-[11px] text-muted">{hand169} in the node&apos;s range</p>
-              <StrategyGrid actions={actions} weights={weights} dead={new Set(context.board)} hovered={hand169} />
-            </div>
+      <div className="grid gap-4 sm:grid-cols-[1fr_15rem]">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <BoardCards cards={cards} size="xs" />
+            <span className="text-xs text-muted">{hand169}</span>
+            <span className="text-xs text-muted">· decision {hand.decisions.length}</span>
           </div>
+          <DecisionResult decision={decision} tree={tree} />
+          {hand.end && <EndBanner hand={hand} />}
         </div>
-
-        <div className="shrink-0 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <p className="mb-2 text-center text-[11px] text-muted tabular-nums">
-            Session: {stats.correct} / {stats.hands} correct
-            {score !== null ? ` · ${Math.round(score)}%` : ""}
-            {saving ? " · saving…" : ""}
-          </p>
-          <div className="grid grid-cols-[auto_1fr] gap-2">
-            <button
-              type="button"
-              onClick={onQuit}
-              className="rounded-lg border border-line px-4 py-2.5 text-sm hover:border-red-500 hover:text-red-500"
-            >
-              Quit
-            </button>
-            <button
-              type="button"
-              onClick={onNext}
-              className="rounded-lg bg-accent py-2.5 text-sm font-medium text-white"
-            >
-              Next hand <span className="hidden opacity-70 sm:inline">(space)</span>
-            </button>
+        {weights && (
+          <div className="mx-auto w-full max-w-[min(100%,32dvh)] sm:max-w-none">
+            <p className="mb-1 text-[11px] text-muted">{hand169} in the node&apos;s range</p>
+            <StrategyGrid actions={decision.actions} weights={weights} dead={new Set(decision.state.board)} hovered={hand169} />
           </div>
-        </div>
+        )}
       </div>
+    </ModalShell>
+  );
+}
+
+function EndBanner({ hand }: { hand: Hand }) {
+  const villain = hand.villainCombo ? comboCards(hand.villainCombo) : null;
+  return (
+    <div className="rounded-lg border border-line bg-background/50 px-3 py-2 text-sm">
+      <p className="font-medium">{endSentence(hand)}</p>
+      {villain && (
+        <p className="mt-1 flex items-center gap-2 text-xs text-muted">
+          {hand.villainSeat} shows
+          <span className="flex gap-0.5">
+            <PlayingCard card={villain[0]} size="sm" />
+            <PlayingCard card={villain[1]} size="sm" />
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The whole hand once it is over: how it ended, the line street by street, every decision graded. */
+function HandModal({
+  hand,
+  tree,
+  stats,
+  saving,
+  onNext,
+  onQuit,
+}: {
+  hand: Hand;
+  tree: Tree;
+  stats: Stats;
+  saving: boolean;
+  onNext: () => void;
+  onQuit: () => void;
+}) {
+  const { decisions, correct } = handScore(hand);
+  const cards = hand.combo ? comboCards(hand.combo) : null;
+  return (
+    <ModalShell
+      label={hand.end ? END_LABELS[hand.end.reason] : "Hand"}
+      footer={<ModalFooter stats={stats} saving={saving} next="Next hand" onNext={onNext} onQuit={onQuit} />}
+    >
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {cards && (
+            <span className="flex gap-0.5">
+              <PlayingCard card={cards[0]} size="sm" />
+              <PlayingCard card={cards[1]} size="sm" />
+            </span>
+          )}
+          <span className="text-sm">
+            {decisions === 0 ? "No decision this hand" : `${correct} / ${decisions} correct`}
+          </span>
+          {decisions > 0 && correct === decisions && (
+            <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">Perfect</span>
+          )}
+        </div>
+        <EndBanner hand={hand} />
+        <HandLine hand={hand} />
+        {hand.decisions.map((d, i) =>
+          d.scored ? (
+            <div key={i} className="rounded-lg border border-line p-3">
+              <p className="mb-1 text-[11px] uppercase tracking-wide text-muted">
+                Decision {i + 1} · {STREET_LABELS[d.state.street]} · pot {fmtBb(totalPot(d.state))}
+              </p>
+              <DecisionResult decision={d} tree={tree} compact />
+            </div>
+          ) : null,
+        )}
+        {hand.end && (hand.end.reason === "end_of_solution" || hand.end.reason === "branch_not_developed") && hand.end.nodeId && (
+          <Link
+            href={`/poker/spots/${hand.spotId}?node=${hand.end.nodeId}`}
+            className="inline-block text-xs text-accent hover:underline"
+          >
+            Open where the tree stops →
+          </Link>
+        )}
+      </div>
+    </ModalShell>
+  );
+}
+
+function HandLine({ hand }: { hand: Hand }) {
+  const rows = streetLines(hand.state.log, hand.state.board);
+  if (rows.length === 0) return null;
+  const who = (seat: string) => (seat === hand.heroSeat ? "You" : seat);
+  return (
+    <div className="space-y-1 text-xs">
+      {rows.map((r) => (
+        <div key={r.street} className="grid grid-cols-[3.25rem_1fr] items-start gap-x-2">
+          <span className="text-muted">{STREET_LABELS[r.street]}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {r.cards.length > 0 && <BoardCards cards={r.cards} size="xs" />}
+            <span>
+              {r.actions
+                .map((a) => `${who(a.seat)} ${a.label.toLowerCase()}${a.amountBb != null && a.kind !== "call" ? ` (${fmt(a.amountBb)})` : ""}`)
+                .join(" · ")}
+            </span>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

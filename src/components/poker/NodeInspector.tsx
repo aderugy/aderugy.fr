@@ -1,28 +1,33 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ACTION_SWATCHES, colorForKind } from "@/lib/solver/colors";
 import { CardPicker } from "@/components/poker/CardPicker";
 import { NodeNotes } from "@/components/poker/NodeNotes";
-import { Segmented } from "@/components/poker/ui";
-import { AddToTrainer } from "@/components/poker/trainer/AddToTrainer";
-import { SEATS, derivedPosition, isSeat, type Seat } from "@/lib/solver/seats";
+import { TrainFromHere } from "@/components/poker/trainer/AddToTrainer";
+import { BoardCards } from "@/components/poker/trainer/Cards";
 import {
-  ACTION_KIND_LABELS,
-  ACTION_KINDS,
+  effectiveStack,
+  fmtBb,
+  stepNode,
+  toCall,
+  totalPot,
+  type HandState,
+  type NodeState,
+} from "@/lib/solver/gameState";
+import {
   asAction,
   asFlop,
+  asOverride,
   asStrategy,
   asStreet,
-  asText,
-  kindHasSize,
   NODE_LABELS,
-  type ActionKind,
+  STREET_LABELS,
   type NodeData,
   type NodeType,
   type PokerNode,
-  type StrategyData,
+  type SpotSetup,
 } from "@/lib/solver/types";
+import { terminalText } from "@/components/poker/NodeCard";
 
 export type ImportResult =
   | { ok: true; message: string; warnings: string[] }
@@ -30,10 +35,13 @@ export type ImportResult =
 
 export function NodeInspector({
   node,
-  path,
   parent,
   dead,
-  childSuggestions,
+  ns,
+  before,
+  setup,
+  childTypes,
+  childLabel,
   onPatch,
   onAddChild,
   onDelete,
@@ -42,11 +50,15 @@ export function NodeInspector({
   onClose,
 }: {
   node: PokerNode;
-  /** Root → this node, every ancestor included. */
-  path: PokerNode[];
   parent: PokerNode | null;
   dead: Set<string>;
-  childSuggestions: NodeType[];
+  /** The hand after this node (null while the spot isn't set up). */
+  ns: NodeState | null;
+  /** The hand before this node. */
+  before: HandState | null;
+  setup: SpotSetup;
+  childTypes: NodeType[];
+  childLabel: (type: NodeType) => string;
   onPatch: (data: NodeData) => void;
   onAddChild: (type: NodeType) => void;
   onDelete: () => void;
@@ -59,6 +71,7 @@ export function NodeInspector({
       <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted">
           {NODE_LABELS[node.type]}
+          {node.type === "strategy" && ns?.actor ? ` · ${ns.actor}` : ""}
         </span>
         <button
           type="button"
@@ -70,9 +83,10 @@ export function NodeInspector({
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+        {ns && <HandSummary node={node} ns={ns} />}
+
         <Editor
           node={node}
-          path={path}
           parent={parent}
           dead={dead}
           onPatch={onPatch}
@@ -80,22 +94,32 @@ export function NodeInspector({
           onImportCsv={onImportCsv}
         />
 
+        {ns && !ns.error && <TrainFromHere node={node} setup={setup} ns={ns} />}
+
+        {before && <OverrideField key={`override-${node.id}`} node={node} parent={parent} before={before} onPatch={onPatch} />}
+
         <NodeNotes key={`notes-${node.id}`} node={node} onPatch={onPatch} />
 
         <div>
           <p className="mb-1 text-xs font-medium text-muted">Add child</p>
-          <div className="flex flex-wrap gap-1">
-            {childSuggestions.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => onAddChild(type)}
-                className="rounded border border-line px-2 py-1 text-xs hover:border-accent"
-              >
-                ＋ {NODE_LABELS[type]}
-              </button>
-            ))}
-          </div>
+          {childTypes.length === 0 ? (
+            <p className="text-[11px] text-muted">
+              {ns?.error ? "Fix this node first." : ns?.state.terminal ? "The hand is over here." : "Nothing can follow here."}
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {childTypes.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => onAddChild(type)}
+                  className="rounded border border-line px-2 py-1 text-xs hover:border-accent"
+                >
+                  ＋ {childLabel(type)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -114,9 +138,132 @@ export function NodeInspector({
   );
 }
 
+/** A12: where the hand is at this node — street, board, pot, stacks, who acts — and how it got here. */
+function HandSummary({ node, ns }: { node: PokerNode; ns: NodeState }) {
+  if (ns.error) {
+    return (
+      <p className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-500">{ns.error}</p>
+    );
+  }
+  const s = ns.state;
+  const who = node.type === "strategy" ? ns.actor : s.toAct;
+  const call = who ? toCall(s, who) : 0;
+  return (
+    <div className="space-y-1.5 rounded border border-line bg-background/50 px-2 py-1.5 text-[11px]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-medium">{STREET_LABELS[s.street]}</span>
+        {s.board.length > 0 && <BoardCards cards={s.board} size="xs" />}
+        <span className="tabular-nums text-muted">
+          Pot {fmtBb(totalPot(s))} · Eff. {fmtBb(effectiveStack(s))}
+        </span>
+      </div>
+      <p className="text-muted">
+        {s.terminal
+          ? terminalText(s.terminal)
+          : s.status === "deal"
+            ? `Round closed — the ${s.nextStreet} comes next`
+            : `${who} to act${call > 0 ? ` · ${fmtBb(call)} to call` : " · nothing to call"}`}
+      </p>
+      {s.log.length > 0 && <p className="leading-relaxed text-muted">{lineText(s)}</p>}
+    </div>
+  );
+}
+
+/** `BTN 2.5 · BB call · [Ks7d2c] BB x · BTN 1.82 · BB call` */
+function lineText(s: HandState): string {
+  const parts: string[] = [];
+  let street = s.log[0]?.street;
+  const boardAt: Record<string, string> = {
+    flop: s.board.slice(0, 3).join(""),
+    turn: s.board[3] ?? "",
+    river: s.board[4] ?? "",
+  };
+  for (const e of s.log) {
+    if (e.street !== street) {
+      street = e.street;
+      if (boardAt[street]) parts.push(`[${boardAt[street]}]`);
+    }
+    const amount = e.amountBb != null && e.kind !== "call" ? ` ${fmtBb(e.amountBb)}` : "";
+    parts.push(`${e.seat} ${e.kind}${amount}`);
+  }
+  return parts.join(" · ");
+}
+
+/**
+ * A5: force the pot and stacks here when the tree can't give them (a bet
+ * without size, a skipped part of the tree). The reconstructed values stay
+ * visible next to the forced ones.
+ */
+function OverrideField({
+  node,
+  parent,
+  before,
+  onPatch,
+}: {
+  node: PokerNode;
+  parent: PokerNode | null;
+  before: HandState;
+  onPatch: (data: NodeData) => void;
+}) {
+  const current = asOverride(node);
+  const step = stepNode(before, node, parent);
+  const rebuilt = step.error ? null : step.state;
+  const [on, setOn] = useState(!!current);
+  const [pot, setPot] = useState(String(current?.potBb ?? (rebuilt ? Math.round(totalPot(rebuilt) * 100) / 100 : "")));
+  const [stack, setStack] = useState(
+    String(current?.stackBb ?? (rebuilt ? Math.round(effectiveStack(rebuilt) * 100) / 100 : "")),
+  );
+
+  function save(p: string, st: string) {
+    const potBb = Number(p);
+    const stackBb = Number(st);
+    if (Number.isFinite(potBb) && potBb > 0 && Number.isFinite(stackBb) && stackBb >= 0) {
+      onPatch({ override: { potBb, stackBb } });
+    }
+  }
+
+  const input =
+    "mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent";
+
+  return (
+    <div className="rounded border border-line p-2">
+      <label className="flex items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => {
+            setOn(e.target.checked);
+            if (e.target.checked) save(pot, stack);
+            else onPatch({ override: null });
+          }}
+        />
+        Set pot &amp; stack by hand here
+      </label>
+      {on && (
+        <div className="mt-2 space-y-1">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-[11px] text-muted">
+              Pot (bb, bets in)
+              <input type="number" step="any" min="0" value={pot} onChange={(e) => setPot(e.target.value)} onBlur={() => save(pot, stack)} className={input} />
+            </label>
+            <label className="block text-[11px] text-muted">
+              Stack behind (bb)
+              <input type="number" step="any" min="0" value={stack} onChange={(e) => setStack(e.target.value)} onBlur={() => save(pot, stack)} className={input} />
+            </label>
+          </div>
+          {rebuilt && (
+            <p className="text-[11px] tabular-nums text-muted">
+              From the action: pot {fmtBb(totalPot(rebuilt))} · stack {fmtBb(effectiveStack(rebuilt))}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Editor({
   node,
-  path,
   parent,
   dead,
   onPatch,
@@ -124,7 +271,6 @@ function Editor({
   onImportCsv,
 }: {
   node: PokerNode;
-  path: PokerNode[];
   parent: PokerNode | null;
   dead: Set<string>;
   onPatch: (data: NodeData) => void;
@@ -132,8 +278,6 @@ function Editor({
   onImportCsv: (text: string) => Promise<ImportResult>;
 }) {
   switch (node.type) {
-    case "text":
-      return <TextEditor key={node.id} node={node} onPatch={onPatch} />;
     case "flop":
       return (
         <div>
@@ -164,7 +308,6 @@ function Editor({
         <StrategyMeta
           key={node.id}
           node={node}
-          path={path}
           onPatch={onPatch}
           onOpenStrategy={onOpenStrategy}
           onImportCsv={onImportCsv}
@@ -177,45 +320,13 @@ function Editor({
   }
 }
 
-function TextEditor({ node, onPatch }: { node: PokerNode; onPatch: (data: NodeData) => void }) {
-  const initial = asText(node);
-  const [title, setTitle] = useState(initial.title);
-  const [body, setBody] = useState(initial.body);
-
-  return (
-    <div className="space-y-2">
-      <label className="block text-xs text-muted">
-        Title
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => onPatch({ title, body })}
-          className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
-        />
-      </label>
-      <label className="block text-xs text-muted">
-        Notes
-        <textarea
-          value={body}
-          rows={5}
-          onChange={(e) => setBody(e.target.value)}
-          onBlur={() => onPatch({ title, body })}
-          className="mt-0.5 w-full resize-y rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
-        />
-      </label>
-    </div>
-  );
-}
-
 function StrategyMeta({
   node,
-  path,
   onPatch,
   onOpenStrategy,
   onImportCsv,
 }: {
   node: PokerNode;
-  path: PokerNode[];
   onPatch: (data: NodeData) => void;
   onOpenStrategy: () => void;
   onImportCsv: (text: string) => Promise<ImportResult>;
@@ -282,8 +393,6 @@ function StrategyMeta({
           className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
         />
       </label>
-      <SeatFields data={data} onPatch={onPatch} />
-      <AddToTrainer node={node} path={path} />
       <div>
         <p className="mb-1 text-xs text-muted">Actions</p>
         <div className="flex flex-wrap gap-1">
@@ -373,7 +482,6 @@ function ActionEditor({
   onPatch: (data: NodeData) => void;
 }) {
   const data = asAction(node);
-  const [label, setLabel] = useState(data.label);
 
   // Linked: an action under a strategy picks from that strategy's action set.
   if (parent && parent.type === "strategy") {
@@ -391,6 +499,7 @@ function ActionEditor({
                 strategyActionId: chosen.id,
                 kind: chosen.kind,
                 sizePct: chosen.sizePct ?? null,
+                sizeUnit: chosen.sizeUnit ?? null,
                 label: chosen.label,
                 color: chosen.color,
               });
@@ -408,160 +517,16 @@ function ActionEditor({
           </select>
         </label>
         <p className="text-xs text-muted">
-          Linked to the parent strategy&apos;s action set. Edit sizings there.
+          One of the decision&apos;s options. Edit sizings in its grid editor.
         </p>
       </div>
     );
   }
 
-  // Free-form action (parent is not a strategy).
+  // Not under a decision: the tree walk flags it; nothing to edit here.
   return (
-    <div className="space-y-2">
-      <label className="block text-xs text-muted">
-        Label
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          onBlur={() => onPatch({ ...data, label: label.trim() || "Action" })}
-          className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
-        />
-      </label>
-      <label className="block text-xs text-muted">
-        Kind
-        <select
-          value={data.kind}
-          onChange={(e) => {
-            const kind = e.target.value as ActionKind;
-            onPatch({ ...data, kind, color: colorForKind(kind) });
-          }}
-          className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
-        >
-          {ACTION_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {ACTION_KIND_LABELS[k]}
-            </option>
-          ))}
-        </select>
-      </label>
-      {kindHasSize(data.kind) && (
-        <label className="block text-xs text-muted">
-          Size (% pot)
-          <input
-            type="number"
-            min={0}
-            value={data.sizePct ?? ""}
-            onChange={(e) =>
-              onPatch({ ...data, sizePct: e.target.value === "" ? null : Number(e.target.value) })
-            }
-            className="mt-0.5 w-full rounded border border-line bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-accent"
-          />
-        </label>
-      )}
-      <div>
-        <span className="text-xs text-muted">Colour</span>
-        <div className="mt-1 flex flex-wrap gap-1">
-          {ACTION_SWATCHES.map((color) => (
-            <button
-              key={color}
-              type="button"
-              onClick={() => onPatch({ ...data, color })}
-              className={[
-                "size-5 rounded-sm border",
-                data.color === color ? "border-foreground" : "border-transparent",
-              ].join(" ")}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Who plays this strategy and against whom. Once both seats are set, IP / OOP
- * is derived and the manual toggle becomes a read-out; without them the old
- * toggle still works, so existing nodes keep their meaning.
- */
-function SeatFields({
-  data,
-  onPatch,
-}: {
-  data: StrategyData;
-  onPatch: (data: NodeData) => void;
-}) {
-  function setSeats(seat: Seat | null, vsSeat: Seat | null) {
-    const derived = derivedPosition(seat, vsSeat);
-    onPatch({ ...data, seat, vsSeat, position: derived ?? data.position ?? null });
-  }
-  const derived = derivedPosition(data.seat, data.vsSeat);
-  const sameSeat = !!data.seat && data.seat === data.vsSeat;
-
-  return (
-    <div>
-      <p className="mb-1 text-xs text-muted">Positions</p>
-      <div className="flex items-center gap-1.5 text-xs">
-        <SeatSelect
-          label="Plays"
-          value={data.seat ?? null}
-          onChange={(seat) => setSeats(seat, data.vsSeat ?? null)}
-        />
-        <span className="text-muted">vs</span>
-        <SeatSelect
-          label="Against"
-          value={data.vsSeat ?? null}
-          onChange={(vs) => setSeats(data.seat ?? null, vs)}
-        />
-        {derived && (
-          <span className="ml-auto rounded border border-line px-1.5 py-0.5 text-[11px] font-medium">
-            {derived}
-          </span>
-        )}
-      </div>
-      {sameSeat && <p className="mt-1 text-[11px] text-red-500">Pick two different seats.</p>}
-      {!derived && !sameSeat && (
-        <div className="mt-1.5">
-          <Segmented
-            size="sm"
-            value={data.position ?? "none"}
-            onChange={(v) => onPatch({ ...data, position: v === "none" ? null : (v as "OOP" | "IP") })}
-            options={[
-              { id: "none", label: "—" },
-              { id: "OOP", label: "OOP" },
-              { id: "IP", label: "IP" },
-            ]}
-          />
-          <p className="mt-1 text-[11px] text-muted">
-            Set both seats to use this node in a trainer; IP / OOP then follows from them.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SeatSelect({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: Seat | null;
-  onChange: (seat: Seat | null) => void;
-}) {
-  return (
-    <select
-      aria-label={label}
-      value={value ?? ""}
-      onChange={(e) => onChange(isSeat(e.target.value) ? e.target.value : null)}
-      className="rounded border border-line bg-background px-1.5 py-1 text-xs text-foreground outline-none focus:border-accent"
-    >
-      <option value="">—</option>
-      {SEATS.map((seat) => (
-        <option key={seat} value={seat}>
-          {seat}
-        </option>
-      ))}
-    </select>
+    <p className="text-xs text-muted">
+      {data.label} — an action must hang from a decision node to be part of the hand.
+    </p>
   );
 }

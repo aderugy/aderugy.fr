@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SpotCanvas } from "@/components/poker/SpotCanvas";
-import type { PokerNode, PokerSpot } from "@/lib/solver/types";
+import { asSetup, type PokerNode, type PokerSpot } from "@/lib/solver/types";
 
 export default async function SpotPage({
   params,
@@ -20,7 +20,7 @@ export default async function SpotPage({
   const [spotRes, rootsRes] = await Promise.all([
     supabase
       .from("poker_spots")
-      .select("id, name, description, created_at, updated_at")
+      .select("id, name, description, setup, created_at, updated_at")
       .eq("id", spotId)
       .eq("user_id", user.id)
       .maybeSingle(),
@@ -76,7 +76,7 @@ export default async function SpotPage({
         <h1 className="truncate text-sm font-medium">{spot.name}</h1>
       </div>
       <div className="min-h-0 flex-1">
-        <SpotCanvas spotId={spot.id} initialNodes={roots} focusPath={focusPath} />
+        <SpotCanvas spotId={spot.id} initialSetup={asSetup(spot.setup)} initialNodes={roots} focusPath={focusPath} />
       </div>
     </div>
   );

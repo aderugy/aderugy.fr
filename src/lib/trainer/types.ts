@@ -1,52 +1,58 @@
 /**
  * Domain types for /poker/trainers. DB rows mirror the columns (snake_case);
- * the context read out of a Solver notes tree is camelCase.
+ * what is read out of a Solver notes tree is camelCase.
  */
 
 import type { Seat } from "../solver/seats";
-import type { ActionKind, StrategyAction, StrategyWeights } from "../solver/types";
+import type { ActionKind, PokerNode, SpotSetup, StrategyAction, StrategyWeights, Street } from "../solver/types";
 
-export type Street = "preflop" | "flop" | "turn" | "river";
+export type { Street } from "../solver/types";
+export { STREET_LABELS } from "../solver/types";
 
-export const STREET_LABELS: Record<Street, string> = {
-  preflop: "Preflop",
-  flop: "Flop",
-  turn: "Turn",
-  river: "River",
-};
-
-/** One action on the current street before hero's decision. */
+/** One action of the hand before an entry node (whole hand, every street). */
 export type LineAction = {
+  street?: Street;
   seat: Seat;
   kind: ActionKind;
-  sizePct: number | null;
   label: string;
+  /** What the seat has in front after it (null for check / fold). */
+  amountBb?: number | null;
+  /** Legacy rows (before 0013) stored the sizing instead. */
+  sizePct?: number | null;
 };
 
-/** What a strategy node's ancestors say about the hand, read top-down. */
-export type NodeContext = {
+/** Where a hand starts, read from the tree above an entry node. */
+export type EntryContext = {
   spotId: string;
+  players: [Seat, Seat];
   street: Street;
   board: string[];
   line: LineAction[];
-  /** Who plays the node — hero when it is trained. */
-  seat: Seat;
-  vsSeat: Seat;
+  potBb: number;
+  stackBb: number;
+  /** Who acts next at the entry (null between streets). */
+  toAct: Seat | null;
 };
+
+export type Feedback = "each" | "hand_end";
 
 export type Trainer = {
   id: string;
   name: string;
   hero_seat: Seat;
   villain_seat: Seat;
-  pot_bb: number;
+  /** Unused since the pot comes from the tree (kept on old rows). */
+  pot_bb: number | null;
   stack_bb: number;
   street: Street | null;
+  stop_at_street_end: boolean;
+  feedback: Feedback;
   archived: boolean;
   created_at: string;
   updated_at: string;
 };
 
+/** An entry node of a trainer, with the context last read from its tree. */
 export type TrainerNodeRow = {
   trainer_id: string;
   node_id: string;
@@ -70,14 +76,41 @@ export const GRADE_LABELS: Record<Grade, string> = {
   blunder: "Blunder",
 };
 
+export type EndReason =
+  | "fold"
+  | "showdown"
+  | "allin"
+  | "end_of_solution"
+  | "branch_not_developed"
+  | "off_range"
+  | "no_runout"
+  | "end_of_street";
+
+export const END_LABELS: Record<EndReason, string> = {
+  fold: "Hand over",
+  showdown: "Showdown",
+  allin: "All-in — runout",
+  end_of_solution: "End of solution",
+  branch_not_developed: "Branch not developed",
+  off_range: "Off range",
+  no_runout: "No runout available with your cards",
+  end_of_street: "End of street",
+};
+
+/** The tree stopped the hand, not the game: something to develop. */
+export const TREE_ENDS: EndReason[] = ["end_of_solution", "branch_not_developed", "off_range", "no_runout"];
+
 export type TrainerSession = {
   id: string;
   trainer_id: string;
   started_at: string;
   ended_at: string | null;
+  /** Decisions answered (the column predates multi-decision hands). */
   hands: number;
   correct: number;
   blunders: number;
+  played_hands: number;
+  perfect_hands: number;
   last_answer_at: string | null;
 };
 
@@ -96,16 +129,42 @@ export type TrainerAnswer = {
   grade: Grade;
   answered_ms: number | null;
   answered_at: string;
+  hand_id: string | null;
+  step: number | null;
+  line: LineAction[] | null;
+  pot_bb: number | null;
 };
 
-/** Everything the practice screen needs for one node, loaded once per session. */
-export type DrillNode = {
-  nodeId: string;
+export type TrainerHand = {
+  id: string;
+  session_id: string;
+  entry_node_id: string | null;
+  end_node_id: string | null;
+  combo: string | null;
+  villain_combo: string | null;
+  board: string[];
+  line: LineAction[];
+  end_reason: EndReason;
+  decisions: number;
+  correct: number;
+  ended_at: string;
+};
+
+/** One spot of a session: its setup and the nodes a hand can go through. */
+export type DrillSpot = {
   spotId: string;
   spotName: string;
-  label: string | null;
-  weight: number;
-  context: NodeContext;
-  actions: StrategyAction[];
-  weights: StrategyWeights;
+  setup: SpotSetup;
+  /** Paths to the entries and every node below them. */
+  nodes: PokerNode[];
+};
+
+export type DrillEntry = { nodeId: string; spotId: string; weight: number; label: string };
+
+/** Everything the practice screen needs, loaded once per session. */
+export type Drill = {
+  spots: Record<string, DrillSpot>;
+  entries: DrillEntry[];
+  /** Grids of the decision nodes below the entries. */
+  weights: Record<string, StrategyWeights>;
 };
