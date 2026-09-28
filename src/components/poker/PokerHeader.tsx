@@ -10,7 +10,7 @@ import { PokerNav } from "./PokerNav";
  */
 export function PokerHeader({ email }: { email?: string | null }) {
   return (
-    <header className="flex shrink-0 items-center gap-3 border-b border-line px-3 py-2 sm:gap-6 sm:px-5 sm:py-3">
+    <header className="flex h-10 shrink-0 items-center gap-3 border-b border-line px-3 sm:gap-6 sm:px-5">
       <Link
         href="/"
         className="hidden shrink-0 text-xs text-muted hover:text-foreground sm:inline"
