@@ -6,7 +6,7 @@
  * buckets) and the strategy of any group. Pure functions only.
  */
 
-import { GRID_HANDS, comboBlocked, handCombos } from "./cards";
+import { GRID_HANDS, RANKS, cardRank, cardSuit, comboBlocked, comboCards, handCombos, type Suit } from "./cards";
 import { comboVector, vectorTotal } from "./strategy";
 import { DRAW_CLASSES, DRAW_LABELS, MADE_CLASSES, MADE_LABELS, drawClass, madeClass } from "./handClass";
 import type { StrategyStats, StrategyWeights } from "./types";
@@ -224,4 +224,47 @@ export function groupFilter(sections: QuickSection[], picked: Set<string>): ((c:
     .filter((gs) => gs.length > 0);
   if (active.length === 0) return null;
   return (c) => active.every((gs) => gs.some((g) => g.test(c)));
+}
+
+/* ---------------------------------------------------------------- suits */
+
+/** Per suit: kept only ("in", left click) or left out ("out", right click). */
+export type SuitMarks = Partial<Record<Suit, "in" | "out">>;
+/** Suits of the high card and of the low card of a combo. */
+export type SuitFilter = { high: SuitMarks; low: SuitMarks };
+
+export const NO_SUITS: SuitFilter = { high: {}, low: {} };
+
+function fits(marks: SuitMarks, suit: Suit): boolean {
+  if (marks[suit] === "out") return false;
+  const ins = Object.values(marks).filter((m) => m === "in").length;
+  return ins === 0 || marks[suit] === "in";
+}
+
+/**
+ * The combos whose high card and low card have the suits asked. A pair has
+ * no high card: either of its cards may be the "high" one.
+ */
+export function suitFilter(f: SuitFilter): ((c: RangeCombo) => boolean) | null {
+  if (Object.keys(f.high).length === 0 && Object.keys(f.low).length === 0) return null;
+  return (c) => {
+    const [a, b] = comboCards(c.combo);
+    const va = RANKS.indexOf(cardRank(a));
+    const vb = RANKS.indexOf(cardRank(b));
+    const as = cardSuit(a);
+    const bs = cardSuit(b);
+    const ok = (hi: Suit, lo: Suit) => fits(f.high, hi) && fits(f.low, lo);
+    if (va === vb) return ok(as, bs) || ok(bs, as);
+    return va < vb ? ok(as, bs) : ok(bs, as);
+  };
+}
+
+/** Both filters (null when neither is on). */
+export function bothFilters(
+  a: ((c: RangeCombo) => boolean) | null,
+  b: ((c: RangeCombo) => boolean) | null,
+): ((c: RangeCombo) => boolean) | null {
+  if (!a) return b;
+  if (!b) return a;
+  return (c) => a(c) && b(c);
 }

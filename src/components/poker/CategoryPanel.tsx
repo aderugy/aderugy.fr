@@ -4,13 +4,17 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { GRID_HANDS, RANKS, SUIT_COLORS, SUIT_SYMBOLS, comboBlocked, comboCards, handCombos, type Suit } from "@/lib/solver/cards";
 import {
   CATEGORY_COLORS,
+  NO_SUITS,
   assignCombos,
+  bothFilters,
   categoryIndex,
   groupFilter,
   quickSections,
   rangeCombos,
+  suitFilter,
   summarize,
   type GroupSummary,
+  type SuitFilter,
   type HandCategory,
   type RangeCombo,
 } from "@/lib/solver/categories";
@@ -59,7 +63,12 @@ export function CategoryPanel({
   const index = useMemo(() => categoryIndex(cats), [cats]);
   const [brush, setBrush] = useState<string | null>(categories[0]?.id ?? null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const filter = useMemo(() => groupFilter(sections, picked), [sections, picked]);
+  const [suits, setSuits] = useState<SuitFilter>(NO_SUITS);
+  const filter = useMemo(() => bothFilters(groupFilter(sections, picked), suitFilter(suits)), [sections, picked, suits]);
+  const clearFilter = () => {
+    setPicked(new Set());
+    setSuits(NO_SUITS);
+  };
   const [hovered, setHovered] = useState<string | null>(null);
   const [form, setForm] = useState<{ id: string | null; name: string; color: string } | null>(null);
 
@@ -143,7 +152,7 @@ export function CategoryPanel({
       // With a filter on, the new category starts with what it matches.
       commit(matching ? assignCombos(next, matching.map((c) => c.combo), id) : next);
       setBrush(id);
-      if (matching) setPicked(new Set());
+      if (matching) clearFilter();
     }
     setForm(null);
   }
@@ -222,6 +231,7 @@ export function CategoryPanel({
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(190px,230px)]">
         <div>
           <CategoryGrid
+            actions={actions}
             range={byCombo}
             index={index}
             cats={cats}
@@ -248,7 +258,7 @@ export function CategoryPanel({
                   Add all to {brushCat.name}
                 </button>
               )}
-              <button type="button" onClick={() => setPicked(new Set())} className="text-muted underline-offset-2 hover:text-foreground hover:underline">
+              <button type="button" onClick={clearFilter} className="text-muted underline-offset-2 hover:text-foreground hover:underline">
                 Clear filter
               </button>
             </div>
@@ -265,7 +275,10 @@ export function CategoryPanel({
             onToggle={toggleCombo}
           />
         </div>
-        <GroupsPanel sections={sections} range={range} actions={actions} picked={picked} onPick={setPicked} />
+        <div className="space-y-3">
+          <SuitPicker value={suits} onChange={setSuits} />
+          <GroupsPanel sections={sections} range={range} actions={actions} picked={picked} onPick={setPicked} />
+        </div>
       </div>
     </div>
   );
@@ -426,6 +439,7 @@ function CategoryForm({
 /* ================================================================== grid */
 
 function CategoryGrid({
+  actions,
   range,
   index,
   cats,
@@ -437,6 +451,7 @@ function CategoryGrid({
   onStart,
   onEnter,
 }: {
+  actions: StrategyAction[];
   range: Map<string, RangeCombo>;
   index: Map<string, string>;
   cats: HandCategory[];
@@ -485,8 +500,16 @@ function CategoryGrid({
           const k = index.get(c) ?? "";
           parts.set(k, (parts.get(k) ?? 0) + rc.reach);
         }
-        const height = live.length ? (inRange / live.length) * 100 : 0;
-        const order = [...cats.map((c) => c.id), ""].filter((k) => parts.has(k));
+        // The strategy behind (of the combos shown), the categories as a band on top.
+        const height = live.length ? ((filter ? shown : inRange) / live.length) * 100 : 0;
+        const order = cats.map((c) => c.id).filter((k) => parts.has(k));
+        const strat = actions.map(() => 0);
+        for (const c of live) {
+          const rc = range.get(c);
+          if (!rc || (filter && !filter(rc))) continue;
+          for (let i = 0; i < strat.length; i++) strat[i] += (rc.strategy[i] ?? 0) * rc.reach;
+        }
+        const stratTotal = strat.reduce((a, b) => a + b, 0);
         return (
           <div
             key={hand}
@@ -500,14 +523,21 @@ function CategoryGrid({
             ].join(" ")}
           >
             <span className="absolute inset-0 flex flex-col justify-end bg-background">
-              {inRange > 0 && (
+              {stratTotal > 0 && (
                 <span className="flex w-full" style={{ height: `${Math.max(8, height)}%` }}>
-                  {order.map((k) => (
-                    <span key={k || "other"} style={{ width: `${((parts.get(k) ?? 0) / inRange) * 100}%`, backgroundColor: k ? colorOf.get(k) : OTHER }} />
-                  ))}
+                  {actions.map((a, i) =>
+                    strat[i] > 0 ? <span key={a.id} style={{ width: `${(strat[i] / stratTotal) * 100}%`, backgroundColor: a.color }} /> : null,
+                  )}
                 </span>
               )}
             </span>
+            {order.length > 0 && shown > 0 && (
+              <span className="absolute inset-x-0 top-0 flex h-[30%] border-b border-black/25">
+                {order.map((k) => (
+                  <span key={k} style={{ width: `${((parts.get(k) ?? 0) / shown) * 100}%`, backgroundColor: colorOf.get(k) }} />
+                ))}
+              </span>
+            )}
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-white mix-blend-difference">{hand}</span>
           </div>
         );
@@ -600,6 +630,57 @@ function ComboText({ combo }: { combo: string }) {
         </span>
       ))}
     </span>
+  );
+}
+
+/* ================================================================= suits */
+
+/**
+ * Two rows of suits, for the high card and the low card of a combo (a pair
+ * matches either way round). Left click keeps only the suits clicked, right
+ * click leaves a suit out; again to undo.
+ */
+function SuitPicker({ value, onChange }: { value: SuitFilter; onChange: (next: SuitFilter) => void }) {
+  const set = (row: "high" | "low", suit: Suit, mark: "in" | "out") => {
+    const marks = { ...value[row] };
+    if (marks[suit] === mark) delete marks[suit];
+    else marks[suit] = mark;
+    onChange({ ...value, [row]: marks });
+  };
+  return (
+    <div className="text-[11px]">
+      <p className="mb-1 font-medium uppercase tracking-wide text-muted">Suits</p>
+      {(["high", "low"] as const).map((row) => (
+        <div key={row} className="mb-1 flex items-center gap-1">
+          <span className="w-14 shrink-0 text-muted">{row === "high" ? "High card" : "Low card"}</span>
+          {(["s", "h", "d", "c"] as Suit[]).map((suit) => {
+            const mark = value[row][suit];
+            return (
+              <button
+                key={suit}
+                type="button"
+                aria-label={`${row} card ${suit}${mark ? `: ${mark === "in" ? "kept" : "left out"}` : ""}`}
+                aria-pressed={!!mark}
+                title="Click: only this suit · Right click: leave it out"
+                onClick={() => set(row, suit, "in")}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  set(row, suit, "out");
+                }}
+                className={[
+                  "relative flex size-7 items-center justify-center rounded border text-base leading-none transition-colors",
+                  mark === "in" ? "border-foreground bg-foreground/10" : mark === "out" ? "border-red-500/60 opacity-40" : "border-line hover:border-accent",
+                ].join(" ")}
+                style={{ color: SUIT_COLORS[suit] }}
+              >
+                {SUIT_SYMBOLS[suit]}
+                {mark === "out" && <span className="absolute inset-x-1 top-1/2 h-0.5 -rotate-45 rounded bg-red-500" />}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
   );
 }
 

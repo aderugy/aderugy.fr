@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assignCombos, categoryIndex, groupFilter, quickSections, rangeCombos, summarize, type HandCategory } from "./categories";
+import { NO_SUITS, assignCombos, bothFilters, categoryIndex, groupFilter, quickSections, rangeCombos, suitFilter, summarize, type HandCategory } from "./categories";
 
 const cats: HandCategory[] = [
   { id: "a", name: "Nuts", color: "#000", combos: ["AsAh", "KsKh"] },
@@ -38,4 +38,22 @@ test("range, summaries and groups", () => {
   const f = groupFilter(sections, new Set(["made:nothing", "draw:combo_draw"]))!;
   assert.deepEqual(range.filter(f).map((c) => c.combo), ["7d6d"]);
   assert.equal(groupFilter(sections, new Set()), null);
+});
+
+test("suit filter: high card, low card, pairs either way", () => {
+  const weights = { hands: { AKs: [100], AKo: [100], QQ: [100] }, combos: {} };
+  const range = rangeCombos(weights, 1, new Set());
+  const pick = (f: Parameters<typeof suitFilter>[0]) => range.filter(suitFilter(f)!).map((c) => c.combo).sort();
+  // High card a spade, low card anything but a heart (pairs: a spade and a non-heart).
+  assert.deepEqual(pick({ high: { s: "in" }, low: { h: "out" } }), ["AsKc", "AsKd", "AsKs", "QsQc", "QsQd"].sort());
+  // Low card a diamond: AKs with diamonds, AKo with Kd, pairs with a diamond.
+  assert.deepEqual(
+    pick({ high: {}, low: { d: "in" } }),
+    ["AdKd", "AsKd", "AhKd", "AcKd", "QsQd", "QhQd", "QdQc"].sort(),
+  );
+  // Pairs: spade + heart in either order.
+  assert.deepEqual(pick({ high: { h: "in" }, low: { s: "in" } }).filter((c) => c.startsWith("Q")), ["QsQh"]);
+  assert.equal(suitFilter(NO_SUITS), null);
+  const both = bothFilters(suitFilter({ high: { c: "in" }, low: {} }), (c) => c.hand === "AKo");
+  assert.deepEqual(range.filter(both!).map((c) => c.combo).sort(), ["AcKd", "AcKh", "AcKs"].sort());
 });
