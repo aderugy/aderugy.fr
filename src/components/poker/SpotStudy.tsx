@@ -50,12 +50,16 @@ import { StatsDetail, rangeTotal, type StatsMode } from "@/components/poker/Stat
 import { BoardCards } from "@/components/poker/trainer/Cards";
 import { Markdown } from "@/components/poker/Markdown";
 import { NodeNotes } from "@/components/poker/NodeNotes";
+import { CategoryPanel } from "@/components/poker/CategoryPanel";
+import { asCategories, type HandCategory } from "@/lib/solver/categories";
 
 /** What the study layout can change, supplied by SpotView. */
 export type StudyEditing = {
   /** Open a node's tools (the drawer); ROOT_ID opens the setup. */
   editNode: (id: string) => void;
   saveNotes: (id: string, patch: NodeMeta) => void;
+  /** A decision's hand categories (see CategoryPanel). */
+  saveCategories: (id: string, categories: HandCategory[]) => void;
   /** Add the action node of an option (and on a solver line, what follows). */
   develop: (decisionId: string, optionId: string) => void;
   /** Delete a node and its subtree (asks first). */
@@ -801,7 +805,7 @@ function Tool({
   );
 }
 
-type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev";
+type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev" | "categories";
 
 function DecisionBody({
   ctx,
@@ -848,14 +852,17 @@ function DecisionBody({
   if (stats?.players.OOP) tabs.push({ id: "eq-OOP", label: `Equity ${name("OOP")}` });
   if (stats?.players.IP) tabs.push({ id: "eq-IP", label: `Equity ${name("IP")}` });
   if (stats?.ev) tabs.push({ id: "ev", label: `EV ${name(stats.actor)}` });
+  const categories = asCategories((node.data as NodeMeta).categories);
+  tabs.push({ id: "categories", label: categories.length ? `Categories (${categories.length})` : "Categories" });
+  const handState = ctx.nodeStates.get(node.id)?.state ?? null;
   const statsMode: StatsMode | null =
     mode === "eq-OOP" ? { kind: "equity", player: "OOP" } : mode === "eq-IP" ? { kind: "equity", player: "IP" } : mode === "ev" ? { kind: "ev" } : null;
 
   return (
-    <div className="max-w-[560px]">
-      {stats && (
-        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <Segmented size="sm" value={mode} onChange={setMode} options={tabs} />
+    <div className={mode === "categories" ? "" : "max-w-[560px]"}>
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <Segmented size="sm" value={mode} onChange={setMode} options={tabs} />
+        {stats && (
           <span className="text-[11px] tabular-nums text-muted">
             {(["OOP", "IP"] as const)
               .filter((p) => stats.players[p])
@@ -863,9 +870,20 @@ function DecisionBody({
               .join(" · ")}
             {stats.ev?.total != null && ` · EV ${name(stats.actor)} ${rangeTotal(stats, { kind: "ev" })}`}
           </span>
-        </div>
-      )}
-      {stats && statsMode ? (
+        )}
+      </div>
+      {mode === "categories" ? (
+        <CategoryPanel
+          actions={actions}
+          weights={w}
+          dead={ctx.deadCards(node.id)}
+          board={handState?.board ?? []}
+          stats={stats}
+          potBb={handState ? totalPot(handState) : null}
+          categories={categories}
+          onChange={(next) => ctx.editing.saveCategories(node.id, next)}
+        />
+      ) : stats && statsMode ? (
         <StatsDetail stats={stats} mode={statsMode} dead={ctx.deadCards(node.id)} />
       ) : (
         <StrategyDetail

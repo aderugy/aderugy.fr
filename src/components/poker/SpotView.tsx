@@ -860,6 +860,7 @@ export function SpotView({
         saveSetup({ ...s, ...(patch.summary !== undefined ? { summary: patch.summary } : {}), ...(patch.notes !== undefined ? { notes: patch.notes } : {}) });
       } else persistData(id, patch);
     },
+    saveCategories: (id, categories) => persistData(id, { categories }),
     develop: (decisionId, optionId) => void develop(decisionId, optionId),
     deleteNode: confirmDelete,
     addChild: async (parentId, type) => {
