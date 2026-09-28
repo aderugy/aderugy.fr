@@ -40,10 +40,9 @@ import type { Seat } from "@/lib/solver/seats";
 import { RootCard, RootInspector, ROOT_ID } from "@/components/poker/SpotRoot";
 import type { ImportResult } from "@/components/poker/NodeInspector";
 import { MiniNodeCard, NodeCard, type CanvasMode } from "@/components/poker/NodeCard";
-import { NotesView } from "@/components/poker/NodeNotes";
 import { NodeInspector } from "@/components/poker/NodeInspector";
 import { StrategyEditor } from "@/components/poker/StrategyEditor";
-import { StrategyReview } from "@/components/poker/StrategyReview";
+import { SpotStudy } from "@/components/poker/SpotStudy";
 import { Segmented } from "@/components/poker/ui";
 
 const NODE_SELECT = "id, spot_id, parent_id, type, position, data, created_at, updated_at";
@@ -74,10 +73,15 @@ export function SpotCanvas({
   const [strategy, setStrategy] = useState<{ nodeId: string; weights: StrategyWeights } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<CanvasMode>("edit");
-  // Cache of strategy grids, loaded on demand for revision-mode previews.
+  // Cache of strategy grids, loaded on demand (study previews, action frequencies).
   const [strategyWeights, setStrategyWeights] = useState<Record<string, StrategyWeights>>({});
-  const [reviewNodeId, setReviewNodeId] = useState<string | null>(null);
   const [setup, setSetup] = useState<SpotSetup>(initialSetup);
+  // Study mode: the node in focus (null = where the tree starts).
+  const [studyFocus, setStudyFocus] = useState<string | null>(null);
+  // Study mode walks the whole tree, so it loads every node at once.
+  const [allLoaded, setAllLoaded] = useState(false);
+  // Canvas: a node to scroll into view once it is laid out.
+  const [centerOn, setCenterOn] = useState<string | null>(null);
 
   function saveSetup(next: SpotSetup) {
     setSetup(next);
@@ -87,11 +91,66 @@ export function SpotCanvas({
     });
   }
 
+  /** Switch between the canvas and study, keeping the node you are on. */
   function switchMode(next: CanvasMode) {
+    if (next === mode) return;
+    if (next === "revision") {
+      // Study opens on the node selected on the canvas, if any.
+      if (selectedId) setStudyFocus(selectedId);
+      void loadAll();
+      setSelectedId(null);
+    } else {
+      // Back on the canvas: the studied node, selected and in view.
+      const id = studyFocus;
+      setSelectedId(id);
+      if (id) revealOnCanvas(id);
+    }
     setMode(next);
-    setSelectedId(null);
-    setReviewNodeId(null);
     setStrategy(null);
+  }
+
+  /** Expand every ancestor of `id` and pan the canvas to it. */
+  function revealOnCanvas(id: string) {
+    const chain: string[] = [];
+    let cur = id === ROOT_ID ? null : (nodesById[id]?.parent_id ?? null);
+    while (cur) {
+      chain.push(cur);
+      cur = nodesById[cur]?.parent_id ?? null;
+    }
+    if (chain.length) setExpanded((prev) => new Set([...prev, ...chain]));
+    setCenterOn(id);
+  }
+
+  const loadingAllRef = useRef(false);
+  async function loadAll() {
+    if (allLoaded || loadingAllRef.current) return;
+    loadingAllRef.current = true;
+    const all: PokerNode[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("poker_nodes")
+        .select(NODE_SELECT)
+        .eq("spot_id", spotId)
+        .order("position")
+        .order("id")
+        .range(from, from + PAGE - 1);
+      if (error) {
+        setError(error.message);
+        loadingAllRef.current = false;
+        return;
+      }
+      all.push(...((data ?? []) as PokerNode[]));
+      if (!data || data.length < PAGE) break;
+    }
+    // Local copies win: they may hold edits not saved yet.
+    setNodesById((prev) => ({ ...Object.fromEntries(all.map((n) => [n.id, n])), ...prev }));
+    setLoaded((prev) => new Set([...prev, ...all.map((n) => n.id)]));
+    setWithChildren(
+      (prev) => new Set([...prev, ...all.flatMap((n) => (n.parent_id ? [n.parent_id] : []))]),
+    );
+    setAllLoaded(true);
+    loadingAllRef.current = false;
   }
 
   const loadingRef = useRef<Set<string>>(new Set());
@@ -286,31 +345,46 @@ export function SpotCanvas({
     [visible, sizes],
   );
 
-  // Load the grid of every visible strategy node: revision-mode bubbles
-  // preview it and action nodes show their global frequency from it. Empties
-  // are cached too, so nothing is refetched.
+  // Strategy grids, fetched once each on demand. Empties are cached too, so
+  // nothing is refetched.
+  const weightsRef = useRef(strategyWeights);
   useEffect(() => {
-    const need = visible
-      .filter((n) => n.type === "strategy" && strategyWeights[n.id] === undefined)
-      .map((n) => n.id);
-    if (need.length === 0) return;
-    (async () => {
-      const { data, error } = await supabase
-        .from("poker_strategies")
-        .select("node_id, weights")
-        .in("node_id", need);
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      setStrategyWeights((prev) => {
-        const next = { ...prev };
-        for (const id of need) next[id] = emptyWeights();
-        for (const row of data ?? []) next[row.node_id as string] = normalizeWeights(row.weights);
-        return next;
-      });
-    })();
-  }, [visible, strategyWeights, supabase]);
+    weightsRef.current = strategyWeights;
+  }, [strategyWeights]);
+  const weightsInflight = useRef<Set<string>>(new Set());
+  const requestWeights = useCallback(
+    (ids: string[]) => {
+      const need = ids.filter((id) => weightsRef.current[id] === undefined && !weightsInflight.current.has(id));
+      if (need.length === 0) return;
+      for (const id of need) weightsInflight.current.add(id);
+      void (async () => {
+        const { data, error } = await supabase
+          .from("poker_strategies")
+          .select("node_id, weights")
+          .in("node_id", need);
+        for (const id of need) weightsInflight.current.delete(id);
+        if (error) {
+          setError(error.message);
+          return;
+        }
+        setStrategyWeights((prev) => {
+          const next = { ...prev };
+          for (const id of need) if (next[id] === undefined) next[id] = emptyWeights();
+          for (const row of data ?? []) {
+            const id = row.node_id as string;
+            if (prev[id] === undefined) next[id] = normalizeWeights(row.weights);
+          }
+          return next;
+        });
+      })();
+    },
+    [supabase],
+  );
+
+  // Action cards show their frequency from the parent decision's grid.
+  useEffect(() => {
+    requestWeights(visible.filter((n) => n.type === "strategy").map((n) => n.id));
+  }, [visible, requestWeights]);
 
   // Global frequency of every action of every visible strategy, by node id.
   const frequencies = useMemo(() => {
@@ -723,16 +797,11 @@ export function SpotCanvas({
   }
 
   function handleSelect(node: PokerNode) {
-    if (mode === "revision") {
-      setReviewNodeId(node.id);
-    } else {
-      setSelectedId(node.id);
-    }
+    setSelectedId(node.id);
   }
 
-  function deadCardsFor(nodeId: string): Set<string> {
-    return deadCardsIn(nodesById, nodeId);
-  }
+  const deadCardsFor = useCallback((nodeId: string) => deadCardsIn(nodesById, nodeId), [nodesById]);
+  const allNodes = useMemo(() => Object.values(nodesById), [nodesById]);
 
   /* ------------------------------------------------------------------ pan/zoom */
 
@@ -742,7 +811,6 @@ export function SpotCanvas({
 
   function closeDrawers() {
     setSelectedId(null);
-    setReviewNodeId(null);
   }
 
   // Pan/deselect live on the viewport, not the transformed layer: once the
@@ -799,9 +867,64 @@ export function SpotCanvas({
     });
   }
 
+  // Pan the canvas so a revealed node sits in the upper middle of the screen.
+  useEffect(() => {
+    if (!centerOn || mode !== "edit") return;
+    const pos = layout.positions.get(centerOn);
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!pos || !rect) return;
+    // The inspector drawer (26rem) covers the right of wide screens.
+    const visibleWidth = selectedId && rect.width > 800 ? rect.width - 416 : rect.width;
+    setView((v) => ({
+      scale: v.scale,
+      tx: visibleWidth / 2 - (pos.x + pos.w / 2) * v.scale,
+      ty: rect.height / 3 - pos.y * v.scale,
+    }));
+    setCenterOn(null);
+  }, [centerOn, layout, mode, selectedId]);
+
   const selected = selectedId && selectedId !== ROOT_ID ? nodesById[selectedId] : null;
   const selectedParent = selected?.parent_id ? nodesById[selected.parent_id] ?? null : null;
-  const reviewNode = reviewNodeId && reviewNodeId !== ROOT_ID ? (nodesById[reviewNodeId] ?? null) : null;
+
+  const modeToggle = (
+    <Segmented
+      size="sm"
+      value={mode}
+      onChange={switchMode}
+      options={[
+        { id: "edit", label: "Edit" },
+        { id: "revision", label: "Study" },
+      ]}
+    />
+  );
+
+  if (mode === "revision") {
+    return (
+      <div className="relative h-full w-full overflow-hidden bg-background">
+        {error && (
+          <div className="absolute left-1/2 top-2 z-30 -translate-x-1/2 rounded border border-red-500/40 bg-red-500/10 px-3 py-1 text-xs text-red-500">
+            {error}
+            <button className="ml-2 underline" onClick={() => setError(null)}>
+              dismiss
+            </button>
+          </div>
+        )}
+        <SpotStudy
+          setup={setup}
+          nodes={allNodes}
+          loading={!allLoaded}
+          nodeStates={nodeStates}
+          rootState={rootState}
+          weights={strategyWeights}
+          requestWeights={requestWeights}
+          deadCards={deadCardsFor}
+          focusId={studyFocus}
+          onFocus={setStudyFocus}
+          toolbar={modeToggle}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -815,17 +938,7 @@ export function SpotCanvas({
       )}
 
       {/* Mode toggle */}
-      <div className="absolute right-2 top-2 z-20">
-        <Segmented
-          size="sm"
-          value={mode}
-          onChange={switchMode}
-          options={[
-            { id: "edit", label: "Edit" },
-            { id: "revision", label: "Revision" },
-          ]}
-        />
-      </div>
+      <div className="absolute right-2 top-2 z-20">{modeToggle}</div>
 
       {/* Canvas viewport */}
       <div
@@ -882,8 +995,8 @@ export function SpotCanvas({
             >
               <RootCard
                 setup={setup}
-                selected={selectedId === ROOT_ID || reviewNodeId === ROOT_ID}
-                onSelect={() => (mode === "revision" ? setReviewNodeId(ROOT_ID) : setSelectedId(ROOT_ID))}
+                selected={selectedId === ROOT_ID}
+                onSelect={() => setSelectedId(ROOT_ID)}
               />
             </MeasuredNode>
           )}
@@ -908,7 +1021,7 @@ export function SpotCanvas({
                 <NodeCard
                   node={node}
                   mode={mode}
-                  selected={node.id === selectedId || node.id === reviewNodeId}
+                  selected={node.id === selectedId}
                   hasChildren={nodeHasChildren(node.id)}
                   expanded={expanded.has(node.id)}
                   weights={node.type === "strategy" ? strategyWeights[node.id] : undefined}
@@ -979,55 +1092,6 @@ export function SpotCanvas({
           onImportCsv={(text) => importStrategyCsv(selected, text)}
           onClose={() => setSelectedId(null)}
         />
-      )}
-
-      {/* Strategy review drawer (revision mode) */}
-      {mode === "revision" && reviewNode?.type === "strategy" && (
-        <StrategyReview
-          key={reviewNode.id}
-          title={`${asStrategy(reviewNode).label || "Strategy"}`}
-          actions={asStrategy(reviewNode).actions}
-          weights={strategyWeights[reviewNode.id] ?? emptyWeights()}
-          dead={deadCardsFor(reviewNode.id)}
-          footer={<NotesView node={reviewNode} />}
-          onClose={() => setReviewNodeId(null)}
-        />
-      )}
-
-      {/* Root notes (revision mode) */}
-      {mode === "revision" && reviewNodeId === ROOT_ID && (
-        <aside className="absolute right-0 top-0 z-20 flex h-full w-[26rem] max-w-full flex-col border-l border-line bg-surface shadow-xl">
-          <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Start of the hand</span>
-            <button type="button" onClick={() => setReviewNodeId(null)} className="ml-auto text-xs text-muted hover:text-foreground">
-              Close
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <NotesView node={{ id: ROOT_ID, data: { summary: setup.summary, notes: setup.notes } } as unknown as PokerNode} />
-          </div>
-        </aside>
-      )}
-
-      {/* Notes drawer for any other node (revision mode) */}
-      {mode === "revision" && reviewNode && reviewNode.type !== "strategy" && (
-        <aside className="absolute right-0 top-0 z-20 flex h-full w-[26rem] max-w-full flex-col border-l border-line bg-surface shadow-xl">
-          <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {NODE_LABELS[reviewNode.type]}
-            </span>
-            <button
-              type="button"
-              onClick={() => setReviewNodeId(null)}
-              className="ml-auto text-xs text-muted hover:text-foreground"
-            >
-              Close
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <NotesView node={reviewNode} />
-          </div>
-        </aside>
       )}
 
       {/* Strategy grid editor (edit mode) */}

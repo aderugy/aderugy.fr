@@ -300,7 +300,7 @@ function NodeBody({
 }
 
 /** 51.25 → "51.3%", 0.4 → "0.40%": keep two significant-ish digits for small values. */
-function formatFrequency(pct: number): string {
+export function formatFrequency(pct: number): string {
   if (pct <= 0) return "0%";
   return `${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}%`;
 }

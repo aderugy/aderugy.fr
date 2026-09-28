@@ -44,3 +44,64 @@ body {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* Study mode (/poker/spots/[id]): the node-centred map slides in from the
+   side the move came from — deeper from the right, back from the left, an
+   alternative from below or above — and the branches on the right follow a
+   beat later. */
+@keyframes study-from-right {
+  from { opacity: 0; transform: translateX(40px); }
+}
+@keyframes study-from-left {
+  from { opacity: 0; transform: translateX(-40px); }
+}
+@keyframes study-from-below {
+  from { opacity: 0; transform: translateY(28px); }
+}
+@keyframes study-from-above {
+  from { opacity: 0; transform: translateY(-28px); }
+}
+@keyframes study-fade {
+  from { opacity: 0; }
+}
+@keyframes study-rise {
+  from { opacity: 0; transform: translateX(16px); }
+}
+.study-enter-down { animation: study-from-right 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.study-enter-up { animation: study-from-left 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.study-enter-next { animation: study-from-below 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.study-enter-prev { animation: study-from-above 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.study-enter-jump,
+.study-enter-none { animation: study-fade 200ms ease-out both; }
+.study-enter .study-stagger { animation: study-rise 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.study-crumb-current { animation: study-fade 240ms ease-out both; }
+
+/* The map's connectors: a rail along the column, a tick to each branch. */
+.study-rail { position: relative; }
+.study-rail-right { padding-left: 14px; }
+.study-rail-left { padding-left: 14px; }
+.study-rail::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  border-left: 1.5px solid var(--border);
+}
+.study-tick { position: relative; }
+.study-tick::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 18px;
+  width: 14px;
+  border-top: 1.5px solid var(--border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-enter-down,
+  .study-enter-up,
+  .study-enter-next,
+  .study-enter-prev,
+  .study-enter .study-stagger { animation: study-fade 120ms ease-out both; }
+}

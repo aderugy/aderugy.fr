@@ -19,7 +19,7 @@ import {
 /** The id the canvas gives the spot's root card (it is not a stored node). */
 export const ROOT_ID = "__root__";
 
-function setupLine(setup: SpotSetup): string {
+export function setupLine(setup: SpotSetup): string {
   const start =
     setup.street === "preflop"
       ? `Preflop · ${fmtBb(setup.stackBb)} bb deep`

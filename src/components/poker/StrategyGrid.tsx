@@ -38,7 +38,8 @@ export function CellBars({
 /**
  * A read-only 13×13 strategy grid. `mini` drops labels and borders for the tiny
  * in-bubble preview; the full variant shows hand labels and reports the hovered
- * hand so a caller can surface per-combo detail.
+ * hand so a caller can surface per-combo detail. `isolate` keeps one action's
+ * share of every cell, to see which hands take it.
  */
 export function StrategyGrid({
   actions,
@@ -47,6 +48,7 @@ export function StrategyGrid({
   variant = "full",
   hovered,
   onHoverHand,
+  isolate = null,
 }: {
   actions: StrategyAction[];
   weights: StrategyWeights;
@@ -54,6 +56,8 @@ export function StrategyGrid({
   variant?: "mini" | "full";
   hovered?: string | null;
   onHoverHand?: (hand: string | null) => void;
+  /** Show only this action's share of each hand (index in `actions`). */
+  isolate?: number | null;
 }) {
   const len = actions.length;
   const mini = variant === "mini";
@@ -64,7 +68,9 @@ export function StrategyGrid({
       onPointerLeave={() => onHoverHand?.(null)}
     >
       {GRID_HANDS.map((hand) => {
-        const vec = handDisplayVector(weights, hand, len);
+        const full = handDisplayVector(weights, hand, len);
+        const vec =
+          full && isolate != null ? full.map((x, i) => (i === isolate ? x : 0)) : full;
         const blocked = handCombos(hand).every((c) => comboBlocked(c, dead));
         return (
           <div

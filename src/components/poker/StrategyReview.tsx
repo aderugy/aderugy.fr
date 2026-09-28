@@ -5,73 +5,69 @@ import { comboBlocked, handCombos } from "@/lib/solver/cards";
 import { comboVector, handDisplayVector, vectorTotal, zeroVector } from "@/lib/solver/strategy";
 import type { StrategyAction, StrategyWeights } from "@/lib/solver/types";
 import { StrategyGrid } from "@/components/poker/StrategyGrid";
+import { formatFrequency } from "@/components/poker/NodeCard";
 
 /**
- * Read-only strategy view for revision mode. The big grid lives in the right
- * drawer; hovering a cell surfaces that hand's aggregate and per-combo detail
- * below it.
+ * Read-only strategy view for study mode: the legend with each action's global
+ * frequency, the big grid, and the hovered hand's aggregate and per-combo
+ * detail under it. Hovering a legend entry (or setting `isolate` from outside)
+ * shows only that action in the grid.
  */
-export function StrategyReview({
-  title,
+export function StrategyDetail({
   actions,
   weights,
   dead,
-  footer,
-  onClose,
+  frequencies,
+  isolate,
+  onIsolate,
 }: {
-  title: string;
   actions: StrategyAction[];
   weights: StrategyWeights;
   dead: Set<string>;
-  /** Extra content under the grid (the node's notes). */
-  footer?: React.ReactNode;
-  onClose: () => void;
+  /** Global frequency of each action, in %; null when the grid is empty. */
+  frequencies?: number[] | null;
+  isolate?: number | null;
+  onIsolate?: (index: number | null) => void;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
-
+  if (actions.length === 0) return <p className="text-sm text-muted">This decision has no options yet.</p>;
   return (
-    <aside className="absolute right-0 top-0 z-20 flex h-full w-[26rem] max-w-full flex-col border-l border-line bg-surface shadow-xl">
-      <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted">
-          {title}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-auto text-xs text-muted hover:text-foreground"
-        >
-          Close
-        </button>
+    <div>
+      <div className="flex flex-wrap gap-1.5 pb-3">
+        {actions.map((a, i) => (
+          <button
+            key={a.id}
+            type="button"
+            onPointerEnter={() => onIsolate?.(i)}
+            onPointerLeave={() => onIsolate?.(null)}
+            onFocus={() => onIsolate?.(i)}
+            onBlur={() => onIsolate?.(null)}
+            className={[
+              "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors",
+              isolate === i ? "border-foreground/40 bg-background" : "border-line",
+              isolate != null && isolate !== i ? "opacity-50" : "",
+            ].join(" ")}
+          >
+            <span className="size-3 rounded-sm" style={{ backgroundColor: a.color }} />
+            <span className="font-medium">{a.label}</span>
+            {frequencies && (
+              <span className="tabular-nums text-muted">{formatFrequency(frequencies[i] ?? 0)}</span>
+            )}
+          </button>
+        ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {actions.length === 0 ? (
-          <p className="text-sm text-muted">This strategy has no actions yet.</p>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-2 pb-3">
-              {actions.map((a) => (
-                <span key={a.id} className="flex items-center gap-1 text-[11px] text-muted">
-                  <span className="size-3 rounded-sm" style={{ backgroundColor: a.color }} />
-                  {a.label}
-                </span>
-              ))}
-            </div>
+      <StrategyGrid
+        actions={actions}
+        weights={weights}
+        dead={dead}
+        hovered={hovered}
+        onHoverHand={setHovered}
+        isolate={isolate}
+      />
 
-            <StrategyGrid
-              actions={actions}
-              weights={weights}
-              dead={dead}
-              hovered={hovered}
-              onHoverHand={setHovered}
-            />
-
-            <HoverDetail hand={hovered} actions={actions} weights={weights} dead={dead} />
-          </>
-        )}
-        {footer && <div className="mt-4 border-t border-line pt-3">{footer}</div>}
-      </div>
-    </aside>
+      <HoverDetail hand={hovered} actions={actions} weights={weights} dead={dead} />
+    </div>
   );
 }
 
