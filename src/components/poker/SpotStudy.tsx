@@ -1026,26 +1026,54 @@ function NextColumn({
       </div>
     );
   }
+  // Options with no line under them (never developed, or deleted) fold into
+  // one small "Deleted lines" row, as long as some option still has a line.
+  const indexed = nexts.map((t, i) => ({ t, i }));
+  const bare = (t: StudyTarget) => !t.via && !!t.option;
+  const fold = indexed.some(({ t }) => !bare(t));
+  const shown = fold ? indexed.filter(({ t }) => !bare(t)) : indexed;
+  const hidden = fold ? indexed.filter(({ t }) => bare(t)) : [];
+  const card = ({ t, i }: { t: StudyTarget; i: number }, delay: number) => (
+    <div key={t.via?.id ?? t.option?.id ?? i} className="study-tick study-stagger group/card relative has-[[aria-expanded=true]]:z-20" style={{ animationDelay: `${delay}ms` }}>
+      <TargetCard
+        ctx={ctx}
+        from={focus}
+        t={t}
+        n={i + 1}
+        visited={!!t.stop && t.stop === trail}
+        deletable={!!t.via}
+        onHover={onIsolate && t.optionIndex >= 0 ? (on) => onIsolate(on ? t.optionIndex : null) : undefined}
+        onGo={onGo}
+      />
+      {t.via && <BranchMenu ctx={ctx} t={t} className="absolute right-1.5 top-1.5" />}
+    </div>
+  );
   return (
     <div>
       <ColumnLabel>{kind === "decision" ? "Options" : kind === "branches" ? "Runouts" : "Next"}</ColumnLabel>
       <div className="study-rail study-rail-right space-y-2">
-        {nexts.map((t, i) => (
-          <div key={t.via?.id ?? t.option?.id ?? i} className="study-tick study-stagger group/card relative has-[[aria-expanded=true]]:z-20" style={{ animationDelay: `${60 + i * 35}ms` }}>
-            <TargetCard
-              ctx={ctx}
-              from={focus}
-              t={t}
-              n={i + 1}
-              visited={!!t.stop && t.stop === trail}
-              deletable={!!t.via}
-              onHover={onIsolate && t.optionIndex >= 0 ? (on) => onIsolate(on ? t.optionIndex : null) : undefined}
-              onGo={onGo}
-            />
-            {t.via && <BranchMenu ctx={ctx} t={t} className="absolute right-1.5 top-1.5" />}
-          </div>
-        ))}
+        {shown.map((x, k) => card(x, 60 + k * 35))}
+        {hidden.length > 0 && <DeletedLines>{hidden.map((x, k) => card(x, k * 35))}</DeletedLines>}
       </div>
+    </div>
+  );
+}
+
+/** The smallest fold: a chevron and "Deleted lines", open on click. */
+function DeletedLines({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-0.5 text-[11px] leading-4 text-muted hover:text-foreground"
+      >
+        <Chevron dir={open ? "down" : "right"} size={11} />
+        Deleted lines
+      </button>
+      {open && <div className="mt-2 space-y-2">{children}</div>}
     </div>
   );
 }
@@ -1399,10 +1427,10 @@ function NavButton({
   );
 }
 
-function Chevron({ dir }: { dir: "left" | "right" | "up" | "down" }) {
+function Chevron({ dir, size = 14 }: { dir: "left" | "right" | "up" | "down"; size?: number }) {
   const rotate = { right: 0, down: 90, left: 180, up: 270 }[dir];
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: `rotate(${rotate}deg)` }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: `rotate(${rotate}deg)` }}>
       <path d="M9 6l6 6-6 6" />
     </svg>
   );
