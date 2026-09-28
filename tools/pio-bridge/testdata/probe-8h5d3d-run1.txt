@@ -1,0 +1,147 @@
+# PioProbe transcript
+# date: 2026-09-28T20:16:53+02:00
+# pio: D:\Programs\PioSOLVER\PioSOLVER3-edge.exe
+# cfr: D:\Poker\Solvers\BB vs BTN\Second souffle\8h5d3d.cfr
+
+=== banner
+PioSOLVER-edge 3.3.0 (Jun 21 2024, 17:30:08)
+(c) Piotr Lopusiewicz
+registered to <redacted>
+started in 322ms
+
+>>> show_version
+3.3.0
+<<< 0 ms · 1 lines · ok
+
+>>> show_build_version
+07a83ad
+<<< 0 ms · 1 lines · ok
+
+>>> set_threads 0
+set_threads ok!
+<<< 0 ms · 1 lines · ok
+
+>>> is_ready
+is_ready ok!
+<<< 0 ms · 1 lines · ok
+
+>>> show_save_version "D:\Poker\Solvers\BB vs BTN\Second souffle\8h5d3d.cfr"
+3.0
+<<< 0 ms · 1 lines · ok
+
+>>> show_metadata "D:\Poker\Solvers\BB vs BTN\Second souffle\8h5d3d.cfr"
+r
+ROOT
+8h 5d 3d 
+0 0 60 
+1 children
+flags: INCOMPLETE_TREE ISOMORPHISM_ON RAKE_ON PIO_ALG 
+
+975
+1 1 1 1 1 1 0 0 0 0 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0 1 1 1 0 0 0 0 0.5 0 0 0 0 0 0 0 0 0.5 0 0 1 0 0 0 0 0 0 0.5 0 1 1 0 0 0 0 0 0 0 0.5 1 1 1 0 0 0 0 0.100000001 0 0 0 1 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0 0 1 0 0 0 0 0 0 0.100000001 0 0 0 1 0 1 1 0 0 0 0 0 0 0 0.100000001 0 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0.5 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0.5 0 0 0 1 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0.5 0 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0.100000001 0.100000001 0.100000001 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0.100000001 1 0.100000001 0.100000001 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0.100000001 0.100000001 1 0.100000001 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0.100000001 0.100000001 0.100000001 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0.25 0.25 0.25 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0.25 1 0.25 0.25 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0.25 0.25 1 0.25 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0.25 0.25 0.25 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0 0 0 1 0.5 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0 0 0.5 1 0.5 0.5 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0 0.5 0.5 1 0.5 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0.5 0.5 0.5 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0 0 0 1 0.5 0.5 0.5 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0 0 0.5 1 0.5 0.5 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0 0.5 0.5 1 0.5 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.100000001 0 0 0 1 0.5 0.5 0.5 1 1 1 1 1 1 1 1 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 1 0 0 0 1 0 0 0 1 0.5 0.5 0.5 1 1 1 1 1 1 1 1 0 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 1 0 0 0 1 0 0 0.5 1 0.5 0.5 1 1 1 1 1 1 1 1 1 0 0 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 1 0 0 0 1 0 0.5 0.5 1 0.5 1 1 1 1 1 1 1 1 1 1 0 0 0 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 0.5 0 0 0 1 0 0 0 1 0.5 0.5 0.5 1 1 1 1 1 1 1 1 1 1 1 1 0.5 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0.5 0.5 0.5 1 1 1 1 1 1 1 1 1 1 1 1 0 0.5 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0.5 1 0.5 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0.5 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0.5 0.5 1 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0.5 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0.5 0.5 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0.0500000007 0.0500000007 0.0500000007 1 0.100000001 0.100000001 0.100000001 1 0.75 0.75 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0.0500000007 1 0.0500000007 0.0500000007 0.100000001 1 0.100000001 0.100000001 0.75 1 0.75 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0.0500000007 0.0500000007 1 0.0500000007 0.100000001 0.100000001 1 0.100000001 0.75 0.75 1 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0.0500000007 0.0500000007 0.0500000007 1 0.100000001 0.100000001 0.100000001 1 0.75 0.75 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 0.5 0.5 1 0.75 0.75 0.75 1 0.75 0.75 0.75 1 0.75 0.75 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 1 0.5 0.5 0.75 1 0.75 0.75 0.75 1 0.75 0.75 0.75 1 0.75 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 0.5 1 0.5 0.75 0.75 1 0.75 0.75 0.75 1 0.75 0.75 0.75 1 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 0.5 0.5 1 0.75 0.75 0.75 1 0.75 0.75 0.75 1 0.75 0.75 0.75 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 
+1 1 1 1 1 1 0 0 0 0 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0 1 1 1 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0 1 0 1 1 0 0 0 0 0 0 0 1 1 1 1 0 0 0 0 1 0 0 0 0.5 0 0 0 0 0 0 0 0 1 0 0 0 0.5 0 0 1 0 0 0 0 0 0 1 0 0 0 0.5 0 1 1 0 0 0 0 0 0 0 1 0 0 0 0.5 1 1 1 0 0 0 0 1 0 0 0 1 0 0 0 0.5 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0.5 0 0 1 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0.5 0 1 1 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0.5 1 1 1 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0.5 1 1 1 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 1 0.5 1 1 1 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 1 1 0.5 1 1 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1 1 1 0.5 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0.5 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 1 0.5 1 1 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 1 1 0.5 1 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1 1 1 0.5 0.5 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0.5 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 1 0.5 1 1 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 1 1 0.5 1 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1 1 1 0.5 0.5 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 1 0 1 1 1 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 1 1 0 1 1 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0 1 1 1 0 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 1 0 1 1 1 0 1 1 1 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 1 1 0 1 1 1 0 1 1 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1 1 1 0 1 1 1 0 1 1 1 0 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 1 0.5 1 1 1 0.5 1 1 1 0 1 1 1 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1 1 1 1 1 0.5 1 1 1 0.5 1 1 1 0 1 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 1 1 1 1 1 1 0.5 1 1 1 0.5 1 1 1 0 1 0 0 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 1 1 1 1 1 0.5 1 1 1 0.5 1 1 1 0 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 1 1 1 1 1 0.5 1 1 1 0.5 1 1 1 0 0.5 0.5 0.5 0 0.5 0.5 0.5 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1 1 1 1 1 1 1 1 1 0.5 1 1 1 0.5 1 1 0.5 0 0.5 0.5 0.5 0 0.5 0.5 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 1 1 1 1 1 1 1 1 1 1 0.5 1 1 1 0.5 1 0.5 0.5 0 0.5 0.5 0.5 0 0.5 0 0 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 0.5 1 1 1 0.5 0.5 0.5 0.5 0 0.5 0.5 0.5 0 0 0 0 1 0 0 0 0.5 1 1 1 0.5 1 1 1 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 1 1 1 0.5 0.5 0.5 0.5 0 0.5 0.5 0.5 0 0 0 0 0 0 0 0 0 1 0 0 1 0.5 1 1 1 0.5 1 1 1 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 1 1 0.5 0.5 0.5 0.5 0.5 0 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 0.5 1 1 1 0.5 1 1 1 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 1 0.5 0.5 0.5 0.5 0.5 0.5 0 0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0.5 1 1 1 0.5 1 1 1 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0 0 0 0 0 0 0 0 0 0 0 0 
+#Type#NoLimit
+#Range0#99:0.5,88:0.5,77,66,55,44,33,22,AJo:0.5,AT:0.5,A9s:0.5,A9o,A8,A7,A6,A5s:0.5,A5o,A4s:0.5,A4o,A3s:0.5,A3o,A2s,KQo:0.5,KJo:0.5,KTs:0.5,KTo,K9s:0.5,K9o,K8,K7,K6s,K5s,K4s,K3s,K2s,QJo,QTs:0.5,QTo,Q9s:0.5,Q9o,Q8,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s,JTo,J9o,J8o,J7s,J6s,T9o,T8o,T7s,T6s,98s:0.5,98o,97s,96s,87s:0.5,87o,86s,85s,76s:0.5,76o,75s,74s,65s:0.5,64s,63s,54s:0.5,53s,43s
+#Range1#AA,KK,QQ,JJ,TT,99,88,77,66,55,44,33,22,AK,AQ,AJ,AT,A9,A8,A7,A6,A5s,A5o:0.75,A4s,A4o:0.75,A3s,A3o:0.75,A2s,A2o:0.5,KQ,KJ,KT,K9,K8s,K8o:0.75,K7s,K7o:0.1,K6s,K6o:0.05,K5s,K4s,K3s,K2s,QJ,QT,Q9,Q8s,Q8o:0.5,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s:0.5,JT,J9,J8s,J8o:0.5,J7s,J6s,J5s:0.5,J4s:0.5,J3s:0.5,J2s:0.5,T9,T8s,T8o:0.5,T7s,T6s:0.1,98s,98o:0.5,97s,96s:0.1,87s,87o:0.25,86s,76s,76o:0.1,75s,65s,64s:0.5,54s,53s:0.1,43s:0.5
+#Rake.Enabled#True
+#Rake.Fraction#0.0575
+#Rake.Cap#60
+#Board#Qs 8c 6s
+#Pot#60
+#EffectiveStacks#975
+#AllinThreshold#67
+#AddAllinOnlyIfLessThanThisTimesThePot#500
+#CapEnabled#True
+#CapPerStreet#4\n4\n4
+#CapMode#NoLimit
+#RemovedLines_2#Check, Bet 33, Call, Check, Bet 33\\0Bet 75, Call, Bet 33\\0Check, Bet 120, Raise 8x\\0Check, Bet 120, Call, Check, Bet 33\\0Check, Check, Bet 300, Raise 3x\\0Check, Check, Bet 300, Raise 400c\\0Check, Bet 33, Call, Check, Bet 150, Raise 4x\\0Check, Bet 33, Call, Check, Bet 100, Raise 4x\\0Check, Bet 33, Call, Check, Bet 75, Raise 8x\\0Check, Bet 33, Call, Check, Bet 150, Call, Check, Bet 33\\0Check, Bet 33, Call, Check, Bet 150, Call, Check, Bet 100\\0Check, Bet 33, Call, Check, Bet 150, Call, Bet 33\\0Check, Bet 120, Call, Check, Bet 150, Call, Check, Bet 33\\0Check, Bet 120, Call, Check, Bet 100, Call, Check, Bet 33\\0
+#ExtraLines_2#Check, Check, Bet 300, Raise 2.2x\\0Check, Check, Bet 300, Raise allin\\0Check, Bet 33, Call, Check, Bet 150, Raise 2.5x\\0Check, Bet 33, Call, Check, Bet 100, Raise 2.5x\\0Check, Bet 33, Call, Check, Bet 75, Raise allin\\0Check, Bet 33, Call, Check, Bet 150, Call, Check, Bet 15\\0
+#FlopConfig.BetSize#33,75
+#FlopConfig.RaiseSize#4x,8x
+#TurnConfig.BetSize#33,75,100,200,300
+#TurnConfig.RaiseSize#4x,8x
+#TurnConfig.DonkBetSize#33,75
+#RiverConfig.BetSize#15,33,75,100,200,300
+#RiverConfig.RaiseSize#4x,8x
+#RiverConfig.DonkBetSize#33,75
+#FlopConfigIP.BetSize#33,66,120
+#FlopConfigIP.RaiseSize#3x
+#TurnConfigIP.BetSize#33,75,100,150
+#TurnConfigIP.RaiseSize#3x
+#RiverConfigIP.BetSize#33,75,100,150
+#RiverConfigIP.RaiseSize#3x
+show_metadata ok!
+<<< 0 ms · 41 lines · ok
+
+>>> load_tree "D:\Poker\Solvers\BB vs BTN\Second souffle\8h5d3d.cfr" fast
+load_tree ok!
+<<< 11 ms · 1 lines · ok
+
+>>> is_tree_present
+true
+<<< 0 ms · 1 lines · ok
+
+>>> show_memory
+Total Physical Memory: 32469 MB
+Available Phys Memory: 24751 MB
+<<< 0 ms · 2 lines · ok
+
+>>> show_tree_info
+#Type#NoLimit
+#Range0#99:0.5,88:0.5,77,66,55,44,33,22,AJo:0.5,AT:0.5,A9s:0.5,A9o,A8,A7,A6,A5s:0.5,A5o,A4s:0.5,A4o,A3s:0.5,A3o,A2s,KQo:0.5,KJo:0.5,KTs:0.5,KTo,K9s:0.5,K9o,K8,K7,K6s,K5s,K4s,K3s,K2s,QJo,QTs:0.5,QTo,Q9s:0.5,Q9o,Q8,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s,JTo,J9o,J8o,J7s,J6s,T9o,T8o,T7s,T6s,98s:0.5,98o,97s,96s,87s:0.5,87o,86s,85s,76s:0.5,76o,75s,74s,65s:0.5,64s,63s,54s:0.5,53s,43s
+#Range1#AA,KK,QQ,JJ,TT,99,88,77,66,55,44,33,22,AK,AQ,AJ,AT,A9,A8,A7,A6,A5s,A5o:0.75,A4s,A4o:0.75,A3s,A3o:0.75,A2s,A2o:0.5,KQ,KJ,KT,K9,K8s,K8o:0.75,K7s,K7o:0.1,K6s,K6o:0.05,K5s,K4s,K3s,K2s,QJ,QT,Q9,Q8s,Q8o:0.5,Q7s,Q6s,Q5s,Q4s,Q3s,Q2s:0.5,JT,J9,J8s,J8o:0.5,J7s,J6s,J5s:0.5,J4s:0.5,J3s:0.5,J2s:0.5,T9,T8s,T8o:0.5,T7s,T6s:0.1,98s,98o:0.5,97s,96s:0.1,87s,87o:0.25,86s,76s,76o:0.1,75s,65s,64s:0.5,54s,53s:0.1,43s:0.5
+#Rake.Enabled#True
+#Rake.Fraction#0.0575
+#Rake.Cap#60
+#Board#Qs 8c 6s
+#Pot#60
+#EffectiveStacks#975
+#AllinThreshold#67
+#AddAllinOnlyIfLessThanThisTimesThePot#500
+#CapEnabled#True
+#CapPerStreet#4\n4\n4
+#CapMode#NoLimit
+#RemovedLines_2#Check, Bet 33, Call, Check, Bet 33\\0Bet 75, Call, Bet 33\\0Check, Bet 120, Raise 8x\\0Check, Bet 120, Call, Check, Bet 33\\0Check, Check, Bet 300, Raise 3x\\0Check, Check, Bet 300, Raise 400c\\0Check, Bet 33, Call, Check, Bet 150, Raise 4x\\0Check, Bet 33, Call, Check, Bet 100, Raise 4x\\0Check, Bet 33, Call, Check, Bet 75, Raise 8x\\0Check, Bet 33, Call, Check, Bet 150, Call, Check, Bet 33\\0Check, Bet 33, Call, Check, Bet 150, Call, Check, Bet 100\\0Check, Bet 33, Call, Check, Bet 150, Call, Bet 33\\0Check, Bet 120, Call, Check, Bet 150, Call, Check, Bet 33\\0Check, Bet 120, Call, Check, Bet 100, Call, Check, Bet 33\\0
+#ExtraLines_2#Check, Check, Bet 300, Raise 2.2x\\0Check, Check, Bet 300, Raise allin\\0Check, Bet 33, Call, Check, Bet 150, Raise 2.5x\\0Check, Bet 33, Call, Check, Bet 100, Raise 2.5x\\0Check, Bet 33, Call, Check, Bet 75, Raise allin\\0Check, Bet 33, Call, Check, Bet 150, Call, Check, Bet 15\\0
+#FlopConfig.BetSize#33,75
+#FlopConfig.RaiseSize#4x,8x
+#TurnConfig.BetSize#33,75,100,200,300
+#TurnConfig.RaiseSize#4x,8x
+#TurnConfig.DonkBetSize#33,75
+#RiverConfig.BetSize#15,33,75,100,200,300
+#RiverConfig.RaiseSize#4x,8x
+#RiverConfig.DonkBetSize#33,75
+#FlopConfigIP.BetSize#33,66,120
+#FlopConfigIP.RaiseSize#3x
+#TurnConfigIP.BetSize#33,75,100,150
+#TurnConfigIP.RaiseSize#3x
+#RiverConfigIP.BetSize#33,75,100,150
+#RiverConfigIP.RaiseSize#3x
+<<< 0 ms · 30 lines · ok
+
+>>> show_effective_stack
+975
+<<< 0 ms · 1 lines · ok
+
+>>> show_board_no_iso
+8h 5d 3d 
+<<< 0 ms · 1 lines · ok
+
+>>> node_count
+<<< 65 ms · 0 lines · FAILED: upi: solver process exited
+
+==== summary (the solver exited) ====
+       0 ms  ok             show_version
+       0 ms  ok             show_build_version
+       0 ms  ok             set_threads 0
+       0 ms  ok             is_ready
+       0 ms  ok             show_save_version "D:\Poker\Solvers\BB vs BTN\Second souffle\8h5d3d.cfr"
+       0 ms  ok             show_metadata "D:\Poker\Solvers\BB vs BTN\Second souffle\8h5d3d.cfr"
+      11 ms  ok             load_tree "D:\Poker\Solvers\BB vs BTN\Second souffle\8h5d3d.cfr" fast
+       0 ms  ok             is_tree_present
+       0 ms  ok             show_memory
+       0 ms  ok             show_tree_info
+       0 ms  ok             show_effective_stack
+       0 ms  ok             show_board_no_iso
+      65 ms  FAILED: upi: solver process exited node_count
+13 commands, 1 failed

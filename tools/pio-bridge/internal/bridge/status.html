@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PioBridge</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1b1f24; --muted:#6a737d; --line:#e3e6ea;
+          --ok:#1f9d55; --busy:#d4910a; --err:#d23b3b; --off:#8a939c; --accent:#2563eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --card:#1a1e24; --ink:#e7eaee; --muted:#9aa4ae; --line:#2a3038; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0; } h2 { font-size: 15px; margin: 0 0 12px; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom: 18px; }
+  .ver { color: var(--muted); font-size: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .state { display:inline-flex; align-items:center; gap:8px; font-weight:600; }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--off); }
+  .ready .dot, .idle .dot { background: var(--ok); } .busy .dot, .starting .dot { background: var(--busy); }
+  .error .dot { background: var(--err); } .pio_missing .dot { background: var(--off); }
+  dl { display:grid; grid-template-columns: 140px 1fr; gap: 6px 12px; margin: 12px 0 0; }
+  dt { color: var(--muted); } dd { margin:0; word-break: break-all; }
+  label { display:block; margin: 10px 0 4px; color: var(--muted); font-size: 12px; }
+  input, textarea { width:100%; font: 13px ui-monospace, Consolas, monospace; padding:7px 9px; border:1px solid var(--line);
+    border-radius:6px; background: var(--bg); color: var(--ink); }
+  textarea { min-height: 72px; }
+  .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .actions { display:flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .flash { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); margin-bottom: 16px; }
+  table { width:100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align:left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  td.path { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+  .s4, .s5 { color: var(--err); }
+  pre { margin:0; max-height: 280px; overflow:auto; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .scroll { overflow-x: auto; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } dl { grid-template-columns: 1fr; } dt { margin-top: 6px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>PioBridge</h1><span class="ver">v{{.Version}}</span>
+  </header>
+  {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
+  <section class="card">
+    <div id="state" class="state idle"><span class="dot"></span><span id="stateText">…</span></div>
+    <dl>
+      <dt>Message</dt><dd id="message">—</dd>
+      <dt>Solver</dt><dd id="pio">—</dd>
+      <dt>Loaded save</dt><dd id="file">—</dd>
+      <dt>Board</dt><dd id="board">—</dd>
+    </dl>
+    <form method="post" action="/restart" class="actions">
+      <input type="hidden" name="token" value="{{.Token}}">
+      <button type="submit">Restart solver</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <form method="post" action="/settings">
+      <input type="hidden" name="token" value="{{.Token}}">
+      <label for="pioPath">PioSOLVER executable</label>
+      <input id="pioPath" name="pioPath" value="{{.Config.PioPath}}">
+      <label for="solvesDir">Solves folder (only .cfr files under it can be opened)</label>
+      <input id="solvesDir" name="solvesDir" value="{{.Config.SolvesDir}}">
+      <div class="row">
+        <div><label for="port">Port</label><input id="port" name="port" value="{{.Config.Port}}"></div>
+        <div><label for="idle">Stop the solver after (minutes idle, 0 = never)</label><input id="idle" name="idleMinutes" value="{{.Config.IdleMinutes}}"></div>
+      </div>
+      <label for="origins">Sites allowed to use the bridge (one per line)</label>
+      <textarea id="origins" name="allowedOrigins">{{.Origins}}</textarea>
+      <div class="hint">The first time aderugy.fr calls the bridge, Chrome asks whether the site may access apps and devices on this computer / your local network: allow it. To undo: site settings of aderugy.fr → Local network access.</div>
+      <div class="actions"><button class="primary" type="submit">Save</button></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Recent requests</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Time</th><th>Status</th><th>ms</th><th>Request</th><th>From</th></tr></thead>
+      <tbody id="reqs"><tr><td colspan="5">None yet</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>Log</h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+<script>
+const labels = { idle: "Ready — the solver starts on the next request", ready: "Ready", busy: "Working…",
+  starting: "Starting…", error: "Error", pio_missing: "PioSOLVER not found" };
+const $ = (id) => document.getElementById(id);
+function text(el, v) { el.textContent = v && String(v).length ? v : "—"; }
+async function refresh() {
+  try {
+    const r = await fetch("/api/status", { cache: "no-store" });
+    const d = await r.json();
+    const s = d.status;
+    $("state").className = "state " + s.state;
+    text($("stateText"), labels[s.state] || s.state);
+    text($("message"), s.message);
+    text($("pio"), s.pioVersion);
+    text($("file"), s.file);
+    text($("board"), (s.board || []).join(" "));
+    const rows = (d.requests || []).slice(0, 30).map(q => {
+      const tr = document.createElement("tr");
+      const cells = [new Date(q.time).toLocaleTimeString(), q.status, q.ms, q.method + " " + q.path, q.origin || ""];
+      cells.forEach((c, i) => { const td = document.createElement("td"); td.textContent = c;
+        if (i === 3) td.className = "path"; if (i === 1) td.className = "s" + String(q.status)[0]; tr.appendChild(td); });
+      return tr;
+    });
+    const body = $("reqs"); body.replaceChildren(...rows);
+    if (!rows.length) body.innerHTML = "<tr><td colspan='5'>None yet</td></tr>";
+    const log = $("log"); const atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+    log.textContent = (d.log || []).join("\n");
+    if (atEnd) log.scrollTop = log.scrollHeight;
+  } catch (e) {
+    $("state").className = "state error"; text($("stateText"), "PioBridge is not running");
+  }
+}
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>

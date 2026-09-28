@@ -1,0 +1,4 @@
+dist/
+# local build overrides (module replacements pointing at local clones)
+go.local.mod
+go.local.sum
