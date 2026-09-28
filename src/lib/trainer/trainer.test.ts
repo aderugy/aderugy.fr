@@ -11,6 +11,7 @@ import { byHandClass, confusions, handClass, mixDiscipline } from "./history";
 import { compatibility, resolveEntry } from "./resolve";
 import { sceneFromState, seatsFromHero } from "./scene";
 import { answer, buildTree, handScore, startHand } from "./play";
+import { framesAfter } from "./replay";
 import { walkPath } from "../solver/gameState";
 import { comboToHand } from "../solver/cards";
 import type { Seat } from "../solver/seats";
@@ -231,6 +232,26 @@ test("play: C2 — two hero decisions, villain bets, a runout, then end of solut
   assert.deepEqual(h.state.board, ["Ks", "7d", "2c", "5h"]);
   assert.ok(Math.abs(h.state.center - 9.13) < 1e-9);
   assert.deepEqual(handScore(h), { decisions: 2, correct: 2 });
+
+  // Replaying it: the deal, then after each answer what happened on the table.
+  const deal = framesAfter(h, -1);
+  assert.equal(deal.length, 1);
+  assert.deepEqual(deal[0].dealt, ["Ks", "7d", "2c"]);
+  const first = framesAfter(h, 0);
+  assert.deepEqual(first.map((f) => f.caption), ["You check", "BTN bet 33% · 1.82"]);
+  assert.ok(Math.abs(first[1].state.bets.BTN - 1.815) < 1e-9);
+  const second = framesAfter(h, 1);
+  assert.deepEqual(second.map((f) => [f.caption, f.sweep]), [
+    ["You call · 1.82", false],
+    ["You call · 1.82", true],
+    ["You call · 1.82", false],
+    ["Turn 5h", false],
+  ]);
+  // Bets stay in front until they are swept, then the pot has them.
+  assert.ok(Math.abs(second[0].state.bets.BB - 1.815) < 1e-9);
+  assert.ok(Math.abs(second[0].state.center - 5.5) < 1e-9);
+  assert.equal(second[2].state.bets.BB, 0);
+  assert.deepEqual(second[3].dealt, ["5h"]);
 });
 
 test("play: villain draws only among developed branches", () => {

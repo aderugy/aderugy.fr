@@ -68,10 +68,11 @@ export function buildTree(spot: DrillSpot, weights: Record<string, StrategyWeigh
   };
 }
 
+/** What happened between hero's decisions, each with the state right after it (for replaying it on the table). */
 export type Step =
-  | { type: "card"; nodeId: string; cards: string[] }
-  | { type: "villain"; nodeId: string; actionNodeId: string; seat: Seat; label: string; actionIndex: number }
-  | { type: "hero"; nodeId: string; decision: number };
+  | { type: "card"; nodeId: string; cards: string[]; after: HandState }
+  | { type: "villain"; nodeId: string; actionNodeId: string; seat: Seat; label: string; actionIndex: number; after: HandState }
+  | { type: "hero"; nodeId: string; decision: number; after: HandState };
 
 /** A hero decision, asked then answered. */
 export type Decision = {
@@ -96,6 +97,8 @@ export type Hand = {
   combo: string | null;
   villainCombo: string | null;
   state: HandState;
+  /** The state at the entry node, before any step. */
+  startState: HandState;
   steps: Step[];
   decisions: Decision[];
   /** The decision waiting for hero's answer. */
@@ -187,7 +190,10 @@ function continueFrom(tree: Tree, h: Hand, node: PokerNode, opts: PlayOptions): 
       h = {
         ...h,
         state: pick.ns.state,
-        steps: [...h.steps, { type: "card", nodeId: pick.k.id, cards: pick.ns.state.board.slice(h.state.board.length) }],
+        steps: [
+          ...h.steps,
+          { type: "card", nodeId: pick.k.id, cards: pick.ns.state.board.slice(h.state.board.length), after: pick.ns.state },
+        ],
       };
       node = pick.k;
       continue;
@@ -231,6 +237,7 @@ function decide(tree: Tree, h: Hand, node: PokerNode, opts: PlayOptions): Hand {
           seat: actor,
           label: actions[pick.index].label,
           actionIndex: pick.index,
+          after: pick.ns.state,
         },
       ],
     };
@@ -283,6 +290,7 @@ export function startHand(
   const entry = path[path.length - 1];
   const [a, b] = tree.setup.players;
   if (heroSeat !== a && heroSeat !== b) return null;
+  const start = states[states.length - 1]?.state ?? initialState(tree.setup);
   const hand: Hand = {
     id,
     spotId: tree.spotId,
@@ -291,7 +299,8 @@ export function startHand(
     villainSeat: heroSeat === a ? b : a,
     combo: null,
     villainCombo: null,
-    state: states[states.length - 1]?.state ?? initialState(tree.setup),
+    state: start,
+    startState: start,
     steps: [],
     decisions: [],
     pending: null,
@@ -308,16 +317,18 @@ export function answer(tree: Tree, h: Hand, index: number, opts: PlayOptions = {
   const scored = scoreAnswer(d.vector, d.rng, index);
   const done: Decision = { ...d, chosenIndex: index, scored };
   const node = tree.byId.get(d.nodeId) as PokerNode;
-  let next: Hand = {
-    ...h,
-    pending: null,
-    decisions: [...h.decisions, done],
-    steps: [...h.steps, { type: "hero", nodeId: d.nodeId, decision: h.decisions.length }],
-  };
+  const next: Hand = { ...h, pending: null, decisions: [...h.decisions, done] };
   const branch = branches(tree, node, d.state).find((b) => b.index === index);
-  if (!branch) return finish(tree, ended(next, "branch_not_developed", d.nodeId), opts);
-  next = { ...next, state: branch.ns.state };
-  return finish(tree, continueFrom(tree, next, branch.node, opts), opts);
+  if (!branch) {
+    const stuck: Hand = { ...next, steps: [...h.steps, { type: "hero", nodeId: d.nodeId, decision: h.decisions.length, after: d.state }] };
+    return finish(tree, ended(stuck, "branch_not_developed", d.nodeId), opts);
+  }
+  const played: Hand = {
+    ...next,
+    state: branch.ns.state,
+    steps: [...h.steps, { type: "hero", nodeId: d.nodeId, decision: h.decisions.length, after: branch.ns.state }],
+  };
+  return finish(tree, continueFrom(tree, played, branch.node, opts), opts);
 }
 
 /** At showdown / all-in, draw villain's hand from his last decision with a grid. */
