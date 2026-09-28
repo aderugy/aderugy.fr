@@ -15,6 +15,7 @@
 
 import { derivedPosition, isSeat, type Seat } from "./seats";
 import type { PioLink, PlayerStats, StrategyStats } from "./pio";
+import type { HandCategory } from "./categories";
 
 export type Street = "preflop" | "flop" | "turn" | "river";
 
@@ -135,6 +136,8 @@ export type NodeMeta = {
    * solver's pot and stack there.
    */
   pio?: PioLink | null;
+  /** On a decision: the user's split of the range into named groups. */
+  categories?: HandCategory[];
 };
 
 /**
