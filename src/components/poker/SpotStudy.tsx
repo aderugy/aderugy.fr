@@ -297,7 +297,7 @@ export function SpotStudy({
                   ← {stopTitle(ctx, setup, up)}
                 </button>
                 {sib.targets.length > 1 && (
-                  <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1">
+                  <div className="relative -mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1">
                     {sib.targets.map((t, i) => (
                       <TargetChip
                         key={t.via?.id ?? t.option?.id ?? i}
@@ -588,10 +588,19 @@ function TargetChip({
 }) {
   const freq = t.optionIndex >= 0 ? ctx.freqs.get(from)?.[t.optionIndex] : undefined;
   const cards = t.folded.flatMap(cardsOf);
+  // Centre the current chip in its row, once, and only sideways: scrolling
+  // into view on every render moved the whole page back up under the finger.
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const row = el?.parentElement;
+    if (!reveal || !current || !el || !row) return;
+    row.scrollLeft = el.offsetLeft - row.clientWidth / 2 + el.clientWidth / 2;
+  }, [reveal, current]);
   return (
     <button
       type="button"
-      ref={reveal && current ? (el) => el?.scrollIntoView({ inline: "center", block: "nearest" }) : undefined}
+      ref={ref}
       disabled={!t.stop || current}
       onClick={onClick}
       aria-current={current ? "location" : undefined}

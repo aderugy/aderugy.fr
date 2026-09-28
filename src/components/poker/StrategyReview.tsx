@@ -99,7 +99,7 @@ function HoverDetail({
 
   if (!hand) {
     return (
-      <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
+      <p className="mt-3 min-h-[22rem] border-t border-line pt-3 text-xs text-muted">
         Hover a hand to see its combo breakdown.
       </p>
     );
@@ -125,7 +125,9 @@ function HoverDetail({
     : null;
 
   return (
-    <div className="mt-3 space-y-3 border-t border-line pt-3">
+    // A fixed minimum height: hovering hands must not push what is below the
+    // grid up and down (on a phone the options column sits there).
+    <div className="mt-3 min-h-[22rem] space-y-3 border-t border-line pt-3">
       <div>
         <h4 className="text-sm font-medium">{hand}</h4>
         <div className="mt-1">
