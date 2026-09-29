@@ -104,6 +104,22 @@ export function SpotView({
   const [allLoaded, setAllLoaded] = useState(false);
   const [setup, setSetup] = useState<SpotSetup>(initialSetup);
   const [focus, setFocus] = useState<string | null>(initialFocus ?? null);
+
+  // Where you are in the tree lives in the URL (?node=<id>): reload or share
+  // the link to come back here, and the browser's back / forward buttons
+  // move through the tree.
+  useEffect(() => {
+    if (!focus) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("node") === focus) return;
+    url.searchParams.set("node", focus);
+    window.history.pushState(null, "", url.pathname + url.search + url.hash);
+  }, [focus]);
+  useEffect(() => {
+    const onPop = () => setFocus(new URL(window.location.href).searchParams.get("node"));
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [notice, setNotice] = useState<Notice>(null);
