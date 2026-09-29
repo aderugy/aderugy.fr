@@ -79,6 +79,8 @@ export type PioRunouts = {
   cards: {
     card: string;
     node: PioNode;
+    /** With `after`: the card's own node (the pot when the street started). */
+    dealt?: PioNode;
     children: PioNode[];
     /** Average frequency of each child over the actor's range (0–1). */
     strategy?: PioVector;

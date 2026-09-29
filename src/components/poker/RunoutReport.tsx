@@ -86,7 +86,10 @@ export function RunoutReportView({
   onCompute,
   onGroups,
   onOpen,
+  lineLabel,
 }: {
+  /** Set when the report is about a later node of the street ("this line"), not the card's first decision. */
+  lineLabel?: string;
   report: RunoutReport | null;
   groups: RunoutGroup[];
   seats: { OOP: string; IP: string };
@@ -119,8 +122,10 @@ export function RunoutReportView({
     return (
       <div className="rounded-lg border border-dashed border-line p-4 text-sm">
         <p className="text-muted">
-          Every {street} card of the save at a glance — both players&apos; equity and EV, and how the player to act plays — to
-          choose which runouts to study. Pio reads the whole save once (a few seconds).
+          {lineLabel
+            ? `This spot on every ${street} of the save: both players' equity and EV here, and how the player to act plays it on each card.`
+            : `Every ${street} card of the save at a glance — both players' equity and EV, and how the player to act plays — to choose which runouts to study.`}{" "}
+          Pio reads the whole save once (a few seconds).
         </p>
         <button
           type="button"
@@ -128,7 +133,7 @@ export function RunoutReportView({
           onClick={onCompute}
           className="mt-3 rounded-md bg-accent px-3 py-1.5 text-xs text-white disabled:opacity-50"
         >
-          {busy ? "Reading…" : `Report on every ${street} from Pio`}
+          {busy ? "Reading…" : lineLabel ? `This line on every ${street} from Pio` : `Report on every ${street} from Pio`}
         </button>
       </div>
     );

@@ -794,6 +794,113 @@ export function SpotView({
     if (dec) setFocus(dec.id);
   }
 
+  /**
+   * The turn or river card dealt above a node on its street, the node it was
+   * dealt from, and the nodes from the card's first decision down to `id`.
+   */
+  function cardAbove(id: string): { card: PokerNode; deal: PokerNode; steps: PokerNode[] } | null {
+    const path = pathNodes(id);
+    for (let i = path.length - 1; i > 0; i--) {
+      const n = path[i];
+      if (n.type === "turn" || n.type === "river") return { card: n, deal: path[i - 1], steps: path.slice(i + 1) };
+      if (n.type === "flop") return null;
+    }
+    return null;
+  }
+
+  /** The node on another card that is the same line as `id` (same options taken), if it is in the tree. */
+  function lineOnCard(id: string, card: string): string | null {
+    const above = cardAbove(id);
+    if (!above) return null;
+    const cardNode = kidsOf(above.deal.id).find((k) => k.type === above.card.type && asStreet(k).card === card);
+    let cur = cardNode ? kidsOf(cardNode.id).find((k) => k.type === "strategy") : undefined;
+    for (let j = 1; cur && j < above.steps.length; j += 2) {
+      const label = asAction(above.steps[j]).label;
+      const opt = asStrategy(cur).actions.find((a) => a.label === label);
+      const act = opt ? kidsOf(cur.id).find((k) => k.type === "action" && asAction(k).strategyActionId === opt.id) : undefined;
+      cur = act ? kidsOf(act.id).find((k) => k.type === "strategy") : undefined;
+    }
+    return cur?.id ?? null;
+  }
+
+  /** The report on every card for the line of a decision after the turn (or river): what happens here on each card. */
+  async function loadLineRunouts(id: string) {
+    const above = cardAbove(id);
+    if (!above) return;
+    try {
+      setNotice({ tone: "busy", text: "Reading this line on every runout from Pio…" });
+      const card = asStreet(above.card).card;
+      const { file, pioId } = await resolvePio(id);
+      const toks = pioId.split(":");
+      const at = card ? toks.lastIndexOf(card) : -1;
+      if (at < 0) throw new Error("This decision isn't below the card in the solver's tree.");
+      const split = toks.slice(0, at).join(":");
+      const after = toks.slice(at + 1).join(":");
+      const [r, tree] = await Promise.all([pioBridge.runouts(file, split, after), pioTree(file)]);
+      const report = runoutReport(r, tree.effectiveStack, new Date().toISOString(), after);
+      persistData(id, { runouts: report });
+      setNotice({
+        tone: report.missing.length ? "warn" : "ok",
+        text: `This line on ${report.rows.length} runouts · ${(r.ms / 1000).toFixed(1)} s`,
+        detail: report.missing.length ? [`Not on these cards: ${report.missing.join(" ")}`] : [],
+      });
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  /** Go to the same line on another card, importing from Pio what the tree doesn't have yet. */
+  async function openLineOnCard(id: string, card: string) {
+    const above = cardAbove(id);
+    if (!above) return;
+    const street = above.card.type as "turn" | "river";
+    try {
+      let cardNode = kidsOf(above.deal.id).find((k) => k.type === street && asStreet(k).card === card);
+      if (!cardNode) {
+        const { file, pioId } = await resolvePio(above.deal.id);
+        await importRunouts(above.deal.id, file, pioId, street, [card]);
+        cardNode = kidsOf(above.deal.id).find((k) => k.type === street && asStreet(k).card === card);
+        if (!cardNode) return;
+      }
+      const cardId = cardNode.id;
+      let first = kidsOf(cardId).find((k) => k.type === "strategy");
+      if (!first) {
+        await continueFromPio(cardId);
+        first = kidsOf(cardId).find((k) => k.type === "strategy");
+        if (!first) return;
+      }
+      let cur: PokerNode = first;
+      for (let j = 1; j < above.steps.length; j += 2) {
+        const label = asAction(above.steps[j]).label;
+        const decId = cur.id;
+        const opt: StrategyAction | undefined = asStrategy(nodesRef.current[decId] ?? cur).actions.find((a) => a.label === label);
+        if (!opt) {
+          setFocus(decId);
+          return setNotice({ tone: "warn", text: `No “${label}” on ${card} here.` });
+        }
+        const optId = opt.id;
+        const findAct = (): PokerNode | undefined =>
+          kidsOf(decId).find((k) => k.type === "action" && asAction(k).strategyActionId === optId);
+        let act = findAct();
+        if (!act) {
+          await develop(decId, optId);
+          act = findAct();
+        } else if (!kidsOf(act.id).some((k) => k.type === "strategy")) {
+          await continueFromPio(act.id);
+        }
+        const next: PokerNode | undefined = act ? kidsOf(act.id).find((k) => k.type === "strategy") : undefined;
+        if (!next) {
+          if (act) setFocus(act.id);
+          return;
+        }
+        cur = next;
+      }
+      setFocus(cur.id);
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   /** Develop an option of a decision; on a solver line, import what follows. */
   async function develop(decisionId: string, optionId: string) {
     const dec = nodesRef.current[decisionId];
@@ -916,6 +1023,13 @@ export function SpotView({
       load: (id) => void loadRunouts(id),
       importCard: (id, card) => void importRunoutCard(id, card),
       saveGroups: (id, runoutGroups) => persistData(id, { runoutGroups }),
+      line: (id) => {
+        const above = cardAbove(id);
+        return above && pioFileAbove(id) ? { street: above.card.type as "turn" | "river", dealId: above.deal.id } : null;
+      },
+      loadLine: (id) => void loadLineRunouts(id),
+      lineOnCard,
+      openLine: (id, card) => void openLineOnCard(id, card),
     },
     develop: (decisionId, optionId) => void develop(decisionId, optionId),
     deleteNode: confirmDelete,

@@ -25,6 +25,8 @@ export type RunoutReport = {
   file: string;
   /** The split node. */
   pioId: string;
+  /** The line below every card the report is about ("" = the card's first decision). */
+  after?: string;
   fetchedAt: string;
   /** Who acts first after the card. */
   actor: PioPlayer | null;
@@ -37,10 +39,10 @@ export type RunoutReport = {
 const round = (x: number, d = 2) => Math.round(x * 10 ** d) / 10 ** d;
 
 /** The bridge's answer, the app's way (labels, %, bb). */
-export function runoutReport(r: PioRunouts, stackChips: number, fetchedAt: string): RunoutReport {
+export function runoutReport(r: PioRunouts, stackChips: number, fetchedAt: string, after = ""): RunoutReport {
   const labels: PioAction[] = [];
   const perCard = r.cards.map((c) => {
-    const pa = c.node.player && c.children.length ? pioActions(c.node, c.children, c.node.pot, stackChips) : [];
+    const pa = c.node.player && c.children.length ? pioActions(c.node, c.children, (c.dealt ?? c.node).pot, stackChips) : [];
     for (const a of pa) if (!labels.some((l) => l.label === a.label)) labels.push(a);
     return { c, pa };
   });
@@ -74,7 +76,7 @@ export function runoutReport(r: PioRunouts, stackChips: number, fetchedAt: strin
     }
     rows.push({ card: c.card, equity, ev, strategy });
   }
-  return { file: r.file, pioId: r.node.id, fetchedAt, actor, actions, rows, missing };
+  return { file: r.file, pioId: r.node.id, after, fetchedAt, actor, actions, rows, missing };
 }
 
 export function asRunoutReport(raw: unknown): RunoutReport | null {

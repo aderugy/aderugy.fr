@@ -57,8 +57,11 @@ export const pioBridge = {
   node: (file: string, id: string) => call<{ file: string; node: PioNode; children: PioNode[] }>("/api/node", { file, id }),
   decision: (file: string, id: string) =>
     call<PioDecision>("/api/decision", { file, id, stats: "1", villain: "1" }),
-  /** Every card of a split node summed up (loads the whole save once: a few seconds). */
-  runouts: (file: string, id: string) => call<PioRunouts>("/api/runouts", { file, id }),
+  /**
+   * Every card of a split node summed up (loads the whole save once: a few
+   * seconds). With `after`, the same line below every card instead (e.g. "c").
+   */
+  runouts: (file: string, id: string, after?: string) => call<PioRunouts>("/api/runouts", { file, id, after: after || undefined }),
   /** The 1326 combos in solver order; fetched once per page. */
   handOrder: () => {
     handOrder ??= call<{ hands: string[] }>("/api/hand-order")

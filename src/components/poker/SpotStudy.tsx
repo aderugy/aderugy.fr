@@ -69,6 +69,14 @@ export type StudyEditing = {
     /** Import one card's line from the solver, then go there. */
     importCard: (id: string, card: string) => void;
     saveGroups: (id: string, groups: RunoutGroup[]) => void;
+    /** Below a turn / river card: the street and where the card was dealt (null elsewhere). */
+    line: (id: string) => { street: "turn" | "river"; dealId: string } | null;
+    /** The report on every card for this decision's line. */
+    loadLine: (id: string) => void;
+    /** The same line on another card, when the tree has it. */
+    lineOnCard: (id: string, card: string) => string | null;
+    /** Go to the same line on another card, importing it from Pio if needed. */
+    openLine: (id: string, card: string) => void;
   };
   /** Add the action node of an option (and on a solver line, what follows). */
   develop: (decisionId: string, optionId: string) => void;
@@ -820,7 +828,7 @@ function Tool({
   );
 }
 
-type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev" | "graph" | "categories";
+type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev" | "graph" | "runouts" | "categories";
 
 function DecisionBody({
   ctx,
@@ -870,6 +878,8 @@ function DecisionBody({
   if (stats?.players.IP) tabs.push({ id: "eq-IP", label: `Equity ${name("IP")}` });
   if (stats?.ev) tabs.push({ id: "ev", label: `EV ${name(stats.actor)}` });
   if (stats) tabs.push({ id: "graph", label: "Graph" });
+  const line = ctx.editing.runouts.line(node.id);
+  if (line) tabs.push({ id: "runouts", label: `Every ${line.street}` });
   const categories = asCategories((node.data as NodeMeta).categories);
   tabs.push({ id: "categories", label: categories.length ? `Categories (${categories.length})` : "Categories" });
   const handState = ctx.nodeStates.get(node.id)?.state ?? null;
@@ -877,7 +887,7 @@ function DecisionBody({
     mode === "eq-OOP" ? { kind: "equity", player: "OOP" } : mode === "eq-IP" ? { kind: "equity", player: "IP" } : mode === "ev" ? { kind: "ev" } : null;
 
   return (
-    <div className={mode === "categories" || (mode === "strategy" && categories.length > 0) ? "" : "max-w-[560px]"}>
+    <div className={mode === "categories" || mode === "runouts" || (mode === "strategy" && categories.length > 0) ? "" : "max-w-[560px]"}>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <Segmented size="sm" value={mode} onChange={setMode} options={tabs} />
         {stats && (
@@ -901,6 +911,8 @@ function DecisionBody({
           categories={categories}
           onChange={(next) => ctx.editing.saveCategories(node.id, next)}
         />
+      ) : mode === "runouts" && line ? (
+        <LineRunouts ctx={ctx} node={node} street={line.street} dealId={line.dealId} />
       ) : mode === "graph" && stats ? (
         <StatsGraph stats={stats} dead={ctx.deadCards(node.id)} seats={{ OOP: name("OOP"), IP: name("IP") }} />
       ) : stats && statsMode ? (
@@ -1014,6 +1026,35 @@ function DealBody({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A decision after the turn (or river) card: the same line on every card of
+ * the save — what the player to act does here on each runout. Groups are the
+ * ones of the node where the card is dealt.
+ */
+function LineRunouts({ ctx, node, street, dealId }: { ctx: Ctx; node: PokerNode; street: "turn" | "river"; dealId: string }) {
+  const ed = ctx.editing;
+  const deal = ctx.tree.node(dealId);
+  const report = asRunoutReport((node.data as NodeMeta).runouts);
+  const groups = asRunoutGroups(deal ? (deal.data as NodeMeta).runoutGroups : undefined);
+  const inTree = new Set<string>();
+  for (const r of report?.rows ?? []) if (ed.runouts.lineOnCard(node.id, r.card)) inTree.add(r.card);
+  const seats = { OOP: ed.seats?.OOP ?? "OOP", IP: ed.seats?.IP ?? "IP" };
+  return (
+    <RunoutReportView
+      report={report}
+      groups={groups}
+      seats={seats}
+      street={street}
+      inTree={inTree}
+      busy={ed.pio.busy}
+      lineLabel="this line"
+      onCompute={() => ed.runouts.loadLine(node.id)}
+      onGroups={(next) => ed.runouts.saveGroups(dealId, next)}
+      onOpen={(card) => ed.runouts.openLine(node.id, card)}
+    />
   );
 }
 
