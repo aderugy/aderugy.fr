@@ -16,7 +16,10 @@ import {
   parentStop,
   pathTo,
   resolveStop,
+  sameLine,
   siblings,
+  solutionName,
+  solutionOf,
   siblingStop,
   stopKind,
   studyTree,
@@ -61,6 +64,7 @@ export type StudyEditing = {
   /** Open a node's tools (the drawer); ROOT_ID opens the setup. */
   editNode: (id: string) => void;
   saveNotes: (id: string, patch: NodeMeta) => void;
+  renameSolution: (id: string, name: string) => void;
   /** A decision's hand categories (see CategoryPanel). */
   saveCategories: (id: string, categories: HandCategory[]) => void;
   /** Where the next card is dealt: the report on every card, groups of cards. */
@@ -92,6 +96,8 @@ export type StudyEditing = {
     importDecision: (id: string) => void;
     continueFrom: (id: string) => void;
     addFlop: () => void;
+    /** Another solution of the spot from this node (a decision next to the one there). */
+    addSolution: (forkId: string) => void;
     busy: boolean;
   };
   /** Solver stats by decision id; undefined = not loaded, null = none. */
@@ -447,6 +453,15 @@ function Breadcrumb({
     const n = ctx.tree.node(id);
     if (!n) continue;
     if (n.type === "strategy") {
+      const sibs = ctx.tree.kids(n.parent_id ?? ctx.tree.rootId).filter((k) => k.type === "strategy");
+      if (sibs.length > 1) {
+        crumbs.push({
+          key: `sol-${id}`,
+          body: <span className="font-medium text-violet-700 dark:text-violet-300">{solutionName(n, sibs.indexOf(n))}</span>,
+          target: current ? null : id,
+          title: "Solution",
+        });
+      }
       if (current) crumbs.push({ key: id, body: `${actorOf(ctx, id)} to act`, target: null, title: stopTitle(ctx, setup, id) });
       continue;
     }
@@ -672,7 +687,18 @@ function TargetLabel({ ctx, t }: { ctx: Ctx; t: StudyTarget }) {
       </span>
     );
   }
-  if (via.type === "strategy") return <span>{actorOf(ctx, via.id)} decision</span>;
+  if (via.type === "strategy") {
+    const sibs = ctx.tree.kids(via.parent_id ?? ctx.tree.rootId).filter((k) => k.type === "strategy");
+    if (sibs.length > 1) {
+      return (
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="shrink-0 rounded bg-violet-500/15 px-1 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">Sol</span>
+          <span className="truncate font-medium">{solutionName(via, sibs.indexOf(via))}</span>
+        </span>
+      );
+    }
+    return <span>{actorOf(ctx, via.id)} decision</span>;
+  }
   return <span>{NODE_LABELS[via.type]}</span>;
 }
 
@@ -714,6 +740,10 @@ function FocusPanel({
   const notesNode = isRoot
     ? ({ id: ROOT_ID, data: { summary: setup.summary ?? "", notes: setup.notes ?? "" } } as unknown as PokerNode)
     : node;
+  const solution = isRoot ? null : solutionOf(ctx.tree, focus);
+  // Where a new solution would hang: above a decision, or here when the next node is a decision.
+  const forkHere = !isRoot && kind !== "decision" && ctx.tree.kids(focus).some((k) => k.type === "strategy");
+  const forkFor = kind === "decision" && node ? (node.parent_id ?? null) : forkHere ? focus : null;
 
   return (
     <div className="rounded-xl border border-line bg-surface p-3 shadow-sm sm:p-4">
@@ -726,6 +756,9 @@ function FocusPanel({
             <span className="min-w-0 truncate">{stopTitle(ctx, setup, focus)}</span>
           </h2>
           {isRoot && <p className="mt-0.5 text-xs tabular-nums text-muted">{setupLine(setup)}</p>}
+          {solution && (
+            <SolutionSwitch ctx={ctx} focus={focus} solution={solution} onGo={onGo} onRename={(id, name) => ed.renameSolution(id, name)} />
+          )}
           {meta?.summary && !notesOpen && <p className="mt-1 whitespace-pre-line text-sm text-muted">{meta.summary}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -739,12 +772,17 @@ function FocusPanel({
               Add flop from Pio
             </Tool>
           )}
-          {!isRoot && kind !== "decision" && !terminal && linked && (
+          {!isRoot && kind !== "decision" && !terminal && linked && !forkHere && (
             <Tool primary disabled={ed.pio.busy} onClick={() => ed.pio.continueFrom(focus)}>
               {nextStreet === "turn" || nextStreet === "river" ? `Add ${nextStreet} cards from Pio` : "Continue from Pio"}
             </Tool>
           )}
-          {addable.map((type) => (
+          {forkHere && linked && (
+            <Tool onClick={() => ed.pio.addSolution(focus)} title="Another solution from here: a node-locked re-solve, this street solved again…">
+              ＋ Solution
+            </Tool>
+          )}
+          {addable.filter((type) => !(forkHere && type === "strategy")).map((type) => (
             <Tool key={type} onClick={() => void ed.addChild(focus, type)}>
               ＋ {ed.childLabel(focus, type)}
             </Tool>
@@ -759,6 +797,9 @@ function FocusPanel({
               items={[
                 ...(kind === "decision"
                   ? [{ label: "Paste CSV", hint: "or Ctrl+V", onSelect: () => void ed.pasteCsv(focus) }]
+                  : []),
+                ...(forkFor && linked
+                  ? [{ label: "Add a solution here…", hint: "node lock, re-solve", onSelect: () => ed.pio.addSolution(forkFor) }]
                   : []),
                 { label: "Delete…", hint: "Delete key", danger: true, onSelect: () => ed.deleteNode(focus) },
               ]}
@@ -795,6 +836,63 @@ function FocusPanel({
       ) : null}
 
       <AlongTheWay ctx={ctx} setup={setup} incoming={incoming} />
+    </div>
+  );
+}
+
+/**
+ * Inside a forked tree: the solutions of the fork above, the current one
+ * highlighted. Picking another goes to the same line in it (as deep as its
+ * tree goes); ✎ renames the current one.
+ */
+function SolutionSwitch({
+  ctx,
+  focus,
+  solution,
+  onGo,
+  onRename,
+}: {
+  ctx: Ctx;
+  focus: string;
+  solution: NonNullable<ReturnType<typeof solutionOf>>;
+  onGo: (id: string) => void;
+  onRename: (id: string, name: string) => void;
+}) {
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px]">
+      <span className="text-muted">Solution</span>
+      {solution.roots.map((r, i) => {
+        const on = r.id === solution.current.id;
+        return (
+          <button
+            key={r.id}
+            type="button"
+            aria-pressed={on}
+            disabled={on}
+            onClick={() => onGo(sameLine(ctx.tree, focus, solution.current.id, r.id))}
+            className={[
+              "rounded-full border px-2 py-0.5",
+              on
+                ? "border-violet-500/60 bg-violet-500/15 font-medium text-violet-800 dark:text-violet-200"
+                : "border-line text-muted hover:border-violet-500/60 hover:text-foreground",
+            ].join(" ")}
+          >
+            {solutionName(r, i)}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        aria-label="Rename this solution"
+        onClick={() => {
+          const i = solution.roots.findIndex((r) => r.id === solution.current.id);
+          const name = window.prompt("Name of this solution", solutionName(solution.current, i));
+          if (name && name.trim()) onRename(solution.current.id, name.trim());
+        }}
+        className="text-muted opacity-60 hover:text-foreground hover:opacity-100"
+      >
+        ✎
+      </button>
     </div>
   );
 }
@@ -1086,7 +1184,7 @@ function BranchesOverview({
       <table className="w-full min-w-[320px] border-separate border-spacing-y-1 text-sm tabular-nums">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wide text-muted">
-            <th className="px-2 font-medium">Card</th>
+            <th className="px-2 font-medium">{nexts.every((t) => t.via?.type === "strategy") ? "Solution" : "Card"}</th>
             <th className="px-2 font-medium">Acts</th>
             {columns.map((c) => (
               <th key={c.label} className="px-2 text-right font-medium">
@@ -1226,7 +1324,15 @@ function NextColumn({
   );
   return (
     <div>
-      <ColumnLabel>{kind === "decision" ? "Options" : kind === "branches" ? "Runouts" : "Next"}</ColumnLabel>
+      <ColumnLabel>
+        {kind === "decision"
+          ? "Options"
+          : kind === "branches"
+            ? nexts.every((t) => t.via?.type === "strategy")
+              ? "Solutions"
+              : "Runouts"
+            : "Next"}
+      </ColumnLabel>
       <div className="study-rail study-rail-right space-y-2">
         {shown.map((x, k) => card(x, 60 + k * 35))}
         {hidden.length > 0 && <DeletedLines>{hidden.map((x, k) => card(x, k * 35))}</DeletedLines>}

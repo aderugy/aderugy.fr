@@ -189,3 +189,73 @@ export function siblingStop(t: StudyTree, stopId: string, step: 1 | -1): string 
   }
   return null;
 }
+
+/* ------------------------------------------------------------- solutions */
+
+/**
+ * Solutions: a node can hold several decisions as children, each the start
+ * of a different solution of the same spot (a node-locked re-solve of the
+ * whole flop, a turn solved again with other settings…), named in its data
+ * (`solution.name`). The node above them is the fork.
+ */
+export type SolutionInfo = {
+  /** The node the solutions hang from. */
+  fork: string;
+  /** Every solution's first decision, in order. */
+  roots: PokerNode[];
+  /** The one this node belongs to. */
+  current: PokerNode;
+};
+
+export function solutionName(n: PokerNode, index: number): string {
+  const s = (n.data as { solution?: { name?: unknown } }).solution;
+  return typeof s?.name === "string" && s.name.trim() ? s.name : index === 0 ? "Main" : `Solution ${index + 1}`;
+}
+
+/** The nearest fork above (or at) a node: the solution it is in, and the others. */
+export function solutionOf(t: StudyTree, id: string): SolutionInfo | null {
+  let cur: string | null = id;
+  while (cur && cur !== t.rootId) {
+    const n = t.node(cur);
+    const parent = t.parent(cur);
+    if (!n || parent == null) return null;
+    if (n.type === "strategy") {
+      const roots = t.kids(parent).filter((k) => k.type === "strategy");
+      if (roots.length > 1) return { fork: parent, roots, current: n };
+    }
+    cur = parent;
+  }
+  return null;
+}
+
+/**
+ * The same line as `id` in another solution starting at `root`: each action
+ * matched by its label, each card by the card. Goes as deep as that solution's
+ * tree allows; returns the deepest node reached.
+ */
+export function sameLine(t: StudyTree, id: string, fromRoot: string, root: string): string {
+  const path = pathTo(t, id);
+  const start = path.indexOf(fromRoot);
+  if (start < 0) return root;
+  let cur = root;
+  for (const stepId of path.slice(start + 1)) {
+    const step = t.node(stepId);
+    if (!step) break;
+    const kids = t.kids(cur);
+    let next: PokerNode | undefined;
+    if (step.type === "action") {
+      const label = asAction(step).label;
+      next = kids.find((k) => k.type === "action" && asAction(k).label === label);
+    } else if (step.type === "strategy") {
+      next = kids.find((k) => k.type === "strategy");
+    } else {
+      const card = JSON.stringify((step.data as { card?: unknown; cards?: unknown }).card ?? (step.data as { cards?: unknown }).cards);
+      next = kids.find(
+        (k) => k.type === step.type && JSON.stringify((k.data as { card?: unknown; cards?: unknown }).card ?? (k.data as { cards?: unknown }).cards) === card,
+      );
+    }
+    if (!next) break;
+    cur = next.id;
+  }
+  return cur;
+}

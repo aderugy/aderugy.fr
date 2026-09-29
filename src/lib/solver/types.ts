@@ -142,6 +142,8 @@ export type NodeMeta = {
   /** Where the next card is dealt: every card of the save summed up, and the user's groups of cards. */
   runouts?: RunoutReport | null;
   runoutGroups?: RunoutGroup[];
+  /** On a decision that starts one of several solutions of a node (see studyNav's solutionOf). */
+  solution?: { name: string } | null;
 };
 
 /**

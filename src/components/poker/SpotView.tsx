@@ -66,7 +66,7 @@ import { RootInspector, ROOT_ID } from "@/components/poker/SpotRoot";
 import { NodeInspector, type ImportResult } from "@/components/poker/NodeInspector";
 import { StrategyEditor } from "@/components/poker/StrategyEditor";
 import { SpotStudy, type StudyEditing } from "@/components/poker/SpotStudy";
-import { PioFilePicker, RunoutPicker } from "@/components/poker/PioDialogs";
+import { PioFilePicker, RunoutPicker, SolutionDialog } from "@/components/poker/PioDialogs";
 import { resolveStop, studyTree } from "@/lib/solver/studyNav";
 
 const NODE_SELECT = "id, spot_id, parent_id, type, position, data, created_at, updated_at";
@@ -75,6 +75,7 @@ type Drawer = { kind: "node"; id: string } | { kind: "setup" } | null;
 type Dialog =
   | { kind: "flop" }
   | { kind: "link"; nodeId: string }
+  | { kind: "solution"; forkId: string }
   | { kind: "runouts"; leafId: string; file: string; splitId: string; street: "turn" | "river"; available: string[]; existing: string[] }
   | null;
 type Notice = { tone: "busy" | "ok" | "warn" | "error"; text: string; detail?: string[] } | null;
@@ -901,6 +902,46 @@ export function SpotView({
     }
   }
 
+  /**
+   * Another solution of the spot from this node on: a decision next to the
+   * one(s) already there, linked to another save (a node-locked re-solve of
+   * the flop, a turn solved again with other settings…) and imported.
+   */
+  async function addSolution(forkId: string, name: string, file: string) {
+    setDialog(null);
+    try {
+      setNotice({ tone: "busy", text: "Opening the save…" });
+      const ns = stateAt(forkId);
+      if (!ns || ns.error) return setNotice({ tone: "error", text: "Fix the line above first." });
+      const board = ns.state.board;
+      const tree = await pioTree(file);
+      if (tree.board.length > board.length || !tree.board.every((c) => board.includes(c))) {
+        return setNotice({ tone: "error", text: `That save's board (${tree.board.join(" ")}) isn't this node's (${board.join(" ")}).` });
+      }
+      // A save that starts where this card is dealt (same board) → its first
+      // decision. Otherwise (e.g. the whole flop re-solved with a node lock)
+      // the same line as in the current save, which must have the same tree.
+      const forkType = nodesRef.current[forkId]?.type;
+      const startsHere = tree.board.length === board.length && (forkType === "flop" || forkType === "turn" || forkType === "river");
+      let pioId = "r:0";
+      if (!startsHere) {
+        const r = await resolvePio(forkId);
+        pioId = r.pioId === "r" ? "r:0" : r.pioId;
+      }
+      const existing = kidsOf(forkId).filter((k) => k.type === "strategy");
+      existing.forEach((d, i) => {
+        if (!(d.data as NodeMeta).solution) persistData(d.id, { solution: { name: i === 0 ? "Main" : `Solution ${i + 1}` } });
+      });
+      const dec = await addChild(forkId, "strategy", { data: { actions: [], pio: { file, id: pioId }, solution: { name } } as NodeData });
+      if (!dec) return;
+      setFocus(dec.id);
+      setNotice({ tone: "busy", text: `Importing “${name}” from Pio…` });
+      show(await importDecision(dec, { at: { file, pioId }, confirm: false }));
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   /** Develop an option of a decision; on a solver line, import what follows. */
   async function develop(decisionId: string, optionId: string) {
     const dec = nodesRef.current[decisionId];
@@ -1019,6 +1060,7 @@ export function SpotView({
       } else persistData(id, patch);
     },
     saveCategories: (id, categories) => persistData(id, { categories }),
+    renameSolution: (id, name) => persistData(id, { solution: { name } }),
     runouts: {
       load: (id) => void loadRunouts(id),
       importCard: (id, card) => void importRunoutCard(id, card),
@@ -1058,6 +1100,7 @@ export function SpotView({
       importDecision: (id) => void importFocusDecision(id),
       continueFrom: (id) => void continueFromPio(id),
       addFlop: () => setDialog({ kind: "flop" }),
+      addSolution: (forkId) => setDialog({ kind: "solution", forkId }),
       busy: notice?.tone === "busy",
     },
     stats: statsById,
@@ -1164,6 +1207,9 @@ export function SpotView({
           onPick={(file) => void addFlopFromPio(file)}
           onClose={() => setDialog(null)}
         />
+      )}
+      {dialog?.kind === "solution" && (
+        <SolutionDialog near={lastFile} onPick={(name, file) => void addSolution(dialog.forkId, name, file)} onClose={() => setDialog(null)} />
       )}
       {dialog?.kind === "link" && (
         <PioFilePicker

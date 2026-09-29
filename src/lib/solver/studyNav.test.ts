@@ -16,6 +16,9 @@ import {
   stopKind,
   studyTree,
   targets,
+  sameLine,
+  solutionName,
+  solutionOf,
 } from "./studyNav";
 import type { PokerNode, StrategyAction } from "./types";
 
@@ -150,4 +153,35 @@ test("a root with several top-level nodes is itself the entry", () => {
     targets(two, ROOT).map((x) => x.stop),
     ["f1", "f2"],
   );
+});
+
+test("solutions: the fork, the solution a node is in, the same line in another", () => {
+  // Flop with two solutions: the main one and a node-locked re-solve.
+  const ns: PokerNode[] = [
+    n("F", "flop", null, { cards: ["Ks", "7d", "2c"] }),
+    n("m1", "strategy", "F", { actions: [opt("x", "Check")] }),
+    act("mx", "m1", "x"),
+    n("m2", "strategy", "mx", { actions: [opt("x", "Check")] }),
+    act("mxx", "m2", "x"),
+    n("mT", "turn", "mxx", { card: "5h" }),
+    n("m3", "strategy", "mT", { actions: [] }),
+    n("l1", "strategy", "F", { actions: [opt("x", "Check")], solution: { name: "Nodelock BTN" } }),
+    act("lx", "l1", "x"),
+    n("l2", "strategy", "lx", { actions: [opt("x", "Check")] }),
+  ];
+  const tt = studyTree(ns, ROOT);
+  const s = solutionOf(tt, "m3")!;
+  assert.equal(s.fork, "F");
+  assert.deepEqual(s.roots.map((r) => r.id), ["m1", "l1"]);
+  assert.equal(s.current.id, "m1");
+  assert.equal(solutionName(s.roots[0], 0), "Main");
+  assert.equal(solutionName(s.roots[1], 1), "Nodelock BTN");
+  assert.equal(solutionOf(tt, "l2")!.current.id, "l1");
+  assert.equal(solutionOf(t, "d3a"), null); // no fork in the main fixture
+  // m2 (after BB check) → l2; m3 (turn 5h) → as deep as the locked tree goes: l2.
+  assert.equal(sameLine(tt, "m2", "m1", "l1"), "l2");
+  assert.equal(sameLine(tt, "m3", "m1", "l1"), "l2");
+  assert.equal(sameLine(tt, "l2", "l1", "m1"), "m2");
+  // The fork is a stop: two decisions below it.
+  assert.equal(stopKind(tt, "F"), "branches");
 });

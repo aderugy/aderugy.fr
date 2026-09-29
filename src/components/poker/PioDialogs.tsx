@@ -58,7 +58,10 @@ export function PioFilePicker({
   near,
   onPick,
   onClose,
+  children,
 }: {
+  /** Shown above the file list (e.g. a name field). */
+  children?: React.ReactNode;
   title?: string;
   near?: string | null;
   onPick: (path: string) => void;
@@ -90,6 +93,7 @@ export function PioFilePicker({
   const crumbs = dir ? dir.split("/") : [];
   return (
     <Modal title={title} onClose={onClose}>
+      {children}
       <nav className="mb-3 flex flex-wrap items-center gap-1 text-xs">
         <button type="button" onClick={() => setDir("")} className="rounded px-1 text-muted hover:bg-background hover:text-foreground">
           Solves
@@ -214,5 +218,41 @@ export function RunoutPicker({
       </div>
       {existing.length > 0 && <p className="mt-3 text-[11px] text-muted">Faded cards are already in the tree.</p>}
     </Modal>
+  );
+}
+
+/**
+ * A new solution of the spot from a node: its name, then the save it comes
+ * from (a node-locked re-solve of the flop, a turn solved on its own…).
+ */
+export function SolutionDialog({
+  near,
+  onPick,
+  onClose,
+}: {
+  near?: string | null;
+  onPick: (name: string, file: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  return (
+    <PioFilePicker
+      title="Add a solution from here"
+      near={near}
+      onClose={onClose}
+      onPick={(file) => onPick(name.trim() || (file.split("/").pop() ?? file).replace(/\.cfr$/i, ""), file)}
+    >
+      <label className="mb-3 block text-xs">
+        <span className="text-muted">Name (e.g. “Nodelock BTN cbet”, “Turn 2 sizes”) — the save&apos;s name if left empty</span>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-1 w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+          placeholder="Solution name"
+        />
+      </label>
+      <p className="mb-2 text-[11px] text-muted">Then pick its save: one of the whole flop (same line is used) or one starting at this node.</p>
+    </PioFilePicker>
   );
 }
