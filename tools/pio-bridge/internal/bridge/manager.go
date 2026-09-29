@@ -54,6 +54,9 @@ type Manager struct {
 	// allNodes: load_all_nodes ran on the loaded save (whole-tree reads are
 	// safe and every turn is in memory).
 	allNodes bool
+	// unsolvedSplits: per split node id of the loaded save, whether it is
+	// UNSOLVED (the rivers of a no_rivers save).
+	unsolvedSplits map[string]bool
 
 	cfgMu sync.RWMutex
 	cfg   Config
@@ -285,7 +288,7 @@ func (m *Manager) ensureLocked(file string) error {
 			return err
 		}
 	}
-	m.file, m.board, m.allNodes = "", nil, false
+	m.file, m.board, m.allNodes, m.unsolvedSplits = "", nil, false, nil
 	if _, err := s.Raw(`load_tree "` + file + `" fast`); err != nil {
 		return err
 	}
@@ -388,7 +391,54 @@ func (s *Session) Node(id string) (NodeInfo, error) {
 	if !ok {
 		return NodeInfo{}, fmt.Errorf("unexpected show_node output: %q", lines)
 	}
-	return nodeInfo(n), nil
+	ni := nodeInfo(n)
+	return ni, s.checkSolved(&ni)
+}
+
+// checkSolved: a decision without the PIO_ALG flag is only "not in the save"
+// when the card above it was dealt at an UNSOLVED split (a river of a
+// no_rivers save). Saves solved another way (node-locked re-solves, a street
+// solved on its own…) can lack the flag and are read normally.
+func (s *Session) checkSolved(ni *NodeInfo) error {
+	if ni.Player == "" || ni.Solved {
+		return nil
+	}
+	toks := strings.Split(ni.ID, ":")
+	for i := len(toks) - 1; i >= 1; i-- {
+		if !isCardToken(toks[i]) {
+			continue
+		}
+		split := strings.Join(toks[:i], ":")
+		unsolved, ok := s.m.unsolvedSplits[split]
+		if !ok {
+			lines, err := s.Raw("show_node " + split)
+			if err != nil {
+				return err
+			}
+			sn, ok2 := upi.ParseNode(lines)
+			if !ok2 {
+				return fmt.Errorf("unexpected show_node output: %q", lines)
+			}
+			for _, f := range sn.Flags {
+				if f == "UNSOLVED" {
+					unsolved = true
+				}
+			}
+			if s.m.unsolvedSplits == nil {
+				s.m.unsolvedSplits = map[string]bool{}
+			}
+			s.m.unsolvedSplits[split] = unsolved
+		}
+		ni.Solved = !unsolved
+		return nil
+	}
+	// No card dealt in the save: its own first street, always solved.
+	ni.Solved = true
+	return nil
+}
+
+func isCardToken(t string) bool {
+	return len(t) == 2 && strings.ContainsRune("23456789TJQKA", rune(t[0])) && strings.ContainsRune("cdhs", rune(t[1]))
 }
 
 func (s *Session) Children(id string) ([]NodeInfo, error) {
@@ -398,7 +448,11 @@ func (s *Session) Children(id string) ([]NodeInfo, error) {
 	}
 	var out []NodeInfo
 	for _, n := range upi.ParseChildren(lines) {
-		out = append(out, nodeInfo(n))
+		ni := nodeInfo(n)
+		if err := s.checkSolved(&ni); err != nil {
+			return nil, err
+		}
+		out = append(out, ni)
 	}
 	if out == nil {
 		out = []NodeInfo{}

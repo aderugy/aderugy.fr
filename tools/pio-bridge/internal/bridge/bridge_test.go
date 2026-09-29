@@ -261,6 +261,20 @@ func TestRiverIsNotInSave(t *testing.T) {
 	}
 }
 
+// A decision without PIO_ALG under a solved split (or with no card above it,
+// like a save of one street) is in the save.
+func TestSolvedWithoutPioAlgFlag(t *testing.T) {
+	a := newTestApp(t)
+	var ni NodeInfo
+	err := a.m.Do("", func(s *Session) error {
+		ni = NodeInfo{ID: "r:0", Player: "OOP"}
+		return s.checkSolved(&ni)
+	})
+	if err != nil || !ni.Solved {
+		t.Fatalf("r:0 without PIO_ALG: solved=%v err=%v", ni.Solved, err)
+	}
+}
+
 func TestTree(t *testing.T) {
 	a := newTestApp(t)
 	rec, body := get(t, a, "/api/tree?file="+url.QueryEscape(saveRel))

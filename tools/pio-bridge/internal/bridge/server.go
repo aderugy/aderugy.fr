@@ -425,7 +425,7 @@ func (a *App) decision(w http.ResponseWriter, r *http.Request) {
 		}
 		if !n.Solved && !allowResolve {
 			return &apiError{http.StatusConflict, "not_in_save",
-				"This node is not in the save (a river of a no_rivers save); the solver would re-solve it on the fly"}
+				"This node (" + id + ") is not in the save: its card was dealt at an unsolved split (a river of a no_rivers save), the solver would re-solve it on the fly"}
 		}
 		kids, err := s.Children(id)
 		if err != nil {
