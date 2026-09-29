@@ -39,7 +39,7 @@ function heat(t: number): string {
   return x < 0.5 ? mix(RED, YELLOW, x * 2) : mix(YELLOW, GREEN, (x - 0.5) * 2);
 }
 
-function metricValue(row: RunoutRow | RunoutSummary, m: Metric, action: number): number | null {
+function metricValue(row: RunoutRow | RunoutSummary, m: Metric, action: number | null): number | null {
   switch (m) {
     case "eq-OOP":
       return row.equity.OOP ?? null;
@@ -50,7 +50,7 @@ function metricValue(row: RunoutRow | RunoutSummary, m: Metric, action: number):
     case "ev-IP":
       return row.ev.IP ?? null;
     case "strategy":
-      return row.strategy?.[action] ?? null;
+      return action == null ? null : (row.strategy?.[action] ?? null);
   }
 }
 
@@ -100,7 +100,8 @@ export function RunoutReportView({
   onOpen: (card: string) => void;
 }) {
   const [metric, setMetric] = useState<Metric>("eq-OOP");
-  const [action, setAction] = useState(0);
+  // Strategy: null = the whole mix in each cell; an option = its frequency, in colour scale.
+  const [action, setAction] = useState<number | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [brush, setBrush] = useState<string | null>(null);
   const [form, setForm] = useState<{ id: string | null; name: string; color: string } | null>(null);
@@ -195,13 +196,13 @@ export function RunoutReportView({
       </div>
 
       {metric === "strategy" && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {report.actions.map((a, i) => (
             <button
               key={a.label}
               type="button"
               aria-pressed={action === i}
-              onClick={() => setAction(i)}
+              onClick={() => setAction(action === i ? null : i)}
               className={[
                 "flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs",
                 action === i ? "border-foreground/50 bg-foreground/[0.06]" : "border-line",
@@ -212,6 +213,9 @@ export function RunoutReportView({
               <span className="tabular-nums text-muted">{formatFrequency(all.strategy?.[i] ?? 0)}</span>
             </button>
           ))}
+          <span className="text-[11px] text-muted">
+            {action == null ? "Click an option to see its frequency on each card." : "Click it again to see the whole mix."}
+          </span>
         </div>
       )}
 
@@ -222,8 +226,12 @@ export function RunoutReportView({
           style={{ gridTemplateColumns: `minmax(1.8rem, 3rem) repeat(${REPORT_RANKS.length}, minmax(0, 1fr))` }}
           onPointerLeave={() => setHovered(null)}
         >
-          <div className="flex items-center justify-center bg-amber-200 px-0.5 py-1.5 font-semibold text-black" title="Average of every runout">
-            {fmtMetric(metricValue(all, metric, action), metric)}
+          <div className="relative flex items-center justify-center overflow-hidden bg-amber-200 px-0.5 py-1.5 font-semibold text-black" title="Average of every runout">
+            {metric === "strategy" && action == null && all.strategy ? (
+              <MixBars actions={report.actions} strategy={all.strategy} />
+            ) : (
+              fmtMetric(metricValue(all, metric, action), metric)
+            )}
           </div>
           {REPORT_RANKS.map((r) => (
             <div key={r} className="flex items-center justify-center bg-background py-1.5 text-sm font-semibold sm:text-base">
@@ -255,8 +263,10 @@ export function RunoutReportView({
                     ].join(" ")}
                     style={row && v != null ? { backgroundColor: heat(t) } : undefined}
                   >
-                    {/* Strategy: the option picked in colour scale, the whole mix along the bottom. */}
-                    {strat && (
+                    {/* Strategy: the whole mix over the cell; with an option picked, its
+                        frequency in colour scale and the mix along the bottom. */}
+                    {strat && action == null && <MixBars actions={report.actions} strategy={strat} />}
+                    {strat && action != null && (
                       <span className="absolute inset-x-0 bottom-0 flex h-1.5 sm:h-2">
                         {report.actions.map((a, i) =>
                           (strat[i] ?? 0) > 0 ? <span key={a.label} style={{ width: `${strat[i]}%`, backgroundColor: a.color }} /> : null,
@@ -407,6 +417,21 @@ export function RunoutReportView({
         )}
       </div>
     </div>
+  );
+}
+
+/** The options' frequencies side by side over the whole cell. */
+function MixBars({ actions, strategy }: { actions: RunoutReport["actions"]; strategy: number[] }) {
+  const total = strategy.reduce((a, b) => a + (b ?? 0), 0) || 1;
+  return (
+    <span
+      className="absolute inset-0 flex"
+      title={actions.map((a, i) => `${a.label} ${formatFrequency(strategy[i] ?? 0)}`).join(" · ")}
+    >
+      {actions.map((a, i) =>
+        (strategy[i] ?? 0) > 0 ? <span key={a.label} style={{ width: `${((strategy[i] ?? 0) / total) * 100}%`, backgroundColor: a.color }} /> : null,
+      )}
+    </span>
   );
 }
 
