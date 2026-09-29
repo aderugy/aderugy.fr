@@ -104,9 +104,16 @@ test("a branching action lists its runouts, each through its card to the decisio
       ["t5", "d3b", ["t5"]],
     ],
   );
+  // A call that deals one turn still stops there: the other turns are picked there.
   assert.deepEqual(
     targets(t, "d4").map((x) => x.stop),
-    [null, "t7", null],
+    [null, "a4c", null],
+  );
+  assert.equal(isStop(t, "a4c"), true);
+  assert.equal(stopKind(t, "a4c"), "branches");
+  assert.deepEqual(
+    targets(t, "a4c").map((x) => [x.via?.id, x.stop]),
+    [["t7", "t7"]],
   );
 });
 

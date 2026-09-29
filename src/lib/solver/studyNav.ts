@@ -9,7 +9,9 @@
  * - the root (the setup and its notes);
  * - every decision (a grid, options);
  * - any other node with several children — typically the action that closes a
- *   betting round, with one child per runout;
+ *   betting round, with one child per runout — and any node where cards are
+ *   dealt next, even a single runout (the runouts report and the other cards
+ *   are picked there);
  * - leaves (a terminal action, an undeveloped branch).
  *
  * Nodes with exactly one child are *folded*: descending walks through them to
@@ -59,7 +61,12 @@ export function isStop(t: StudyTree, id: string): boolean {
   const n = t.node(id);
   if (!n) return false;
   if (n.type === "strategy") return true;
-  return t.kids(id).length !== 1;
+  return t.kids(id).length !== 1 || dealsCards(t, id);
+}
+
+/** The node's children are cards (the next street is dealt below it). */
+function dealsCards(t: StudyTree, id: string): boolean {
+  return t.kids(id).some((k) => k.type === "flop" || k.type === "turn" || k.type === "river");
 }
 
 export type StopKind = "root" | "decision" | "branches" | "leaf";
@@ -67,7 +74,7 @@ export type StopKind = "root" | "decision" | "branches" | "leaf";
 export function stopKind(t: StudyTree, id: string): StopKind {
   if (id === t.rootId) return "root";
   if (t.node(id)?.type === "strategy") return "decision";
-  return t.kids(id).length > 1 ? "branches" : "leaf";
+  return t.kids(id).length > 1 || dealsCards(t, id) ? "branches" : "leaf";
 }
 
 /** From `id` down through single-child nodes to the first stop, and the nodes walked through. */
