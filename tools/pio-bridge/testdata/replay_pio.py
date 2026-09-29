@@ -72,10 +72,23 @@ for cmd, lines in answers.items():
 
 def is_card(tok): return len(tok) == 2 and tok[0] in "23456789TJQKA" and tok[1] in "cdhs"
 
-def node_block(nid):
+def node_block(nid, synth_ok=True):
     rec = answers.get("show_node " + nid)
     if rec: return [l for l in rec if l.strip()]
-    return blocks.get(nid)
+    if nid in blocks or not synth_ok: return blocks.get(nid)
+    # A node known on another card: same line, that card swapped in.
+    toks = nid.split(":")
+    for oid, blk in list(blocks.items()):
+        other = oid.split(":")
+        if len(other) != len(toks): continue
+        if not all(a == b or (is_card(a) and is_card(b)) for a, b in zip(toks, other)): continue
+        swaps = {b: a for a, b in zip(toks, other) if a != b}
+        out = [nid]
+        for l in blk[1:]:
+            if l.startswith(oid): l = nid + l[len(oid):]
+            out.append(" ".join(swaps.get(w, w) for w in l.split(" ")) if l == blk[2] else l)
+        return out
+    return None
 
 def children_lines(nid):
     rec = answers.get("show_children " + nid)

@@ -199,6 +199,25 @@ func TestRunouts(t *testing.T) {
 	if len(seen) < 10 {
 		t.Errorf("runouts all alike: %d distinct equities", len(seen))
 	}
+	// A later node of the turn on every card: BB checked, BTN to act.
+	rec, body = get(t, a, "/api/runouts?"+q(saveRel, "r:0:c:c", "after", "c"))
+	if rec.Code != 200 {
+		t.Fatalf("after=c: status %d: %s", rec.Code, rec.Body.String())
+	}
+	cards = body["cards"].([]any)
+	if len(cards) != 49 {
+		t.Fatalf("after=c: %d cards", len(cards))
+	}
+	for _, x := range cards {
+		c := x.(map[string]any)
+		node := c["node"].(map[string]any)
+		if node["player"] != "IP" || !strings.HasSuffix(node["id"].(string), ":c") || c["dealt"] == nil {
+			t.Fatalf("after=c, %v: node %v (%v)", c["card"], node, c["notes"])
+		}
+	}
+	if rec, _ := get(t, a, "/api/runouts?"+q(saveRel, "r:0:c:c", "after", "c x")); rec.Code != 400 {
+		t.Errorf("bad after: status %d", rec.Code)
+	}
 	// Not a split node.
 	if rec, _ := get(t, a, "/api/runouts?"+q(saveRel, "r:0")); rec.Code != 400 {
 		t.Errorf("runouts on a decision: status %d", rec.Code)

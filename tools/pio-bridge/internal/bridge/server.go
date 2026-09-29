@@ -522,8 +522,10 @@ func (a *App) decision(w http.ResponseWriter, r *http.Request) {
 // One card dealt at a split node, summed up: both players' equity and EV
 // over their ranges there, and how often the player to act takes each option.
 type runoutCard struct {
-	Card     string     `json:"card"`
-	Node     NodeInfo   `json:"node"`
+	Card string   `json:"card"`
+	Node NodeInfo `json:"node"`
+	// With after=: the card's own node (the pot when the street started).
+	Dealt    *NodeInfo  `json:"dealt,omitempty"`
 	Children []NodeInfo `json:"children"`
 	// Average frequency of each child (option) over the actor's range.
 	Strategy Floats `json:"strategy,omitempty"`
@@ -572,6 +574,13 @@ func (a *App) runouts(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	// after: the same line below every card (e.g. "c" = the first player
+	// checked), to see a later node of the street on every runout.
+	after := r.URL.Query().Get("after")
+	if after != "" && !ValidNodeID("r:"+after) {
+		writeError(w, &apiError{http.StatusBadRequest, "bad_node_id", "Invalid line after the card: " + after})
+		return
+	}
 	var resp runoutsResp
 	err = a.m.Do(abs, func(s *Session) error {
 		n, err := s.Node(id)
@@ -591,6 +600,22 @@ func (a *App) runouts(w http.ResponseWriter, r *http.Request) {
 		resp = runoutsResp{File: rel, Node: n, Cards: []runoutCard{}}
 		for _, k := range kids {
 			c := runoutCard{Card: k.Last, Node: k, Children: []NodeInfo{}, Equity: map[string]*float64{}, EV: map[string]*float64{}, Notes: []string{}}
+			if after != "" && k.Solved {
+				t, err := s.Node(k.ID + ":" + after)
+				switch {
+				case err == nil:
+					dealt := k
+					c.Dealt = &dealt
+					k, c.Node = t, t
+				case isSolverErr(err):
+					c.Notes = append(c.Notes, "no such line on this card: "+err.Error())
+					c.Node.Solved = false
+					resp.Cards = append(resp.Cards, c)
+					continue
+				default:
+					return err
+				}
+			}
 			if !k.Solved {
 				c.Notes = append(c.Notes, "not in the save")
 				resp.Cards = append(resp.Cards, c)
