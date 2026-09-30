@@ -926,7 +926,7 @@ function Tool({
   );
 }
 
-type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev" | "graph" | "runouts" | "categories";
+type GridMode = "strategy" | "eq-OOP" | "eq-IP" | "ev" | "eqr" | "graph" | "runouts" | "categories";
 
 function DecisionBody({
   ctx,
@@ -974,15 +974,26 @@ function DecisionBody({
   const tabs: { id: GridMode; label: string }[] = [{ id: "strategy", label: "Strategy" }];
   if (stats?.players.OOP) tabs.push({ id: "eq-OOP", label: `Equity ${name("OOP")}` });
   if (stats?.players.IP) tabs.push({ id: "eq-IP", label: `Equity ${name("IP")}` });
+  const handState = ctx.nodeStates.get(node.id)?.state ?? null;
+  const potBb = handState ? totalPot(handState) : null;
   if (stats?.ev) tabs.push({ id: "ev", label: `EV ${name(stats.actor)}` });
+  if (stats?.ev && stats.players[stats.actor] && potBb) tabs.push({ id: "eqr", label: `EqR ${name(stats.actor)}` });
   if (stats) tabs.push({ id: "graph", label: "Graph" });
   const line = ctx.editing.runouts.line(node.id);
   if (line) tabs.push({ id: "runouts", label: `Every ${line.street}` });
   const categories = asCategories((node.data as NodeMeta).categories);
   tabs.push({ id: "categories", label: categories.length ? `Categories (${categories.length})` : "Categories" });
-  const handState = ctx.nodeStates.get(node.id)?.state ?? null;
   const statsMode: StatsMode | null =
-    mode === "eq-OOP" ? { kind: "equity", player: "OOP" } : mode === "eq-IP" ? { kind: "equity", player: "IP" } : mode === "ev" ? { kind: "ev" } : null;
+    mode === "eq-OOP"
+      ? { kind: "equity", player: "OOP" }
+      : mode === "eq-IP"
+        ? { kind: "equity", player: "IP" }
+        : mode === "ev"
+          ? { kind: "ev" }
+          : mode === "eqr"
+            ? { kind: "eqr" }
+            : null;
+  const eqrTotal = stats ? rangeTotal(stats, { kind: "eqr" }, potBb) : null;
 
   return (
     <div className={mode === "categories" || mode === "runouts" || (mode === "strategy" && categories.length > 0) ? "" : "max-w-[560px]"}>
@@ -995,6 +1006,7 @@ function DecisionBody({
               .map((p) => `${name(p)} ${rangeTotal(stats, { kind: "equity", player: p })}`)
               .join(" · ")}
             {stats.ev?.total != null && ` · EV ${name(stats.actor)} ${rangeTotal(stats, { kind: "ev" })}`}
+            {eqrTotal != null && ` · EqR ${eqrTotal}`}
           </span>
         )}
       </div>
@@ -1005,7 +1017,7 @@ function DecisionBody({
           dead={ctx.deadCards(node.id)}
           board={handState?.board ?? []}
           stats={stats}
-          potBb={handState ? totalPot(handState) : null}
+          potBb={potBb}
           categories={categories}
           onChange={(next) => ctx.editing.saveCategories(node.id, next)}
         />
@@ -1014,7 +1026,7 @@ function DecisionBody({
       ) : mode === "graph" && stats ? (
         <StatsGraph stats={stats} dead={ctx.deadCards(node.id)} seats={{ OOP: name("OOP"), IP: name("IP") }} />
       ) : stats && statsMode ? (
-        <StatsDetail stats={stats} mode={statsMode} dead={ctx.deadCards(node.id)} />
+        <StatsDetail stats={stats} mode={statsMode} dead={ctx.deadCards(node.id)} potBb={potBb} />
       ) : categories.length > 0 ? (
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:gap-4">
           <div className="min-w-0 xl:order-2 xl:w-52 xl:shrink-0">
