@@ -58,6 +58,7 @@ import {
   type PioNode,
   type PioPlayer,
   type PioTree,
+  type PioRunouts,
 } from "@/lib/solver/pio";
 import { asRunoutReport, runoutReport } from "@/lib/solver/runouts";
 import { pioBridge, PioBridgeError } from "@/lib/solver/pioBridge";
@@ -762,6 +763,16 @@ export function SpotView({
     setNotice({ tone: warnings.length ? "warn" : "ok", text: `Imported ${done} ${street} card${done === 1 ? "" : "s"} from Pio`, detail: warnings.slice(0, 6) });
   }
 
+  /** No card of the report is in the save: say which save, and why, instead of saving an empty report. */
+  function noRunouts(file: string, r: PioRunouts): Notice {
+    const notes = [...new Set(r.cards.flatMap((c) => c.notes))].slice(0, 3);
+    return {
+      tone: "error",
+      text: `None of these cards is solved in ${file.split("/").pop()} (a save without rivers, or a line this save doesn't have). Nothing was saved.`,
+      detail: notes,
+    };
+  }
+
   /** The report on every card dealt below a node (turn or river), saved on the node. */
   async function loadRunouts(id: string) {
     const leaf = nodesRef.current[id];
@@ -772,6 +783,7 @@ export function SpotView({
       if (leaf.type === "action" && asPio(leaf)?.id !== pioId) persistData(id, { pio: { file, id: pioId } });
       const [r, tree] = await Promise.all([pioBridge.runouts(file, pioId), pioTree(file)]);
       const report = runoutReport(r, tree.effectiveStack, new Date().toISOString());
+      if (report.rows.length === 0) return setNotice(noRunouts(file, r));
       persistData(id, { runouts: report });
       setNotice({
         tone: report.missing.length ? "warn" : "ok",
@@ -839,6 +851,7 @@ export function SpotView({
       const after = toks.slice(at + 1).join(":");
       const [r, tree] = await Promise.all([pioBridge.runouts(file, split, after), pioTree(file)]);
       const report = runoutReport(r, tree.effectiveStack, new Date().toISOString(), after);
+      if (report.rows.length === 0) return setNotice(noRunouts(file, r));
       persistData(id, { runouts: report });
       setNotice({
         tone: report.missing.length ? "warn" : "ok",
