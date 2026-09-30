@@ -478,7 +478,7 @@ function Grid({
             onPointerEnter={() => onCellEnter(hand)}
             title={hand}
             className={[
-              "relative aspect-square overflow-hidden rounded-sm border border-line text-[9px] font-semibold",
+              "relative aspect-square overflow-hidden rounded-sm border border-line text-[10px] font-semibold sm:text-[13px]",
               blocked ? "opacity-25" : "",
             ].join(" ")}
           >

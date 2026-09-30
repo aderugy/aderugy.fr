@@ -96,10 +96,15 @@ function HoverDetail({
   stats: StrategyStats | null;
 }) {
   const len = actions.length;
-  const combos = useMemo(
-    () => (hand ? handCombos(hand).filter((c) => !comboBlocked(c, dead)) : []),
-    [hand, dead],
-  );
+  const combos = useMemo(() => {
+    if (!hand) return [];
+    const live = handCombos(hand).filter((c) => !comboBlocked(c, dead));
+    if (!stats) return live;
+    // With solver numbers: best to worst by EV (equity where there's no EV), unknown last.
+    const eq = stats.players[stats.actor]?.equity;
+    const key = (c: string) => stats.ev?.node[c] ?? eq?.[c] ?? -Infinity;
+    return live.sort((a, b) => key(b) - key(a));
+  }, [hand, dead, stats]);
 
   if (!hand) {
     return (
@@ -159,12 +164,12 @@ function HoverDetail({
         <div className="space-y-1.5">
           {combos.map((combo) => (
             <div key={combo} className="flex items-center gap-2">
-              <span className="w-10 shrink-0 text-[11px] font-medium tabular-nums">{combo}</span>
+              <span className="w-12 shrink-0 text-xs font-medium tabular-nums">{combo}</span>
               <div className="flex-1">
                 <WeightBars actions={actions} vector={comboVector(weights, combo, hand, len)} />
               </div>
               {stats && (
-                <span className="w-24 shrink-0 text-right text-[11px] tabular-nums text-muted">
+                <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted">
                   {actor?.equity[combo] != null ? `${actor.equity[combo].toFixed(1)}%` : "—"}
                   {stats.ev?.node[combo] != null ? ` · ${fmtBb(stats.ev.node[combo])}bb` : ""}
                 </span>
@@ -188,7 +193,7 @@ function WeightBars({ actions, vector }: { actions: StrategyAction[]; vector: nu
         return (
           <span
             key={action.id}
-            className="flex items-center justify-center text-[9px] text-white"
+            className="flex items-center justify-center text-[10px] text-white"
             style={{ width: `${pct}%`, backgroundColor: action.color }}
             title={`${action.label}: ${Math.round(vector[i] ?? 0)}`}
           >

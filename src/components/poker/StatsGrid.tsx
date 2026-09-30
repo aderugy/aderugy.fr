@@ -12,8 +12,9 @@ import { fmtBb } from "@/lib/solver/gameState";
  * - EV: the acting player's EV, coloured by its share of the pot — green as
  *   soon as the hand wins more than half of it;
  * - EqR: equity realization, EV% / Eq with EV% = EV / pot — green above 100%.
- * Each cell is split into one stripe per combo in range (width ∝ reach), so
- * suit differences show at a glance; hands out of range stay blank.
+ * Each cell is split into one stripe per combo in range (width ∝ reach),
+ * best to worst from left to right so a cell reads as one gradient; hands out
+ * of range stay blank.
  */
 
 export type StatsMode = { kind: "equity"; player: "OOP" | "IP" } | { kind: "ev" } | { kind: "eqr" };
@@ -82,6 +83,7 @@ function handValues(sel: Selection, dead: Set<string>): Map<string, HandValue> {
       const cv = comboValue(sel, c);
       if (cv != null) stripes.push({ value: cv, reach: r });
     }
+    stripes.sort((a, b) => b.value - a.value);
     if (w > 0 && d > 0) out.set(hand, { value: n / d, weight: w, stripes });
   }
   return out;
@@ -258,8 +260,8 @@ export function StatsGrid({
               ].join(" ")}
               style={c ? { background: stripesBackground(c.stripes, scale) } : undefined}
             >
-              <span className="text-[8px] font-semibold sm:text-[9px]">{hand}</span>
-              {c && <span className="mt-px text-[8px] font-medium tabular-nums sm:text-[10px]">{cellText(mode, c.value)}</span>}
+              <span className="text-[9px] font-semibold sm:text-[11px]">{hand}</span>
+              {c && <span className="mt-0.5 text-[9px] font-medium tabular-nums sm:text-[13px]">{cellText(mode, c.value)}</span>}
             </div>
           );
         })}
@@ -346,7 +348,15 @@ export function StatsDetail({
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const { sel, scale } = useStatsView(stats, mode, potBb, dead);
-  const combos = hovered ? handCombos(hovered).filter((c) => !comboBlocked(c, dead) && (sel?.range[c] ?? 0) > 0) : [];
+  // Best to worst, combos without a value last.
+  const combos =
+    hovered && sel
+      ? handCombos(hovered)
+          .filter((c) => !comboBlocked(c, dead) && (sel.range[c] ?? 0) > 0)
+          .map((c) => ({ c, v: comboValue(sel, c) }))
+          .sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity))
+          .map((x) => x.c)
+      : [];
   return (
     <div>
       <StatsGrid stats={stats} mode={mode} dead={dead} potBb={potBb} hovered={hovered} onHoverHand={setHovered} />

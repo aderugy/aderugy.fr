@@ -106,7 +106,7 @@ export function StrategyGrid({
             onPointerEnter={onHoverHand ? () => onHoverHand(hand) : undefined}
             className={[
               "relative aspect-square overflow-hidden",
-              mini ? "" : "rounded-sm border text-[9px] font-semibold",
+              mini ? "" : "rounded-sm border text-[10px] font-semibold sm:text-[13px]",
               mini ? "" : hovered === hand ? "border-accent ring-1 ring-accent" : "border-line",
               blocked ? "opacity-25" : "",
             ].join(" ")}

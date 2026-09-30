@@ -227,7 +227,7 @@ export function RunoutReportView({
       {/* The grid: suits × ranks, like Pio's report */}
       <div className="overflow-x-auto">
         <div
-          className="grid min-w-[330px] select-none gap-px rounded-md border border-line bg-line text-[10px] tabular-nums sm:text-xs"
+          className="grid min-w-[330px] select-none gap-px rounded-md border border-line bg-line text-xs tabular-nums sm:text-sm"
           style={{ gridTemplateColumns: `minmax(1.8rem, 3rem) repeat(${REPORT_RANKS.length}, minmax(0, 1fr))` }}
           onPointerLeave={() => setHovered(null)}
         >
@@ -239,7 +239,7 @@ export function RunoutReportView({
             )}
           </div>
           {REPORT_RANKS.map((r) => (
-            <div key={r} className="flex items-center justify-center bg-background py-1.5 text-sm font-semibold sm:text-base">
+            <div key={r} className="flex items-center justify-center bg-background py-1.5 text-base font-semibold sm:text-lg">
               {r}
             </div>
           ))}
