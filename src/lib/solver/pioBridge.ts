@@ -55,13 +55,19 @@ export const pioBridge = {
   files: (dir = "") => call<{ dir: string; entries: PioFileEntry[] }>("/api/files", { dir }),
   tree: (file: string) => call<PioTree>("/api/tree", { file }),
   node: (file: string, id: string) => call<{ file: string; node: PioNode; children: PioNode[] }>("/api/node", { file, id }),
-  decision: (file: string, id: string) =>
-    call<PioDecision>("/api/decision", { file, id, stats: "1", villain: "1" }),
+  /**
+   * A decision with its stats. `resolve`: read it even when the save doesn't
+   * hold it (a river of a no_rivers save) — PioSOLVER re-solves it on the fly.
+   */
+  decision: (file: string, id: string, resolve = false) =>
+    call<PioDecision>("/api/decision", { file, id, stats: "1", villain: "1", resolve: resolve ? "1" : undefined }),
   /**
    * Every card of a split node summed up (loads the whole save once: a few
    * seconds). With `after`, the same line below every card instead (e.g. "c").
+   * `resolve`: cards the save doesn't hold are re-solved on the fly (~1 s each).
    */
-  runouts: (file: string, id: string, after?: string) => call<PioRunouts>("/api/runouts", { file, id, after: after || undefined }),
+  runouts: (file: string, id: string, after?: string, resolve = false) =>
+    call<PioRunouts>("/api/runouts", { file, id, after: after || undefined, resolve: resolve ? "1" : undefined }),
   /** The 1326 combos in solver order; fetched once per page. */
   handOrder: () => {
     handOrder ??= call<{ hands: string[] }>("/api/hand-order")

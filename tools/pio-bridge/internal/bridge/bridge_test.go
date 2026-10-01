@@ -224,6 +224,39 @@ func TestRunouts(t *testing.T) {
 	}
 }
 
+// Rivers of a no_rivers save: missing by default, re-solved with resolve=1.
+func TestRunoutsResolveRivers(t *testing.T) {
+	a := newTestApp(t, "REPLAY_SYNTH", "1")
+	split := "r:0:c:c:As:c:c"
+	rec, body := get(t, a, "/api/runouts?"+q(saveRel, split))
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	missing := 0
+	for _, x := range body["cards"].([]any) {
+		if x.(map[string]any)["node"].(map[string]any)["solved"] == false {
+			missing++
+		}
+	}
+	if missing != 48 {
+		t.Fatalf("only %d rivers reported missing without resolve", missing)
+	}
+	rec, body = get(t, a, "/api/runouts?"+q(saveRel, split, "resolve", "1"))
+	if rec.Code != 200 {
+		t.Fatalf("resolve: status %d: %s", rec.Code, rec.Body.String())
+	}
+	cards := body["cards"].([]any)
+	if len(cards) != 48 {
+		t.Fatalf("%d rivers", len(cards))
+	}
+	for _, x := range cards {
+		c := x.(map[string]any)
+		if c["equity"].(map[string]any)["OOP"] == nil || c["node"].(map[string]any)["solved"] != true {
+			t.Fatalf("river %v not read with resolve: %v", c["card"], c["notes"])
+		}
+	}
+}
+
 func TestDecisionLabelsAndPots(t *testing.T) {
 	a := newTestApp(t)
 	rec, body := get(t, a, "/api/node?"+q(saveRel, "r:0:b45:c:2c"))

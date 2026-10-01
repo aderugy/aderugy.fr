@@ -83,6 +83,9 @@ def node_block(nid, synth_ok=True):
         if len(other) != len(toks): continue
         if not all(a == b or (is_card(a) and is_card(b)) for a, b in zip(toks, other)): continue
         swaps = {b: a for a, b in zip(toks, other) if a != b}
+        # The node as first shown (before the solver re-solved it, if it did).
+        first = answers.get("show_node " + oid)
+        if first: blk = [l for l in first if l.strip()]
         out = [nid]
         for l in blk[1:]:
             if l.startswith(oid): l = nid + l[len(oid):]

@@ -395,12 +395,12 @@ func (s *Session) Node(id string) (NodeInfo, error) {
 	return ni, s.checkSolved(&ni)
 }
 
-// checkSolved: a decision without the PIO_ALG flag is only "not in the save"
-// when the card above it was dealt at an UNSOLVED split (a river of a
-// no_rivers save). Saves solved another way (node-locked re-solves, a street
-// solved on its own…) can lack the flag and are read normally.
+// checkSolved: a decision is "not in the save" exactly when the card above
+// it was dealt at an UNSOLVED split (the rivers of a no_rivers save). Its own
+// flags don't say: saves solved another way carry PIO_CFR instead of PIO_ALG,
+// and show_children lists unsolved rivers with PIO_ALG anyway.
 func (s *Session) checkSolved(ni *NodeInfo) error {
-	if ni.Player == "" || ni.Solved {
+	if ni.Player == "" {
 		return nil
 	}
 	toks := strings.Split(ni.ID, ":")

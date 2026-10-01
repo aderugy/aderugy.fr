@@ -577,6 +577,10 @@ func (a *App) runouts(w http.ResponseWriter, r *http.Request) {
 	// after: the same line below every card (e.g. "c" = the first player
 	// checked), to see a later node of the street on every runout.
 	after := r.URL.Query().Get("after")
+	// resolve=1: cards the save doesn't hold (rivers of a no_rivers save) are
+	// read anyway — the solver re-solves each one on the fly (about 1 s each),
+	// as PioViewer does.
+	allowResolve := r.URL.Query().Get("resolve") == "1"
 	if after != "" && !ValidNodeID("r:"+after) {
 		writeError(w, &apiError{http.StatusBadRequest, "bad_node_id", "Invalid line after the card: " + after})
 		return
@@ -600,12 +604,21 @@ func (a *App) runouts(w http.ResponseWriter, r *http.Request) {
 		resp = runoutsResp{File: rel, Node: n, Cards: []runoutCard{}}
 		for _, k := range kids {
 			c := runoutCard{Card: k.Last, Node: k, Children: []NodeInfo{}, Equity: map[string]*float64{}, EV: map[string]*float64{}, Notes: []string{}}
+			resolved := !k.Solved && allowResolve
+			if resolved {
+				k.Solved = true
+				c.Node = k
+				c.Notes = append(c.Notes, "re-solved on the fly (not in the save)")
+			}
 			if after != "" && k.Solved {
 				t, err := s.Node(k.ID + ":" + after)
 				switch {
 				case err == nil:
 					dealt := k
 					c.Dealt = &dealt
+					if resolved {
+						t.Solved = true
+					}
 					k, c.Node = t, t
 				case isSolverErr(err):
 					c.Notes = append(c.Notes, "no such line on this card: "+err.Error())

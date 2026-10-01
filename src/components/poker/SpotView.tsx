@@ -140,6 +140,21 @@ export function SpotView({
     setupRef.current = setup;
   }, [setup]);
 
+  // Saves whose missing rivers PioSOLVER may re-solve on the fly (asked once
+  // per save and page).
+  const resolveOkRef = useRef(new Set<string>());
+
+  /** May PioSOLVER re-solve on the fly what this save doesn't hold? Asks once per save. */
+  function allowResolve(file: string, what: string): boolean {
+    if (resolveOkRef.current.has(file)) return true;
+    const ok = window.confirm(
+      `${file.split("/").pop()} doesn't hold ${what} (a save without rivers).\n\n` +
+        "PioSOLVER can solve each river on the fly, like PioViewer does (about a second per river). Do it?",
+    );
+    if (ok) resolveOkRef.current.add(file);
+    return ok;
+  }
+
   const fail = useCallback((e: unknown) => {
     const text = e instanceof PioBridgeError || e instanceof Error ? e.message : String(e);
     setNotice({ tone: "error", text });
@@ -650,7 +665,16 @@ export function SpotView({
       if (!ns) return { ok: false, error: "Set who plays first (Start → Setup)." };
       if (ns.error) return { ok: false, error: `Fix the line first: ${ns.error}` };
       const { file, pioId } = opts.at ?? (await resolvePio(node.id));
-      const [d, handOrder, tree] = await Promise.all([pioBridge.decision(file, pioId), pioBridge.handOrder(), pioTree(file)]);
+      const readDecision = async () => {
+        try {
+          return await pioBridge.decision(file, pioId, resolveOkRef.current.has(file));
+        } catch (e) {
+          if (!(e instanceof PioBridgeError && e.code === "not_in_save") || !allowResolve(file, "this river")) throw e;
+          setNotice({ tone: "busy", text: "PioSOLVER is solving this river…" });
+          return pioBridge.decision(file, pioId, true);
+        }
+      };
+      const [d, handOrder, tree] = await Promise.all([readDecision(), pioBridge.handOrder(), pioTree(file)]);
       const ss = streetStartId(pioId);
       const start = ss === pioId ? d.node.pot : (await pioNode(file, ss)).node.pot;
       const st = seats();
@@ -665,6 +689,7 @@ export function SpotView({
       const stats = pioStats(d, handOrder, { seats: st, importedAt });
       const snap = pioSnapshot(d.node, tree.effectiveStack);
       const warnings = [...(stats?.notes ?? [])];
+      if (!d.node.solved) warnings.push("Not in the save: PioSOLVER re-solved this river on the fly.");
       const engPot = totalPot(ns.state);
       const engStack = effectiveStack(ns.state);
       if (Math.abs(engPot - snap.potBb) > 0.06 || Math.abs(engStack - snap.stackBb) > 0.06) {
@@ -714,7 +739,9 @@ export function SpotView({
       const target = pioId === "r" ? "r:0" : pioId;
       const { node: pn, children } = await pioNode(file, target);
       if (pn.player) {
-        if (!pn.solved) return setNotice({ tone: "warn", text: "This node isn't in the save (a river of a no-rivers save)." });
+        if (!pn.solved && !allowResolve(file, "this river")) {
+          return setNotice({ tone: "warn", text: "This node isn't in the save (a river of a no-rivers save)." });
+        }
         const dec = await addChild(leafId, "strategy", { data: { actions: [], pio: { file, id: target } } as NodeData });
         if (!dec) return;
         setFocus(dec.id);
@@ -724,7 +751,7 @@ export function SpotView({
       }
       if (pn.type.startsWith("SPLIT")) {
         const cards = children.map((c) => c.last ?? "").filter(isCardToken);
-        if (cards.length === 0 || children.every((c) => !c.solved)) {
+        if (cards.length === 0 || (children.every((c) => !c.solved) && !allowResolve(file, "the rivers"))) {
           return setNotice({ tone: "warn", text: "The next street isn't in this save (no_rivers save)." });
         }
         const ns = stateAt(leafId);
@@ -773,6 +800,20 @@ export function SpotView({
     };
   }
 
+  /** Every card below a split from the bridge; cards the save doesn't hold are re-solved on the fly once allowed. */
+  async function readRunouts(file: string, split: string, after?: string): Promise<PioRunouts> {
+    const r = await pioBridge.runouts(file, split, after, resolveOkRef.current.has(file));
+    const missing = r.cards.filter((c) => c.notes.includes("not in the save")).length;
+    if (missing === 0 || !allowResolve(file, missing === r.cards.length ? "these rivers" : `${missing} of these rivers`)) return r;
+    setNotice({ tone: "busy", text: `PioSOLVER is solving ${missing} rivers on the fly (about ${missing} s)…` });
+    return pioBridge.runouts(file, split, after, true);
+  }
+
+  function resolvedNote(r: PioRunouts): string {
+    const n = r.cards.filter((c) => c.notes.some((x) => x.startsWith("re-solved"))).length;
+    return n ? ` (${n} re-solved on the fly)` : "";
+  }
+
   /** The report on every card dealt below a node (turn or river), saved on the node. */
   async function loadRunouts(id: string) {
     const leaf = nodesRef.current[id];
@@ -781,13 +822,13 @@ export function SpotView({
       setNotice({ tone: "busy", text: "Reading every runout from Pio (the whole save is loaded once: a few seconds)…" });
       const { file, pioId } = await resolvePio(id);
       if (leaf.type === "action" && asPio(leaf)?.id !== pioId) persistData(id, { pio: { file, id: pioId } });
-      const [r, tree] = await Promise.all([pioBridge.runouts(file, pioId), pioTree(file)]);
+      const [r, tree] = await Promise.all([readRunouts(file, pioId), pioTree(file)]);
       const report = runoutReport(r, tree.effectiveStack, new Date().toISOString());
       if (report.rows.length === 0) return setNotice(noRunouts(file, r));
       persistData(id, { runouts: report });
       setNotice({
         tone: report.missing.length ? "warn" : "ok",
-        text: `${report.rows.length} runouts read from Pio · ${(r.ms / 1000).toFixed(1)} s`,
+        text: `${report.rows.length} runouts read from Pio${resolvedNote(r)} · ${(r.ms / 1000).toFixed(1)} s`,
         detail: report.missing.length ? [`Not in the save: ${report.missing.join(" ")}`] : [],
       });
     } catch (e) {
@@ -849,13 +890,13 @@ export function SpotView({
       if (at < 0) throw new Error("This decision isn't below the card in the solver's tree.");
       const split = toks.slice(0, at).join(":");
       const after = toks.slice(at + 1).join(":");
-      const [r, tree] = await Promise.all([pioBridge.runouts(file, split, after), pioTree(file)]);
+      const [r, tree] = await Promise.all([readRunouts(file, split, after), pioTree(file)]);
       const report = runoutReport(r, tree.effectiveStack, new Date().toISOString(), after);
       if (report.rows.length === 0) return setNotice(noRunouts(file, r));
       persistData(id, { runouts: report });
       setNotice({
         tone: report.missing.length ? "warn" : "ok",
-        text: `This line on ${report.rows.length} runouts · ${(r.ms / 1000).toFixed(1)} s`,
+        text: `This line on ${report.rows.length} runouts${resolvedNote(r)} · ${(r.ms / 1000).toFixed(1)} s`,
         detail: report.missing.length ? [`Not on these cards: ${report.missing.join(" ")}`] : [],
       });
     } catch (e) {
