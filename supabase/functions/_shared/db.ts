@@ -9,10 +9,35 @@ export function adminClient(): SupabaseClient {
   );
 }
 
-/** Resolves the caller from their Supabase JWT. Returns null when absent or invalid. */
+/**
+ * The `client_id` claim of a bearer JWT, or null when there is none.
+ *
+ * Supabase's OAuth 2.1 server issues ordinary user JWTs to third-party clients
+ * (the Claude connector) and marks them with `client_id`. Only decoded here —
+ * callers verify the token first.
+ */
+export function oauthClientOf(authorization: string): string | null {
+  const token = authorization.replace(/^Bearer\s+/i, "");
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, "=")));
+    return typeof claims.client_id === "string" && claims.client_id ? claims.client_id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves the caller from their Supabase JWT. Returns null when absent or
+ * invalid — and for tokens issued to an OAuth client: the Google integration
+ * belongs to the owner's own sessions, never to a connected app.
+ */
 export async function callerFromRequest(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization) return null;
+  if (oauthClientOf(authorization)) return null;
 
   const client = createClient(
     Deno.env.get("SUPABASE_URL")!,

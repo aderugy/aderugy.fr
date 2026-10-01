@@ -2,6 +2,10 @@
 
 import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
+import { insertTasks, patchTask, removeTask } from "@/server/agenda/tasks";
+
+// Thin wrappers: the rules live in server/agenda/tasks.ts, shared with the
+// Claude connector, so the two can never disagree about what a valid task is.
 
 export async function createTask(input: {
   categoryId: string;
@@ -14,18 +18,8 @@ export async function createTask(input: {
   try {
     const { supabase, user } = await requireUser();
     // The category is the label, so there is nothing to show without it.
-    if (!input.categoryId) return { ok: false, error: "Pick a category" };
-
-    const { error } = await supabase.from("tasks").insert({
-      user_id: user.id,
-      category_id: input.categoryId,
-      description: input.description?.trim() || null,
-      estimated_minutes: input.estimatedMinutes,
-      priority: input.priority,
-      deadline: input.deadline,
-      splittable: input.splittable ?? true,
-    });
-    if (error) throw error;
+    const result = await insertTasks(supabase, user.id, [input]);
+    if (!result.ok) return result;
 
     refresh();
     return { ok: true };
@@ -45,31 +39,9 @@ export async function updateTask(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    const patch: Record<string, unknown> = {};
-
-    if (input.categoryId !== undefined) {
-      if (!input.categoryId) return { ok: false, error: "Pick a category" };
-      patch.category_id = input.categoryId;
-    }
-    if (input.description !== undefined) {
-      patch.description = input.description?.trim() || null;
-    }
-    if (input.estimatedMinutes !== undefined) {
-      patch.estimated_minutes = input.estimatedMinutes;
-    }
-    if (input.priority !== undefined) patch.priority = input.priority;
-    if (input.deadline !== undefined) patch.deadline = input.deadline;
-    if (input.status !== undefined) {
-      patch.status = input.status;
-      patch.completed_at = input.status === "done" ? new Date().toISOString() : null;
-    }
-
-    const { error } = await supabase
-      .from("tasks")
-      .update(patch)
-      .eq("id", input.id)
-      .eq("user_id", user.id);
-    if (error) throw error;
+    const { id, ...patch } = input;
+    const result = await patchTask(supabase, user.id, id, patch);
+    if (!result.ok) return result;
 
     refresh();
     return { ok: true };
@@ -81,12 +53,8 @@ export async function updateTask(input: {
 export async function deleteTask(id: string): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    const { error } = await supabase
-      .from("tasks")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
+    const result = await removeTask(supabase, user.id, id);
+    if (!result.ok) return result;
 
     refresh();
     return { ok: true };

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { GoogleConnection } from "@/components/agenda/GoogleConnection";
+import { ConnectedApps, type ConnectedApp } from "@/components/agenda/ConnectedApps";
 import type {
   CalendarSource,
   Category,
@@ -23,7 +24,7 @@ export default async function SettingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(LOGIN_PATH);
 
-  const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes] = await Promise.all([
+  const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes, grantsRes] = await Promise.all([
     supabase
       .from("google_accounts")
       .select(
@@ -53,7 +54,19 @@ export default async function SettingsPage({
       .select("pending, failed, synced, last_block_error")
       .eq("user_id", user.id)
       .maybeSingle(),
+    // Errors when the OAuth server is not enabled on the project — the section
+    // then says so rather than claiming nothing is connected.
+    supabase.auth.oauth.listGrants().catch((e: unknown) => ({
+      data: null,
+      error: e instanceof Error ? e : new Error("Could not list connected apps"),
+    })),
   ]);
+
+  const apps: ConnectedApp[] = (grantsRes.data ?? []).map((g) => ({
+    clientId: g.client.id,
+    name: g.client.name || "Unnamed app",
+    grantedAt: g.granted_at,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-2xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
@@ -66,6 +79,15 @@ export default async function SettingsPage({
         categories={(categoriesRes.data ?? []) as Category[]}
         pushStatus={(pushRes.data ?? null) as PushStatus | null}
         notice={{ error: typeof params.error === "string" ? params.error : undefined }}
+      />
+
+      <ConnectedApps
+        apps={apps}
+        unavailable={
+          grantsRes.error
+            ? `Connected apps are unavailable: ${grantsRes.error.message}`
+            : null
+        }
       />
     </main>
   );

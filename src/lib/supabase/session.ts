@@ -21,8 +21,11 @@ export function safeNext(value: string | null | undefined): string {
   if (value.startsWith("//")) return HOME_PATH;
   if (value === LOGIN_PATH || value.startsWith(`${LOGIN_PATH}?`)) return HOME_PATH;
   if (value.startsWith(`${LOGIN_PATH}/`)) return HOME_PATH;
+  // The query string rides along: the OAuth consent page cannot work without
+  // its `authorization_id`, and a deep link to a given week keeps its `?week`.
   const allowed = ALLOWED_ROOTS.some(
-    (root) => value === root || value.startsWith(`${root}/`),
+    (root) =>
+      value === root || value.startsWith(`${root}/`) || value.startsWith(`${root}?`),
   );
   return allowed ? value : HOME_PATH;
 }
@@ -54,7 +57,7 @@ export async function updateSession(request: NextRequest) {
   // renders, where it explains what is missing.
   if (!url || !key) {
     if (onLoginPage) return response;
-    return redirectKeepingCookies(request, response, LOGIN_PATH, { next: path });
+    return redirectKeepingCookies(request, response, LOGIN_PATH, { next: path + request.nextUrl.search });
   }
 
   const supabase = createServerClient(url, key, {
@@ -79,7 +82,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user && !onLoginPage) {
-    return redirectKeepingCookies(request, response, LOGIN_PATH, { next: path });
+    return redirectKeepingCookies(request, response, LOGIN_PATH, { next: path + request.nextUrl.search });
   }
 
   // Already signed in: never show the form again on this browser.
@@ -108,9 +111,13 @@ function redirectKeepingCookies(
   pathname: string,
   params?: Record<string, string>,
 ) {
+  // `pathname` may carry a query (a `next` such as
+  // `/agenda/oauth/consent?authorization_id=…`). Assigning it to
+  // `target.pathname` would percent-encode the `?` into the path.
+  const destination = new URL(pathname, request.nextUrl.origin);
   const target = request.nextUrl.clone();
-  target.pathname = pathname;
-  target.search = "";
+  target.pathname = destination.pathname;
+  target.search = destination.search;
   for (const [k, v] of Object.entries(params ?? {})) {
     target.searchParams.set(k, v);
   }
