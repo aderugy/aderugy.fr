@@ -37,8 +37,9 @@ export const SERVER_INSTRUCTIONS = `Arthur's weekly planner backlog (aderugy.fr/
 How the data works:
 - A task has exactly one category from a user-defined tree, written as a path like "poker > grind". The category is the task's label; the description is what distinguishes two tasks in the same category, so write it as a short, specific phrase.
 - Call list_categories before creating or recategorising tasks. Categories cannot be created or renamed from here — if none fits, say so and suggest one for Arthur to add.
+- A task can also carry notes: an extended description in Markdown (context, links, checklists). Keep the description short and put detail in notes.
 - Priority: 1 urgent, 2 high, 3 normal (default), 4 someday. Estimates are in minutes (5–1440). Deadlines are dates (YYYY-MM-DD).
-- Status: backlog (waiting), scheduled (placed on the week grid — set by the planner, not by you), done, dropped.
+- Status: backlog (waiting), scheduled (placed on the week grid — set by the planner, not by you), done, dropped. A task whose block was skipped is back in the backlog.
 - A task placed on the grid cannot be deleted from here; mark it dropped instead.`;
 
 /* ------------------------------------------------------------- shapes */
@@ -69,10 +70,16 @@ const date = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
   .describe("A date, YYYY-MM-DD.");
 
+const notesIn = z
+  .string()
+  .max(TASK_LIMITS.maxNotes)
+  .describe("Extended description in Markdown: context, links, checklists.");
+
 const taskOut = z.object({
   id: z.string(),
   category: z.string(),
   description: z.string().nullable(),
+  notes: z.string().nullable(),
   estimated_minutes: z.number(),
   priority: z.number(),
   priority_label: z.string(),
@@ -95,6 +102,7 @@ function toOut(
     id: task.id,
     category: categoryPath ?? paths.get(task.category_id) ?? "(unknown category)",
     description: task.description,
+    notes: task.notes,
     estimated_minutes: task.estimated_minutes,
     priority: task.priority,
     priority_label: PRIORITY_LABELS[task.priority] ?? String(task.priority),
@@ -115,7 +123,13 @@ function line(t: TaskOut): string {
   if (t.deadline) bits.push(`due ${t.deadline}`);
   if (t.status !== "backlog") bits.push(t.status);
   if (t.placed_minutes > 0) bits.push(`${t.placed_minutes} min on the grid`);
-  return `- ${bits.join(" · ")} (id ${t.id})`;
+  const head = `- ${bits.join(" · ")} (id ${t.id})`;
+  if (!t.notes) return head;
+  // Notes travel with the task, indented under it and capped so a long one
+  // does not drown the list; the structured result always has them in full.
+  const max = 600;
+  const body = t.notes.length > max ? `${t.notes.slice(0, max)}… (truncated)` : t.notes;
+  return `${head}\n${body.split("\n").map((l) => `    ${l}`).join("\n")}`;
 }
 
 function failure(message: string): CallToolResult {
@@ -279,6 +293,7 @@ export function registerBacklogTools(server: McpServer) {
                 .max(TASK_LIMITS.maxDescription)
                 .optional()
                 .describe("What this task specifically is — short and concrete."),
+              notes: notesIn.optional(),
               estimated_minutes: minutes,
               priority: priority.optional().describe("Default 3 (normal)."),
               deadline: date.optional(),
@@ -317,6 +332,7 @@ export function registerBacklogTools(server: McpServer) {
         tasks.map((t, i) => ({
           categoryId: resolved[i].categoryId,
           description: t.description ?? null,
+          notes: t.notes ?? null,
           estimatedMinutes: t.estimated_minutes,
           priority: t.priority ?? 3,
           deadline: resolved[i].deadline,
@@ -344,11 +360,12 @@ export function registerBacklogTools(server: McpServer) {
     {
       title: "Edit a task",
       description:
-        "Change a backlog task's category, description, estimate, priority or deadline. Only the fields given change; pass null to clear the description or the deadline.",
+        "Change a backlog task's category, description, notes, estimate, priority or deadline. Only the fields given change; pass null to clear the description, the notes or the deadline. Notes are replaced as a whole.",
       inputSchema: z.object({
         id: taskId,
         category: categoryRef.optional(),
         description: z.string().max(TASK_LIMITS.maxDescription).nullable().optional(),
+        notes: notesIn.nullable().optional(),
         estimated_minutes: minutes.optional(),
         priority: priority.optional(),
         deadline: date.nullable().optional(),
@@ -383,6 +400,7 @@ export function registerBacklogTools(server: McpServer) {
       const result = await patchTask(db, userId, input.id, {
         categoryId,
         description: input.description,
+        notes: input.notes,
         estimatedMinutes: input.estimated_minutes,
         priority: input.priority,
         deadline,

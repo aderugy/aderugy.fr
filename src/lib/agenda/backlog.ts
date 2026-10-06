@@ -254,4 +254,5 @@ export const TASK_LIMITS = {
   minMinutes: 5,
   maxMinutes: 1440,
   maxDescription: 2000,
+  maxNotes: 20000,
 } as const;

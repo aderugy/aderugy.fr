@@ -33,10 +33,39 @@ export async function ensureWeek(
   return data as Week;
 }
 
+/** Live placements per task: links to blocks that are not skipped. */
+export async function livePlacements(
+  supabase: SupabaseClient,
+  taskIds: string[],
+): Promise<Map<string, { count: number; minutes: number; total: number }>> {
+  const ids = [...new Set(taskIds)].filter(Boolean);
+  const out = new Map<string, { count: number; minutes: number; total: number }>();
+  if (ids.length === 0) return out;
+
+  const { data, error } = await supabase.rpc("task_placements", { p_task_ids: ids });
+  if (error) throw error;
+  for (const row of (data ?? []) as {
+    task_id: string;
+    live_count: number;
+    live_minutes: number;
+    total_count: number;
+  }[]) {
+    out.set(row.task_id, {
+      count: row.live_count,
+      minutes: row.live_minutes,
+      total: row.total_count,
+    });
+  }
+  return out;
+}
+
 /**
- * A task counts as scheduled when it is attached to at least one scheduled
- * block. Deriving it after every placement keeps the backlog rail honest
- * without a trigger. `done` and `dropped` are user intent and stay untouched.
+ * A task counts as scheduled when it sits in at least one block that is not
+ * skipped. Skipping a block means the work did not happen, so its tasks go
+ * back to the backlog — the link stays, so the skipped block still shows what
+ * was planned. Deriving it after every placement or status change keeps the
+ * backlog rail honest without a trigger. `done` and `dropped` are user intent
+ * and stay untouched; ad-hoc tasks belong to their block and are left alone.
  */
 export async function syncTaskStatus(
   supabase: SupabaseClient,
@@ -46,30 +75,28 @@ export async function syncTaskStatus(
   const ids = [...new Set(taskIds)].filter(Boolean);
   if (ids.length === 0) return;
 
-  const { data: links } = await supabase
-    .from("scheduled_block_tasks")
-    .select("task_id")
-    .eq("user_id", userId)
-    .in("task_id", ids);
-
-  const scheduled = new Set((links ?? []).map((l) => l.task_id as string));
-  const nowScheduled = ids.filter((id) => scheduled.has(id));
-  const nowFree = ids.filter((id) => !scheduled.has(id));
+  const placements = await livePlacements(supabase, ids);
+  const nowScheduled = ids.filter((id) => (placements.get(id)?.count ?? 0) > 0);
+  const nowFree = ids.filter((id) => (placements.get(id)?.count ?? 0) === 0);
 
   if (nowScheduled.length) {
-    await supabase
+    const { error } = await supabase
       .from("tasks")
       .update({ status: "scheduled" })
       .eq("user_id", userId)
       .eq("status", "backlog")
+      .eq("ad_hoc", false)
       .in("id", nowScheduled);
+    if (error) throw error;
   }
   if (nowFree.length) {
-    await supabase
+    const { error } = await supabase
       .from("tasks")
       .update({ status: "backlog" })
       .eq("user_id", userId)
       .eq("status", "scheduled")
+      .eq("ad_hoc", false)
       .in("id", nowFree);
+    if (error) throw error;
   }
 }

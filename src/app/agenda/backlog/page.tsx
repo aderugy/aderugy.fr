@@ -26,7 +26,7 @@ export default async function BacklogPage() {
     supabase
       .from("tasks")
       .select(
-        "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at",
+        "id, category_id, description, notes, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at",
       )
       .eq("user_id", user.id)
       .in("status", ["backlog", "scheduled"])

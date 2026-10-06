@@ -311,6 +311,8 @@ export function WeekPlanner({
                 tasks: {
                   id: payload.id,
                   description: payload.description,
+                  // Filled in by the refresh; the grid never shows notes.
+                  notes: null,
                   category_id: payload.categoryId,
                   estimated_minutes: payload.minutes,
                   ad_hoc: false,

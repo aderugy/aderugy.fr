@@ -10,6 +10,7 @@ import { insertTasks, patchTask, removeTask } from "@/server/agenda/tasks";
 export async function createTask(input: {
   categoryId: string;
   description: string | null;
+  notes?: string | null;
   estimatedMinutes: number;
   priority: number;
   deadline: string | null;
@@ -32,6 +33,8 @@ export async function updateTask(input: {
   id: string;
   categoryId?: string;
   description?: string | null;
+  /** Extended description, Markdown. */
+  notes?: string | null;
   estimatedMinutes?: number;
   priority?: number;
   deadline?: string | null;

@@ -16,6 +16,11 @@ const tools = [
     name: "Maths",
     description: "Probability & statistics path: a DAG of concepts, courses, exercises, spaced repetition.",
   },
+  {
+    href: "/jobs",
+    name: "Jobs",
+    description: "The internship search: applications, companies, interviews on the agenda, offers kept.",
+  },
 ];
 
 export default function Home() {

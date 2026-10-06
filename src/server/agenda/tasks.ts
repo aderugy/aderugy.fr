@@ -8,6 +8,7 @@ import {
   type CategoryPathRow,
 } from "@/lib/agenda/backlog";
 import type { TaskStatus } from "@/lib/types";
+import { livePlacements } from "@/server/weeks";
 
 /**
  * Backlog persistence shared by the UI's server actions and the Claude
@@ -26,16 +27,21 @@ export type Result<T = undefined> =
 export type NewTask = {
   categoryId: string;
   description: string | null;
+  /** Extended description, Markdown. */
+  notes?: string | null;
   estimatedMinutes: number;
   priority: number;
   /** ISO timestamp, or null. */
   deadline: string | null;
   splittable?: boolean;
+  /** The /jobs application this task belongs to (prep, follow-up…). */
+  applicationId?: string | null;
 };
 
 export type TaskPatch = {
   categoryId?: string;
   description?: string | null;
+  notes?: string | null;
   estimatedMinutes?: number;
   priority?: number;
   deadline?: string | null;
@@ -43,12 +49,13 @@ export type TaskPatch = {
 };
 
 export const TASK_COLUMNS =
-  "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at";
+  "id, category_id, description, notes, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at";
 
 export type TaskRow = {
   id: string;
   category_id: string;
   description: string | null;
+  notes: string | null;
   estimated_minutes: number;
   priority: number;
   deadline: string | null;
@@ -77,6 +84,18 @@ function cleanDescription(d: string | null | undefined): string | null {
   return t ? t : null;
 }
 
+/** Notes keep their inner formatting; only surrounding blank space goes. */
+function cleanNotes(n: string | null | undefined): string | null {
+  const t = n?.replace(/^\s*\n/, "").trimEnd();
+  return t ? t : null;
+}
+
+function checkNotes(n: string | null): string | null {
+  return n && n.length > TASK_LIMITS.maxNotes
+    ? `Notes are limited to ${TASK_LIMITS.maxNotes} characters.`
+    : null;
+}
+
 function checkDescription(d: string | null): string | null {
   return d && d.length > TASK_LIMITS.maxDescription
     ? `Description is limited to ${TASK_LIMITS.maxDescription} characters.`
@@ -94,19 +113,24 @@ export async function insertTasks(
     const at = tasks.length > 1 ? `Task ${i + 1}: ` : "";
     if (!t.categoryId) return { ok: false, error: `${at}Pick a category` };
     const description = cleanDescription(t.description);
+    const notes = cleanNotes(t.notes);
     const problem =
       checkMinutes(t.estimatedMinutes) ??
       checkPriority(t.priority) ??
-      checkDescription(description);
+      checkDescription(description) ??
+      checkNotes(notes);
     if (problem) return { ok: false, error: at + problem };
     rows.push({
       user_id: userId,
       category_id: t.categoryId,
       description,
+      notes,
       estimated_minutes: t.estimatedMinutes,
       priority: t.priority,
       deadline: t.deadline,
       splittable: t.splittable ?? true,
+      // Only sent when set, so creating a task never depends on the column.
+      ...(t.applicationId ? { application_id: t.applicationId } : {}),
     });
   }
   if (rows.length === 0) return { ok: true, value: [] };
@@ -133,6 +157,12 @@ export async function patchTask(
     const problem = checkDescription(description);
     if (problem) return { ok: false, error: problem };
     patch.description = description;
+  }
+  if (input.notes !== undefined) {
+    const notes = cleanNotes(input.notes);
+    const problem = checkNotes(notes);
+    if (problem) return { ok: false, error: problem };
+    patch.notes = notes;
   }
   if (input.estimatedMinutes !== undefined) {
     const problem = checkMinutes(input.estimatedMinutes);
@@ -199,7 +229,7 @@ export async function loadCategoryPaths(
 /** A task as listed: the row, its category path, and how much of it is on the grid. */
 export type ListedTask = TaskRow & {
   category_path: string;
-  /** Minutes planned in scheduled blocks, across all weeks. */
+  /** Minutes planned in blocks that are not skipped, across all weeks. */
   placed_minutes: number;
 };
 
@@ -234,7 +264,7 @@ export async function listTasks(
 
   let q = db
     .from("tasks")
-    .select(`${TASK_COLUMNS}, scheduled_block_tasks(planned_minutes)`)
+    .select(TASK_COLUMNS)
     .eq("user_id", userId)
     // Tasks drawn inside a block belong to it, not to the backlog — the
     // backlog page hides them for the same reason.
@@ -258,22 +288,26 @@ export async function listTasks(
   if (error) throw error;
 
   const paths = new Map(categories.map((c) => [c.id, c.path]));
-  type Raw = TaskRow & { scheduled_block_tasks: { planned_minutes: number }[] | null };
-  const rows = ((data ?? []) as unknown as Raw[]).map(
-    ({ scheduled_block_tasks, ...task }): ListedTask => ({
+  const found = (data ?? []) as TaskRow[];
+  const placements = await livePlacements(
+    db,
+    found.map((t) => t.id),
+  );
+  const rows = found.map(
+    (task): ListedTask => ({
       ...task,
       category_path: paths.get(task.category_id) ?? "(unknown category)",
-      placed_minutes: (scheduled_block_tasks ?? []).reduce(
-        (sum, l) => sum + (l.planned_minutes ?? 0),
-        0,
-      ),
+      placed_minutes: placements.get(task.id)?.minutes ?? 0,
     }),
   );
   rows.sort(compareTasks);
   return { tasks: rows.slice(0, limit), truncated: rows.length > limit };
 }
 
-/** One task with its placement, or null when it does not exist for this user. */
+/**
+ * One task with its placement, or null when it does not exist for this user.
+ * `placements` counts live placements only — blocks that are not skipped.
+ */
 export async function getTask(
   db: SupabaseClient,
   userId: string,
@@ -281,19 +315,18 @@ export async function getTask(
 ): Promise<(TaskRow & { placed_minutes: number; placements: number }) | null> {
   const { data, error } = await db
     .from("tasks")
-    .select(`${TASK_COLUMNS}, scheduled_block_tasks(planned_minutes)`)
+    .select(TASK_COLUMNS)
     .eq("user_id", userId)
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  const { scheduled_block_tasks: links, ...task } = data as unknown as TaskRow & {
-    scheduled_block_tasks: { planned_minutes: number }[] | null;
-  };
+  const task = data as TaskRow;
+  const placement = (await livePlacements(db, [task.id])).get(task.id);
   return {
     ...task,
-    placements: (links ?? []).length,
-    placed_minutes: (links ?? []).reduce((s, l) => s + (l.planned_minutes ?? 0), 0),
+    placements: placement?.count ?? 0,
+    placed_minutes: placement?.minutes ?? 0,
   };
 }
 

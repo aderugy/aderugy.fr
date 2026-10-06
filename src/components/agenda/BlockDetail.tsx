@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { CategoryPicker } from "./CategoryPicker";
+import { Markdown } from "@/components/ui/Markdown";
+import { BlockInterview } from "@/components/jobs/BlockInterview";
 import { categoryIndex, DEFAULT_COLOR } from "@/lib/categories";
 import { blockChildren, blockMinutes, childMinutes } from "@/lib/blocks";
 import { fmtDuration, fmtTime, minutesOfDay } from "@/lib/time";
@@ -54,6 +56,8 @@ export function BlockDetail({ block, categories, onClose }: Props) {
         {fmtTime(minutesOfDay(start))}–{fmtTime(minutesOfDay(end))} (
         {fmtDuration(minutes)})
       </div>
+
+      {block.interview && <BlockInterview interview={block.interview} />}
 
       <label className="block">
         <span className="text-muted">Description</span>
@@ -113,43 +117,53 @@ export function BlockDetail({ block, categories, onClose }: Props) {
             {children.map((child) => (
               <li
                 key={child.id}
-                className="flex items-center gap-2 rounded border border-line bg-surface px-2 py-1"
+                className="rounded border border-line bg-surface px-2 py-1"
               >
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: child.color ?? DEFAULT_COLOR }}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{child.label}</span>
-                  {child.description && (
-                    <span className="block truncate text-[10px] text-muted">
-                      {child.description}
-                    </span>
-                  )}
-                </span>
-                <MinutesField
-                  value={child.minutes}
-                  onCommit={(value) =>
-                    commit(() =>
-                      updateBlockTask({
-                        scheduledBlockId: block.id,
-                        taskId: child.id,
-                        plannedMinutes: value,
-                      }),
-                    )
-                  }
-                />
-                <button
-                  onClick={() =>
-                    commit(() =>
-                      detachTask({ scheduledBlockId: block.id, taskId: child.id }),
-                    )
-                  }
-                  className="text-muted hover:text-red-500"
-                  title="Take it out of this block"
-                >
-                  ×
-                </button>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: child.color ?? DEFAULT_COLOR }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{child.label}</span>
+                    {child.description && (
+                      <span className="block truncate text-[10px] text-muted">
+                        {child.description}
+                      </span>
+                    )}
+                  </span>
+                  <MinutesField
+                    value={child.minutes}
+                    onCommit={(value) =>
+                      commit(() =>
+                        updateBlockTask({
+                          scheduledBlockId: block.id,
+                          taskId: child.id,
+                          plannedMinutes: value,
+                        }),
+                      )
+                    }
+                  />
+                  <button
+                    onClick={() =>
+                      commit(() =>
+                        detachTask({ scheduledBlockId: block.id, taskId: child.id }),
+                      )
+                    }
+                    className="text-muted hover:text-red-500"
+                    title="Take it out of this block"
+                  >
+                    ×
+                  </button>
+                </div>
+                {child.notes && (
+                  <details className="mt-1 border-t border-line pt-1">
+                    <summary className="cursor-pointer text-[10px] text-muted hover:text-foreground">
+                      Notes
+                    </summary>
+                    <Markdown source={child.notes} className="mt-1 text-xs" />
+                  </details>
+                )}
               </li>
             ))}
           </ul>

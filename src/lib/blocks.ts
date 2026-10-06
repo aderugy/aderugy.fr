@@ -34,6 +34,7 @@ export function blockChildren(
         label: category?.name ?? "Uncategorised",
         categoryId: link.tasks?.category_id ?? null,
         description: link.tasks?.description ?? null,
+        notes: link.tasks?.notes ?? null,
         color: category?.effectiveColor ?? DEFAULT_COLOR,
         minutes: link.planned_minutes,
         offsetMinutes: offset,

@@ -1,3 +1,5 @@
+import type { InterviewOnBlock } from "@/lib/jobs/types";
+
 export type Category = {
   id: string;
   parent_id: string | null;
@@ -24,6 +26,8 @@ export type Task = {
   /** Required: the category is the label. */
   category_id: string;
   description: string | null;
+  /** Extended description, Markdown. Shown in full in the backlog and the block panel. */
+  notes: string | null;
   estimated_minutes: number;
   priority: number;
   deadline: string | null;
@@ -68,7 +72,7 @@ export type ScheduledBlockTask = {
   position: number;
   tasks: Pick<
     Task,
-    "id" | "description" | "category_id" | "estimated_minutes" | "ad_hoc"
+    "id" | "description" | "notes" | "category_id" | "estimated_minutes" | "ad_hoc"
   > | null;
 };
 
@@ -89,6 +93,8 @@ export type ScheduledBlock = {
   status: ScheduledStatus;
   actual_minutes: number | null;
   scheduled_block_tasks: ScheduledBlockTask[];
+  /** Set when the block holds a /jobs interview (added by the week page, not stored here). */
+  interview?: InterviewOnBlock | null;
 };
 
 export type Week = {
@@ -209,6 +215,8 @@ export type GridChild = {
   /** That leaf's id, so the grid can tell whether it is currently hidden. */
   categoryId: string | null;
   description: string | null;
+  /** The task's Markdown notes, shown in the block panel. */
+  notes: string | null;
   color: string;
   minutes: number;
   /** Minutes from the top of the block: children stack in order. */

@@ -1,9 +1,11 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { RESOURCE_METADATA_PATH, verifyToken } from "@/server/mcp/auth";
 import { SERVER_INSTRUCTIONS, registerBacklogTools } from "@/server/mcp/backlog-tools";
+import { JOBS_INSTRUCTIONS, registerJobsTools } from "@/server/mcp/jobs-tools";
 
 /**
- * The Claude connector for the /agenda backlog — a remote MCP server over
+ * The Claude connector for the /agenda backlog and the /jobs internship search
+ * — one remote MCP server over
  * Streamable HTTP, stateless (mcp-handler v2: no Redis, no sessions).
  *
  * Unauthenticated requests get a 401 whose WWW-Authenticate header points at
@@ -13,10 +15,17 @@ import { SERVER_INSTRUCTIONS, registerBacklogTools } from "@/server/mcp/backlog-
 
 export const maxDuration = 30;
 
-const handler = createMcpHandler(registerBacklogTools, {
-  serverInfo: { name: "aderugy-agenda", version: "1.0.0" },
-  instructions: SERVER_INSTRUCTIONS,
-});
+const handler = createMcpHandler(
+  (server) => {
+    registerBacklogTools(server);
+    registerJobsTools(server);
+  },
+  {
+    // The name stays: it is what the connector was registered under.
+    serverInfo: { name: "aderugy-agenda", version: "1.1.0" },
+    instructions: `${SERVER_INSTRUCTIONS}\n\n${JOBS_INSTRUCTIONS}`,
+  },
+);
 
 const authHandler = withMcpAuth(handler, verifyToken, {
   required: true,

@@ -380,12 +380,24 @@ export async function updateScheduled(input: {
     if (input.status !== undefined) patch.status = input.status;
     if (input.actualMinutes !== undefined) patch.actual_minutes = input.actualMinutes;
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("scheduled_blocks")
       .update(patch)
       .eq("id", input.id)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .select("scheduled_block_tasks(task_id)")
+      .maybeSingle();
     if (error) throw error;
+
+    // Skipping a block (or un-skipping it) changes whether its tasks are still
+    // placed: a skipped block's tasks go back to the backlog rail.
+    if (input.status !== undefined && updated) {
+      await syncTaskStatus(
+        supabase,
+        user.id,
+        (updated.scheduled_block_tasks ?? []).map((l) => l.task_id as string),
+      );
+    }
 
     await queuePush(supabase);
     refresh();

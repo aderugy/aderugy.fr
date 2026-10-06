@@ -175,6 +175,11 @@ export function PlannerRail({
                     <span className="flex-1 leading-snug font-medium">
                       {category?.name ?? "Uncategorised"}
                     </span>
+                    {task.notes && (
+                      <span className="shrink-0 text-muted" title="Has notes">
+                        ¶
+                      </span>
+                    )}
                     <span className="shrink-0 tabular-nums text-muted">
                       {fmtDuration(task.estimated_minutes)}
                     </span>

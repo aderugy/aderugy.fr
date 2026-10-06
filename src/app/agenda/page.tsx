@@ -4,6 +4,7 @@ import { LOGIN_PATH } from "@/lib/supabase/session";
 import { ensureWeek } from "@/server/weeks";
 import { addDays, fromISODate, isoWeekStartInTimeZone, toISODate } from "@/lib/time";
 import { WeekPlanner } from "@/components/agenda/WeekPlanner";
+import type { InterviewOnBlock } from "@/lib/jobs/types";
 import type {
   Block,
   CalendarSource,
@@ -16,6 +17,43 @@ import type {
 } from "@/lib/types";
 
 export const metadata = { title: "Week — Agenda" };
+
+type InterviewRow = Omit<InterviewOnBlock, "company" | "role_title"> & {
+  scheduled_block_id: string;
+  applications: { role_title: string; companies: { name: string } | { name: string }[] | null } | null;
+};
+
+/**
+ * Mark the blocks that hold a /jobs interview. A separate query rather than an
+ * embed, and its failure ignored: the week must still render on a database
+ * where the jobs migration has not run yet.
+ */
+async function withInterviews(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  blocks: ScheduledBlock[],
+): Promise<ScheduledBlock[]> {
+  if (blocks.length === 0) return blocks;
+  const { data, error } = await supabase
+    .from("interviews")
+    .select("id, application_id, scheduled_block_id, kind, prep_notes, debrief_notes, applications(role_title, companies(name))")
+    .in(
+      "scheduled_block_id",
+      blocks.map((b) => b.id),
+    );
+  if (error || !data?.length) return blocks;
+
+  const byBlock = new Map<string, InterviewOnBlock>();
+  for (const row of data as unknown as InterviewRow[]) {
+    const { applications, scheduled_block_id, ...rest } = row;
+    const c = applications?.companies;
+    byBlock.set(scheduled_block_id, {
+      ...rest,
+      role_title: applications?.role_title ?? "",
+      company: (Array.isArray(c) ? c[0]?.name : c?.name) ?? "",
+    });
+  }
+  return blocks.map((b) => (byBlock.has(b.id) ? { ...b, interview: byBlock.get(b.id)! } : b));
+}
 
 const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "Europe/Paris";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -59,7 +97,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       supabase
         .from("tasks")
         .select(
-          "id, category_id, description, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at",
+          "id, category_id, description, notes, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at",
         )
         .eq("user_id", user.id)
         .in("status", ["backlog", "scheduled"])
@@ -81,7 +119,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       supabase
         .from("scheduled_blocks")
         .select(
-          "id, week_id, starts_at, ends_at, description, source_block_id, status, actual_minutes, scheduled_block_tasks(task_id, planned_minutes, position, tasks(id, description, category_id, estimated_minutes, ad_hoc))",
+          "id, week_id, starts_at, ends_at, description, source_block_id, status, actual_minutes, scheduled_block_tasks(task_id, planned_minutes, position, tasks(id, description, notes, category_id, estimated_minutes, ad_hoc))",
         )
         .eq("user_id", user.id)
         .gte("starts_at", rangeStart)
@@ -147,6 +185,8 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
     );
   }
 
+  const scheduled = await withInterviews(supabase, (scheduledRes.data ?? []) as unknown as ScheduledBlock[]);
+
   // The weakest link decides how fresh the picture is, so report the oldest.
   const syncTimes = ((syncRes.data ?? []) as { last_synced_at: string | null }[]).map(
     (row) => row.last_synced_at,
@@ -162,7 +202,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       categories={(categoriesRes.data ?? []) as Category[]}
       tasks={(tasksRes.data ?? []) as Task[]}
       blocks={(blocksRes.data ?? []) as unknown as Block[]}
-      scheduled={(scheduledRes.data ?? []) as unknown as ScheduledBlock[]}
+      scheduled={scheduled}
       objectives={(objectivesRes.data ?? []) as Objective[]}
       externalEvents={(externalRes.data ?? []) as ExternalEvent[]}
       calendarSources={(sourcesRes.data ?? []) as CalendarSource[]}
