@@ -2,7 +2,7 @@
 
 Personal website and utility tools. Next.js (App Router) · Tailwind · Supabase · Vercel.
 
-Four tools live here so far:
+Five tools live here so far:
 
 - **`/agenda`** — a weekly planner: typed tasks in a backlog, reusable blocks,
   and a week grid you assemble by hand.
@@ -13,6 +13,10 @@ Four tools live here so far:
 - **`/maths`** — a probability & statistics learning path (in French): a DAG
   of 192 concepts, courses in MDX with KaTeX, exercises, runnable Python
   (Pyodide) and FSRS spaced repetition. See [The maths path](#the-maths-path).
+- **`/poker/live`** — a live session tracker for the phone: buy-ins, rebuys,
+  breaks and cash-out; the table and who sits where, with a player database
+  (tags, timestamped notes); hands entered action by action and replayed; Claude
+  tools to review them. See [docs/live/design.md](docs/live/design.md).
 - **`/jobs`** — the internship search: applications with their companies,
   type-of-job tags, notes and a saved copy of each offer; interviews that go on
   the agenda; Claude tools to prepare them. See [docs/jobs/design.md](docs/jobs/design.md).
