@@ -486,7 +486,7 @@ function MoneyForm({
       className="space-y-3"
     >
       <div className="flex items-center gap-2">
-        <input autoFocus inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} className={INPUT} />
+        <input autoFocus inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={amount} onChange={(e) => setAmount(e.target.value)} className={INPUT} />
         <span className="text-sm text-muted">{currency}</span>
       </div>
       <ErrorLine error={error} />
@@ -524,7 +524,7 @@ function EndForm({
       <label className="block text-xs text-muted">
         Cash-out (0 if busted)
         <div className="mt-1 flex items-center gap-2">
-          <input autoFocus inputMode="decimal" value={cash} onChange={(e) => setCash(e.target.value)} className={INPUT} />
+          <input autoFocus inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={cash} onChange={(e) => setCash(e.target.value)} className={INPUT} />
           <span className="text-sm">{currency}</span>
         </div>
       </label>

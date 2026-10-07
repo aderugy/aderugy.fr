@@ -438,15 +438,15 @@ function SetupPanel(props: {
       <section className="grid grid-cols-3 gap-2">
         <label className="text-xs text-muted">
           SB
-          <input inputMode="decimal" value={props.sb} onChange={(e) => props.setSb(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={props.sb} onChange={(e) => props.setSb(e.target.value)} className={INPUT} />
         </label>
         <label className="text-xs text-muted">
           BB
-          <input inputMode="decimal" value={props.bb} onChange={(e) => props.setBb(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={props.bb} onChange={(e) => props.setBb(e.target.value)} className={INPUT} />
         </label>
         <label className="text-xs text-muted">
           Straddle
-          <input inputMode="decimal" value={props.straddle} placeholder="—" onChange={(e) => props.setStraddle(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={props.straddle} placeholder="—" onChange={(e) => props.setStraddle(e.target.value)} className={INPUT} />
         </label>
       </section>
 
@@ -460,7 +460,7 @@ function SetupPanel(props: {
               <label key={s} className="text-xs text-muted">
                 {s === props.hero ? "You" : (props.names.get(s)?.name ?? `Seat ${s}`)} · {s}
                 <input
-                  inputMode="decimal"
+                  inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
                   value={props.stacks[s] ?? ""}
                   placeholder="?"
                   onChange={(e) => props.setStacks((x) => ({ ...x, [s]: e.target.value }))}
@@ -599,7 +599,8 @@ function ActionPanel({
           disabled={!o.aggressive}
           onClick={() => {
             setSizing((s) => !s);
-            setAmount(fmtChips(o.minTo));
+            // Empty, not the minimum: typed digits must not land after a default.
+            setAmount("");
           }}
           className="h-12 rounded-lg border border-rose-500/50 bg-rose-500/10 text-sm font-medium capitalize disabled:opacity-40"
         >
@@ -627,8 +628,9 @@ function ActionPanel({
             <span className="text-sm text-muted">{o.aggressive === "bet" ? "Bet" : "Raise to"}</span>
             <input
               autoFocus
-              inputMode="decimal"
+              inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
               value={o.maxTo !== null && allIn ? fmtChips(o.maxTo) : amount}
+              placeholder={`min ${fmtChips(o.minTo)}`}
               onChange={(e) => {
                 setAmount(e.target.value);
                 setAllIn(false);
@@ -645,8 +647,13 @@ function ActionPanel({
             Min {fmtChips(o.minTo)}
             {o.maxTo !== null ? ` · max ${fmtChips(o.maxTo)}` : ""} — the total in front of them on this street.
           </p>
-          <button type="button" onClick={submitSize} className="w-full rounded-lg bg-rose-600 py-2.5 text-sm font-medium text-white">
-            {o.aggressive === "bet" ? "Bet" : "Raise to"} {o.maxTo !== null && allIn ? fmtChips(o.maxTo) : amount}
+          <button
+            type="button"
+            onClick={submitSize}
+            disabled={!(o.maxTo !== null && allIn) && !amount.trim()}
+            className="w-full rounded-lg bg-rose-600 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {o.aggressive === "bet" ? "Bet" : "Raise to"} {o.maxTo !== null && allIn ? fmtChips(o.maxTo) : amount || "…"}
             {allIn ? " (all-in)" : ""}
           </button>
         </div>
@@ -849,7 +856,7 @@ function ResultPanel(props: {
         <section className="flex items-center gap-2">
           <span className="shrink-0 text-sm">Your net</span>
           <input
-            inputMode="decimal"
+            inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
             value={props.netOverride}
             onChange={(e) => props.setNetOverride(e.target.value)}
             placeholder={props.autoNet !== null ? fmtChips(props.autoNet) : "?"}

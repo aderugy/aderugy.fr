@@ -199,10 +199,10 @@ function EditForm({
           <input value={game} onChange={(e) => setGame(e.target.value)} className={INPUT} />
         </Field>
         <Field label="SB">
-          <input inputMode="decimal" value={sb} onChange={(e) => setSb(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={sb} onChange={(e) => setSb(e.target.value)} className={INPUT} />
         </Field>
         <Field label="BB">
-          <input inputMode="decimal" value={bb} onChange={(e) => setBb(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={bb} onChange={(e) => setBb(e.target.value)} className={INPUT} />
         </Field>
         <Field label="Started">
           <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className={INPUT} />
@@ -213,7 +213,7 @@ function EditForm({
         {money.map((m, i) => (
           <Field key={m.id} label={m.kind === "buy_in" ? "Buy-in" : `Rebuy ${i}`}>
             <input
-              inputMode="decimal"
+              inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
               value={amounts[m.id]}
               onChange={(e) => setAmounts((a) => ({ ...a, [m.id]: e.target.value }))}
               className={INPUT}
@@ -221,7 +221,7 @@ function EditForm({
           </Field>
         ))}
         <Field label="Cash-out">
-          <input inputMode="decimal" value={cash} onChange={(e) => setCash(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={cash} onChange={(e) => setCash(e.target.value)} className={INPUT} />
         </Field>
       </div>
       <button type="submit" disabled={pending} className="w-full rounded-lg bg-accent py-2.5 text-sm font-medium text-white disabled:opacity-50">

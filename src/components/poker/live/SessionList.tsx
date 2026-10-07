@@ -147,13 +147,13 @@ function StartForm({ last, venues, onCancel }: { last: SessionRow | null; venues
       </Field>
       <div className="grid grid-cols-3 gap-2">
         <Field label="SB">
-          <input inputMode="decimal" value={sb} onChange={(e) => setSb(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={sb} onChange={(e) => setSb(e.target.value)} className={INPUT} />
         </Field>
         <Field label="BB">
-          <input inputMode="decimal" value={bb} onChange={(e) => setBb(e.target.value)} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={bb} onChange={(e) => setBb(e.target.value)} className={INPUT} />
         </Field>
         <Field label="Buy-in">
-          <input inputMode="decimal" value={buyIn} onChange={(e) => setBuyIn(e.target.value)} placeholder={currency} className={INPUT} />
+          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={buyIn} onChange={(e) => setBuyIn(e.target.value)} placeholder={currency} className={INPUT} />
         </Field>
       </div>
       <Field label="Table">
