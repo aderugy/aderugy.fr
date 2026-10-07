@@ -12,6 +12,7 @@ export const config = {
   matcher: [
     "/",
     "/agenda/:path*",
+    "/poker/live/:path*",
     "/poker/spots/:path*",
     "/poker/trainers/:path*",
     "/maths/:path*",

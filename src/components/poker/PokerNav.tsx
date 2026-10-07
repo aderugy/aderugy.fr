@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
+  { href: "/poker/live", label: "Live" },
   { href: "/poker/spots", label: "Solver notes" },
   { href: "/poker/trainers", label: "Trainers" },
   { href: "/poker", label: "Calculator" },
 ];
 
 /**
- * The poker tools' shared nav: Solver notes · Trainers · Calculator. Scrolls
+ * The poker tools' shared nav: Live · Solver notes · Trainers · Calculator. Scrolls
  * rather than wraps, like the other sections' navs, so the header keeps one
  * height on a phone.
  */
