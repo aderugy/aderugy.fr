@@ -51,7 +51,7 @@ export default async function MathsLayout({ children }: LayoutProps<"/maths">) {
     // graphe se calent dessus (top-12, 100dvh - 3rem).
     <div className="maths flex min-h-[100dvh] flex-col">
       <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-background px-3 sm:gap-6 sm:px-5">
-        <Link href="/" className="hidden shrink-0 text-xs text-muted hover:text-foreground sm:inline">
+        <Link href="/" className="hidden shrink-0 text-xs text-muted hover:text-foreground sm:inline standalone:inline">
           ←
         </Link>
         <MathsNav

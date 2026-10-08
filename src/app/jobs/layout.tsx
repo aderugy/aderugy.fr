@@ -25,7 +25,7 @@ export default async function JobsLayout({ children }: LayoutProps<"/jobs">) {
   return (
     <div className="flex min-h-[100dvh] flex-col">
       <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-background px-3 sm:gap-6 sm:px-5">
-        <Link href="/" className="hidden shrink-0 text-xs text-muted hover:text-foreground sm:inline">
+        <Link href="/" className="hidden shrink-0 text-xs text-muted hover:text-foreground sm:inline standalone:inline">
           ←
         </Link>
         <Link href="/jobs" className="shrink-0 text-sm font-semibold tracking-tight">
