@@ -1,106 +1,28 @@
 "use server";
 
 import { refresh } from "next/cache";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
-import { ensureWeek, syncTaskStatus } from "@/server/weeks";
+import { ensureWeek } from "@/server/weeks";
 import { queuePush } from "@/server/push";
-import { resizedChildMinutes } from "@/lib/blocks";
+import {
+  addTaskToBlock as addTaskToBlockRow,
+  attachTask as attachTaskRow,
+  createDrawnBlock,
+  detachTask as detachTaskRow,
+  moveBlock,
+  patchBlock,
+  placeTask as placeTaskRow,
+  placeTemplate,
+  removeBlock,
+  setBlockTaskMinutes,
+} from "@/server/agenda/schedule";
+
+// Thin wrappers: the rules live in server/agenda/schedule.ts, shared with the
+// Claude connector where it is allowed to act.
 
 type PlacedResult = { ok: true; id: string } | { ok: false; error: string };
 
-type NewChild = {
-  categoryId: string;
-  description: string | null;
-  minutes: number;
-};
-
-/**
- * Create tasks that exist only inside a block and link them to it.
- *
- * These are instances, not backlog items: they are born scheduled, marked
- * `ad_hoc`, and deleted with the block. Without that flag, removing a block
- * drawn on the grid would push its task into the backlog as work still to do.
- */
-async function insertAdHocTasks(
-  supabase: SupabaseClient,
-  userId: string,
-  scheduledBlockId: string,
-  children: NewChild[],
-  positionOffset = 0,
-): Promise<string[]> {
-  const wanted = children.filter((c) => c.categoryId && c.minutes > 0);
-  if (wanted.length === 0) return [];
-
-  const { data: created, error: taskError } = await supabase
-    .from("tasks")
-    .insert(
-      wanted.map((c) => ({
-        user_id: userId,
-        category_id: c.categoryId,
-        description: c.description?.trim() || null,
-        estimated_minutes: c.minutes,
-        priority: 3,
-        status: "scheduled",
-        ad_hoc: true,
-      })),
-    )
-    .select("id");
-  if (taskError) throw taskError;
-
-  const ids = (created ?? []).map((t) => t.id as string);
-
-  const { error: linkError } = await supabase.from("scheduled_block_tasks").insert(
-    ids.map((id, i) => ({
-      user_id: userId,
-      scheduled_block_id: scheduledBlockId,
-      task_id: id,
-      planned_minutes: wanted[i].minutes,
-      position: positionOffset + i,
-    })),
-  );
-  if (linkError) throw linkError;
-
-  return ids;
-}
-
-/**
- * Delete the ad-hoc tasks among a set, leaving real backlog tasks alone.
- *
- * Called wherever a link disappears: a task that only ever existed to fill a
- * block has nothing left to be once it is out of one.
- */
-async function dropAdHocTasks(
-  supabase: SupabaseClient,
-  userId: string,
-  taskIds: string[],
-): Promise<string[]> {
-  const ids = [...new Set(taskIds)].filter(Boolean);
-  if (ids.length === 0) return [];
-
-  const { data: adHoc } = await supabase
-    .from("tasks")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("ad_hoc", true)
-    .in("id", ids);
-
-  const doomed = (adHoc ?? []).map((t) => t.id as string);
-  if (doomed.length > 0) {
-    await supabase.from("tasks").delete().eq("user_id", userId).in("id", doomed);
-  }
-
-  // What is left is the caller's problem: real tasks whose status must be
-  // recomputed now that one of their links is gone.
-  return ids.filter((id) => !doomed.includes(id));
-}
-
-/**
- * Drop a backlog task onto the grid.
- *
- * The block itself carries no category and no description: the task inside it
- * is what says what this hour counts as.
- */
+/** Drop a backlog task onto the grid. */
 export async function placeTask(input: {
   weekStart: string;
   taskId: string;
@@ -109,60 +31,16 @@ export async function placeTask(input: {
 }): Promise<PlacedResult> {
   try {
     const { supabase, user } = await requireUser();
-    const week = await ensureWeek(supabase, user.id, input.weekStart);
-
-    const { data: task, error: taskError } = await supabase
-      .from("tasks")
-      .select("id")
-      .eq("id", input.taskId)
-      .eq("user_id", user.id)
-      .single();
-    if (taskError) throw taskError;
-
-    const startsAt = new Date(input.startsAt);
-    const endsAt = new Date(startsAt.getTime() + input.minutes * 60_000);
-
-    const { data: block, error } = await supabase
-      .from("scheduled_blocks")
-      .insert({
-        user_id: user.id,
-        week_id: week.id,
-        starts_at: startsAt.toISOString(),
-        ends_at: endsAt.toISOString(),
-        description: null,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-
-    const { error: linkError } = await supabase
-      .from("scheduled_block_tasks")
-      .insert({
-        user_id: user.id,
-        scheduled_block_id: block.id,
-        task_id: task.id,
-        planned_minutes: input.minutes,
-        position: 0,
-      });
-    if (linkError) throw linkError;
-
-    await syncTaskStatus(supabase, user.id, [task.id]);
+    const id = await placeTaskRow(supabase, user.id, input);
     await queuePush(supabase);
     refresh();
-    return { ok: true, id: block.id };
+    return { ok: true, id };
   } catch (e) {
     return fail(e) as PlacedResult;
   }
 }
 
-/**
- * Drop a reusable block onto the grid.
- *
- * A bundle lands as one scheduled block sized to the sum of its items, not as
- * one block per item — so it stays a single thing you can move and resize. Each
- * item becomes a task inside it, which is what gives the block its categories:
- * the item's own, or the template's default when the item has none.
- */
+/** Drop a reusable block onto the grid. */
 export async function placeBlock(input: {
   weekStart: string;
   blockId: string;
@@ -170,82 +48,16 @@ export async function placeBlock(input: {
 }): Promise<PlacedResult> {
   try {
     const { supabase, user } = await requireUser();
-    const week = await ensureWeek(supabase, user.id, input.weekStart);
-
-    const { data: block, error: blockError } = await supabase
-      .from("blocks")
-      .select(
-        "id, default_minutes, default_category_id, block_items(position, label, estimated_minutes, category_id)",
-      )
-      .eq("id", input.blockId)
-      .eq("user_id", user.id)
-      .single();
-    if (blockError) throw blockError;
-
-    const items = (block.block_items ?? []) as {
-      position: number;
-      label: string;
-      estimated_minutes: number;
-      category_id: string | null;
-    }[];
-    const itemMinutes = items.reduce((sum, i) => sum + i.estimated_minutes, 0);
-    const minutes = itemMinutes > 0 ? itemMinutes : block.default_minutes;
-
-    const startsAt = new Date(input.startsAt);
-    const endsAt = new Date(startsAt.getTime() + minutes * 60_000);
-
-    const { data: created, error } = await supabase
-      .from("scheduled_blocks")
-      .insert({
-        user_id: user.id,
-        week_id: week.id,
-        starts_at: startsAt.toISOString(),
-        ends_at: endsAt.toISOString(),
-        // No description: a placed template is labelled by its own name, which
-        // is resolved from source_block_id when rendering.
-        description: null,
-        source_block_id: block.id,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-
-    // A template with no steps still has to account for its time, so it lands
-    // as a single task of the default category covering the whole block.
-    const steps =
-      items.length > 0
-        ? [...items]
-            .sort((a, b) => a.position - b.position)
-            .map((i) => ({
-              categoryId: i.category_id ?? block.default_category_id,
-              description: i.label,
-              minutes: i.estimated_minutes,
-            }))
-        : [
-            {
-              categoryId: block.default_category_id,
-              description: null as string | null,
-              minutes,
-            },
-          ];
-
-    await insertAdHocTasks(supabase, user.id, created.id, steps);
-
+    const id = await placeTemplate(supabase, user.id, input);
     await queuePush(supabase);
     refresh();
-    return { ok: true, id: created.id };
+    return { ok: true, id };
   } catch (e) {
     return fail(e) as PlacedResult;
   }
 }
 
-/**
- * Create a block from a timeframe drawn on the grid.
- *
- * Both ends come from the drag, so unlike the task and template paths there is
- * no implied duration to derive. The category picked in the popup belongs to
- * the task the block is created around, not to the block: a block has none.
- */
+/** Create a block from a timeframe drawn on the grid. */
 export async function createScheduledBlock(input: {
   weekStart: string;
   categoryId: string;
@@ -255,40 +67,11 @@ export async function createScheduledBlock(input: {
 }): Promise<PlacedResult> {
   try {
     const { supabase, user } = await requireUser();
-    if (!input.categoryId) return { ok: false, error: "Pick a category" };
-
-    const week = await ensureWeek(supabase, user.id, input.weekStart);
-
-    const startsAt = new Date(input.startsAt);
-    const endsAt = new Date(input.endsAt);
-    if (endsAt <= startsAt) return { ok: false, error: "End must be after start" };
-
-    const minutes = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
-
-    const { data, error } = await supabase
-      .from("scheduled_blocks")
-      .insert({
-        user_id: user.id,
-        week_id: week.id,
-        starts_at: startsAt.toISOString(),
-        ends_at: endsAt.toISOString(),
-        description: input.description?.trim() || null,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-
-    await insertAdHocTasks(supabase, user.id, data.id, [
-      {
-        categoryId: input.categoryId,
-        description: input.description?.trim() || null,
-        minutes,
-      },
-    ]);
-
+    const r = await createDrawnBlock(supabase, user.id, input);
+    if (!r.ok) return r;
     await queuePush(supabase);
     refresh();
-    return { ok: true, id: data.id };
+    return { ok: true, id: r.value };
   } catch (e) {
     return fail(e) as PlacedResult;
   }
@@ -309,55 +92,8 @@ export async function moveScheduled(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    const starts = new Date(input.startsAt);
-    const ends = new Date(input.endsAt);
-    if (ends <= starts) return { ok: false, error: "End must be after start" };
-
-    // Read the span and the tasks before writing: a resize carries a single
-    // task along with the block, and that rule needs the old span.
-    const { data: before, error: readError } = await supabase
-      .from("scheduled_blocks")
-      .select("starts_at, ends_at, scheduled_block_tasks(task_id, planned_minutes, position)")
-      .eq("id", input.id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (readError) throw readError;
-    if (!before) return { ok: false, error: "Block not found" };
-
-    const { error } = await supabase
-      .from("scheduled_blocks")
-      .update({
-        starts_at: starts.toISOString(),
-        ends_at: ends.toISOString(),
-        sync_state: "pending",
-      })
-      .eq("id", input.id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-
-    const links = [...(before.scheduled_block_tasks ?? [])].sort(
-      (a, b) => a.position - b.position || a.task_id.localeCompare(b.task_id),
-    );
-    const fromMinutes = Math.round(
-      (new Date(before.ends_at).getTime() - new Date(before.starts_at).getTime()) / 60_000,
-    );
-    const toMinutes = Math.round((ends.getTime() - starts.getTime()) / 60_000);
-    const resized = resizedChildMinutes(
-      links.map((l) => l.planned_minutes),
-      fromMinutes,
-      toMinutes,
-    );
-    for (const [i, link] of links.entries()) {
-      if (resized[i] === link.planned_minutes) continue;
-      const { error: linkError } = await supabase
-        .from("scheduled_block_tasks")
-        .update({ planned_minutes: resized[i] })
-        .eq("user_id", user.id)
-        .eq("scheduled_block_id", input.id)
-        .eq("task_id", link.task_id);
-      if (linkError) throw linkError;
-    }
-
+    const r = await moveBlock(supabase, user.id, input);
+    if (!r.ok) return r;
     await queuePush(supabase);
     return { ok: true };
   } catch (e) {
@@ -373,32 +109,8 @@ export async function updateScheduled(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    const patch: Record<string, unknown> = {};
-    if (input.description !== undefined) {
-      patch.description = input.description?.trim() || null;
-    }
-    if (input.status !== undefined) patch.status = input.status;
-    if (input.actualMinutes !== undefined) patch.actual_minutes = input.actualMinutes;
-
-    const { data: updated, error } = await supabase
-      .from("scheduled_blocks")
-      .update(patch)
-      .eq("id", input.id)
-      .eq("user_id", user.id)
-      .select("scheduled_block_tasks(task_id)")
-      .maybeSingle();
-    if (error) throw error;
-
-    // Skipping a block (or un-skipping it) changes whether its tasks are still
-    // placed: a skipped block's tasks go back to the backlog rail.
-    if (input.status !== undefined && updated) {
-      await syncTaskStatus(
-        supabase,
-        user.id,
-        (updated.scheduled_block_tasks ?? []).map((l) => l.task_id as string),
-      );
-    }
-
+    const r = await patchBlock(supabase, user.id, input);
+    if (!r.ok) return r;
     await queuePush(supabase);
     refresh();
     return { ok: true };
@@ -410,28 +122,8 @@ export async function updateScheduled(input: {
 export async function deleteScheduled(id: string): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-
-    // Read the links first: after the cascade there is nothing left to
-    // recompute task status from, nor to tell the ad-hoc tasks apart.
-    const { data: links } = await supabase
-      .from("scheduled_block_tasks")
-      .select("task_id")
-      .eq("user_id", user.id)
-      .eq("scheduled_block_id", id);
-
-    const { error } = await supabase
-      .from("scheduled_blocks")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-
-    const survivors = await dropAdHocTasks(
-      supabase,
-      user.id,
-      (links ?? []).map((l) => l.task_id as string),
-    );
-    await syncTaskStatus(supabase, user.id, survivors);
+    const r = await removeBlock(supabase, user.id, id);
+    if (!r.ok) return r;
     await queuePush(supabase);
     refresh();
     return { ok: true };
@@ -448,25 +140,7 @@ export async function attachTask(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-
-    const { data: last } = await supabase
-      .from("scheduled_block_tasks")
-      .select("position")
-      .eq("user_id", user.id)
-      .eq("scheduled_block_id", input.scheduledBlockId)
-      .order("position", { ascending: false })
-      .limit(1);
-
-    const { error } = await supabase.from("scheduled_block_tasks").upsert({
-      user_id: user.id,
-      scheduled_block_id: input.scheduledBlockId,
-      task_id: input.taskId,
-      planned_minutes: input.plannedMinutes,
-      position: (last?.[0]?.position ?? -1) + 1,
-    });
-    if (error) throw error;
-
-    await syncTaskStatus(supabase, user.id, [input.taskId]);
+    await attachTaskRow(supabase, user.id, input);
     await queuePush(supabase);
     refresh();
     return { ok: true };
@@ -475,12 +149,7 @@ export async function attachTask(input: {
   }
 }
 
-/**
- * Add a new task directly inside a block.
- *
- * This is how a block gets its second category without a trip through the
- * backlog — the block is a container, and this is what fills it.
- */
+/** Add a new task directly inside a block. */
 export async function addTaskToBlock(input: {
   scheduledBlockId: string;
   categoryId: string;
@@ -489,41 +158,8 @@ export async function addTaskToBlock(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    if (!input.categoryId) return { ok: false, error: "Pick a category" };
-    if (!(input.minutes > 0)) return { ok: false, error: "Give it a duration" };
-
-    // Ownership is enforced by RLS on the insert below, but reading the block
-    // first turns a silent no-op into a message.
-    const { data: block, error: blockError } = await supabase
-      .from("scheduled_blocks")
-      .select("id")
-      .eq("id", input.scheduledBlockId)
-      .eq("user_id", user.id)
-      .single();
-    if (blockError) throw blockError;
-
-    const { data: last } = await supabase
-      .from("scheduled_block_tasks")
-      .select("position")
-      .eq("user_id", user.id)
-      .eq("scheduled_block_id", block.id)
-      .order("position", { ascending: false })
-      .limit(1);
-
-    await insertAdHocTasks(
-      supabase,
-      user.id,
-      block.id,
-      [
-        {
-          categoryId: input.categoryId,
-          description: input.description,
-          minutes: input.minutes,
-        },
-      ],
-      (last?.[0]?.position ?? -1) + 1,
-    );
-
+    const r = await addTaskToBlockRow(supabase, user.id, input);
+    if (!r.ok) return r;
     await queuePush(supabase);
     refresh();
     return { ok: true };
@@ -540,18 +176,8 @@ export async function updateBlockTask(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    if (!(input.plannedMinutes > 0)) {
-      return { ok: false, error: "Give it a duration" };
-    }
-
-    const { error } = await supabase
-      .from("scheduled_block_tasks")
-      .update({ planned_minutes: input.plannedMinutes })
-      .eq("user_id", user.id)
-      .eq("scheduled_block_id", input.scheduledBlockId)
-      .eq("task_id", input.taskId);
-    if (error) throw error;
-
+    const r = await setBlockTaskMinutes(supabase, user.id, input);
+    if (!r.ok) return r;
     await queuePush(supabase);
     refresh();
     return { ok: true };
@@ -566,18 +192,8 @@ export async function detachTask(input: {
 }): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
-    const { error } = await supabase
-      .from("scheduled_block_tasks")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("scheduled_block_id", input.scheduledBlockId)
-      .eq("task_id", input.taskId);
-    if (error) throw error;
-
-    // A backlog task goes back to the rail; one that only existed to fill this
-    // block goes away with it.
-    const survivors = await dropAdHocTasks(supabase, user.id, [input.taskId]);
-    await syncTaskStatus(supabase, user.id, survivors);
+    const r = await detachTaskRow(supabase, user.id, input);
+    if (!r.ok) return r;
     await queuePush(supabase);
     refresh();
     return { ok: true };

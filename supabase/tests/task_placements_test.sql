@@ -67,7 +67,8 @@ select pg_temp.check((select (live_count, live_minutes, total_count) = (1, 45, 1
 select pg_temp.check((select (live_count, live_minutes, total_count) = (0, 0, 1)  from p where task_id = '70000000-0000-4000-8000-0000000000a2'), 'placements: skipped → not live, still counted in total');
 select pg_temp.check((select (live_count, live_minutes, total_count) = (1, 30, 2) from p where task_id = '70000000-0000-4000-8000-0000000000a3'), 'placements: skipped minutes excluded');
 select pg_temp.check(not exists (select 1 from p where task_id = '70000000-0000-4000-8000-0000000000a4'), 'placements: no row for an unplaced task');
-select pg_temp.check((select count(*) from public.scheduled_blocks) = 0, 'OAuth client still cannot read blocks themselves');
+-- Since 0019 a connected app reads the blocks too (see calendar_oauth_test.sql).
+select pg_temp.check((select count(*) from public.scheduled_blocks) > 0, 'OAuth client reads the blocks themselves (0019)');
 
 update public.tasks set notes = E'# Plan\n- [ ] read\n- [x] write' where id = '70000000-0000-4000-8000-0000000000a4';
 select pg_temp.check((select notes like '# Plan%' from public.tasks where id = '70000000-0000-4000-8000-0000000000a4'), 'OAuth client can write notes');

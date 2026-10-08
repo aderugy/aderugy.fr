@@ -1,11 +1,12 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { RESOURCE_METADATA_PATH, verifyToken } from "@/server/mcp/auth";
 import { SERVER_INSTRUCTIONS, registerBacklogTools } from "@/server/mcp/backlog-tools";
+import { CALENDAR_INSTRUCTIONS, registerCalendarTools } from "@/server/mcp/calendar-tools";
 import { JOBS_INSTRUCTIONS, registerJobsTools } from "@/server/mcp/jobs-tools";
 import { LIVE_INSTRUCTIONS, registerLiveTools } from "@/server/mcp/live-tools";
 
 /**
- * The Claude connector for the /agenda backlog, the /jobs internship search
+ * The Claude connector for the /agenda backlog and week grid, the /jobs internship search
  * and /poker/live sessions — one remote MCP server over
  * Streamable HTTP, stateless (mcp-handler v2: no Redis, no sessions).
  *
@@ -19,13 +20,14 @@ export const maxDuration = 30;
 const handler = createMcpHandler(
   (server) => {
     registerBacklogTools(server);
+    registerCalendarTools(server);
     registerJobsTools(server);
     registerLiveTools(server);
   },
   {
     // The name stays: it is what the connector was registered under.
-    serverInfo: { name: "aderugy-agenda", version: "1.2.0" },
-    instructions: `${SERVER_INSTRUCTIONS}\n\n${JOBS_INSTRUCTIONS}\n\n${LIVE_INSTRUCTIONS}`,
+    serverInfo: { name: "aderugy-agenda", version: "1.3.0" },
+    instructions: `${SERVER_INSTRUCTIONS}\n\n${CALENDAR_INSTRUCTIONS}\n\n${JOBS_INSTRUCTIONS}\n\n${LIVE_INSTRUCTIONS}`,
   },
 );
 

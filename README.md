@@ -5,7 +5,8 @@ Personal website and utility tools. Next.js (App Router) · Tailwind · Supabase
 Five tools live here so far:
 
 - **`/agenda`** — a weekly planner: typed tasks in a backlog, reusable blocks,
-  and a week grid you assemble by hand.
+  and a week grid you assemble by hand. Claude can read the week and plan blocks of its own
+  through the connector ([docs/agenda/calendar-connector.md](docs/agenda/calendar-connector.md)).
 - **`/poker`** — pot odds, drawing equity and the fold equity a semi-bluff
   needs, with the site's rake taken off the pot. No account and nothing stored:
   the whole model is pure functions in `src/lib/poker.ts`, and the page is

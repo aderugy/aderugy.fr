@@ -39,7 +39,7 @@ How the data works:
 - Call list_categories before creating or recategorising tasks. Categories cannot be created or renamed from here — if none fits, say so and suggest one for Arthur to add.
 - A task can also carry notes: an extended description in Markdown (context, links, checklists). Keep the description short and put detail in notes.
 - Priority: 1 urgent, 2 high, 3 normal (default), 4 someday. Estimates are in minutes (5–1440). Deadlines are dates (YYYY-MM-DD).
-- Status: backlog (waiting), scheduled (placed on the week grid — set by the planner, not by you), done, dropped. A task whose block was skipped is back in the backlog.
+- Status: backlog (waiting), scheduled (placed on the week grid — set automatically when the task is put in a block, by Arthur or with create_block / add_to_block), done, dropped. A task whose block was skipped is back in the backlog.
 - A task placed on the grid cannot be deleted from here; mark it dropped instead.`;
 
 /* ------------------------------------------------------------- shapes */

@@ -44,10 +44,11 @@ select pg_temp.check((select count(*) from public.tasks) = 2, 'reads own tasks o
 select pg_temp.check((select count(*) from public.categories) = 2, 'reads own categories');
 select pg_temp.check((select count(*) from public.categories_with_path) = 2, 'reads categories_with_path');
 select pg_temp.check((select count(*) from public.scheduled_block_tasks) = 1, 'reads placement links');
-select pg_temp.check((select count(*) from public.weeks) = 0, 'weeks hidden');
-select pg_temp.check((select count(*) from public.scheduled_blocks) = 0, 'scheduled blocks hidden');
+-- 0019 opened the calendar side for reading: calendar_oauth_test.sql covers it.
+select pg_temp.check((select count(*) from public.weeks) = 1, 'weeks readable (0019)');
+select pg_temp.check((select count(*) from public.scheduled_blocks) = 1, 'scheduled blocks readable (0019)');
 select pg_temp.check((select count(*) from public.google_accounts) = 0, 'google_accounts hidden');
-select pg_temp.check((select count(*) from public.push_status) = 0, 'push_status view hidden');
+select pg_temp.check((select count(*) from public.push_status) <= 1, 'push_status shows own counts only');
 
 insert into public.tasks (user_id, category_id, description, estimated_minutes, priority)
 values ('aaaaaaaa-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000002', 'from claude', 45, 2);
@@ -71,7 +72,7 @@ do $$
 declare
   stmts text[] := array[
     $q$insert into public.categories (user_id, name, position) values ('aaaaaaaa-0000-4000-8000-000000000001', 'new', 9)$q$,
-    $q$insert into public.weeks (user_id, week_start) values ('aaaaaaaa-0000-4000-8000-000000000001', '2026-10-05')$q$,
+    $q$insert into public.weeks (user_id, week_start, theme) values ('aaaaaaaa-0000-4000-8000-000000000001', '2026-10-05', 'mine')$q$,
     $q$insert into public.scheduled_block_tasks (user_id, scheduled_block_id, task_id) values ('aaaaaaaa-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000001')$q$,
     $q$select public.update_calendar_source(gen_random_uuid(), 'x')$q$
   ];
