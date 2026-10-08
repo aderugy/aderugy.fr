@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* `standalone:` — only inside the installed app, where there is no address bar
+   or back button, so the way home has to be on the page. */
+@custom-variant standalone (@media (display-mode: standalone));
+
 :root {
   --background: #fbfbfa;
   --surface: #ffffff;

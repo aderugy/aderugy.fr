@@ -29,6 +29,12 @@ export default async function AgendaLayout({ children }: LayoutProps<"/agenda">)
     <div className="flex h-[100dvh] flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-line px-3 py-2 sm:gap-6 sm:px-5 sm:py-3">
         <Link
+          href="/"
+          className="hidden shrink-0 text-xs text-muted hover:text-foreground sm:inline standalone:inline"
+        >
+          ←
+        </Link>
+        <Link
           href="/agenda"
           className="shrink-0 text-sm font-semibold tracking-tight"
         >
