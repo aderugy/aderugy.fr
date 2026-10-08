@@ -112,7 +112,7 @@ projects.
 ### 3. Edge Functions
 
 ```bash
-supabase functions deploy google-oauth google-sync google-channels google-webhook google-push
+supabase functions deploy google-oauth google-sync google-channels google-webhook google-push web-push
 
 supabase secrets set GOOGLE_CLIENT_ID=...
 supabase secrets set GOOGLE_CLIENT_SECRET=...
@@ -211,6 +211,39 @@ database is the security boundary, not the UI. The Next app holds no
 service-role key and no Google client secret: the only elevated credential in
 the system lives inside Supabase Edge Functions, which is also the only place
 that talks to Google.
+
+## Installing the app and block reminders
+
+The site is installable (`src/app/manifest.ts`): Chrome or Edge on a computer
+(install icon in the address bar), Android, and iPhone via Share → Add to Home
+Screen. It opens on `/agenda`; the other tools are shortcuts on the icon.
+
+`public/sw.js` handles notifications only — no fetch handler, nothing cached —
+so a deploy is never hidden behind a stale copy.
+
+Reminders: each device turns them on from **/agenda → Settings →
+Notifications**, and then gets one notification per planned block, a chosen
+number of minutes before it starts (10 by default). On iPhone this only works
+from the installed app, not from a Safari tab.
+
+How it works: devices are rows in `push_subscriptions`; the `web-push` Edge
+Function, swept every minute by pg_cron, sends what
+`blocks_due_for_reminder()` returns and records it in `block_reminders_sent`,
+keyed on the start time, so moving a block makes it due again. Encryption and
+VAPID signing are in `supabase/functions/_shared/webpush.ts`, with no
+dependency, tested against RFC 8291's own vector.
+
+Setup, once:
+
+1. `node scripts/vapid-keys.mjs` and follow what it prints: the public key goes
+   to Vercel as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (redeploy after), the three
+   secrets to Supabase. Keep the pair — new keys orphan every device.
+2. Run `supabase/migrations/0020_block_reminders.sql`.
+3. `supabase functions deploy web-push`
+4. Re-run `supabase/cron.sql` (it adds the `block-reminders-due` job).
+
+Tests: `supabase/tests/block_reminders_test.sql`,
+`supabase/functions/_shared/webpush.test.ts`, `reminders.test.ts`.
 
 ## Poker rake presets
 

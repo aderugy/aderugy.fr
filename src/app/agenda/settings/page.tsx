@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { GoogleConnection } from "@/components/agenda/GoogleConnection";
 import { ConnectedApps, type ConnectedApp } from "@/components/agenda/ConnectedApps";
+import {
+  NotificationSettings,
+  type PushDevice,
+} from "@/components/agenda/NotificationSettings";
 import type {
   CalendarSource,
   Category,
@@ -24,7 +28,8 @@ export default async function SettingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(LOGIN_PATH);
 
-  const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes, grantsRes] = await Promise.all([
+  const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes, grantsRes, devicesRes, prefsRes] =
+    await Promise.all([
     supabase
       .from("google_accounts")
       .select(
@@ -60,6 +65,16 @@ export default async function SettingsPage({
       data: null,
       error: e instanceof Error ? e : new Error("Could not list connected apps"),
     })),
+    supabase
+      .from("push_subscriptions")
+      .select("id, endpoint, label, created_at, last_success_at, last_error, last_error_at")
+      .eq("user_id", user.id)
+      .order("created_at"),
+    supabase
+      .from("notification_prefs")
+      .select("block_reminders, lead_minutes")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
 
   const apps: ConnectedApp[] = (grantsRes.data ?? []).map((g) => ({
@@ -79,6 +94,15 @@ export default async function SettingsPage({
         categories={(categoriesRes.data ?? []) as Category[]}
         pushStatus={(pushRes.data ?? null) as PushStatus | null}
         notice={{ error: typeof params.error === "string" ? params.error : undefined }}
+      />
+
+      <NotificationSettings
+        devices={(devicesRes.data ?? []) as PushDevice[]}
+        prefs={{
+          // No row yet means the defaults the reminder sweep applies too.
+          blockReminders: prefsRes.data?.block_reminders ?? true,
+          leadMinutes: prefsRes.data?.lead_minutes ?? 10,
+        }}
       />
 
       <ConnectedApps

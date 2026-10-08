@@ -9,6 +9,20 @@ const nextConfig: NextConfig = {
     "/maths": ["./content/maths/**/*"],
     "/maths/**": ["./content/maths/**/*"],
   },
+  // The service worker must be revalidated on every load, or browsers keep an
+  // old one for up to a day after a deploy.
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
