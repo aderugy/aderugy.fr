@@ -130,7 +130,9 @@ what authenticates a ping.
 
 ### 4. Scheduled jobs
 
-Run `supabase/cron.sql` in the SQL editor after filling in the two placeholders.
+Run `supabase/cron.sql` in the SQL editor after filling in the project URL, then
+add the service-role key to the Vault with the one statement it shows. Without the
+key the jobs run and do nothing; check with `select * from cron.job_run_details`.
 It schedules the 5-minute sync sweep, daily channel renewal, pruning, and the
 one-minute push sweep (which only invokes the function when there is work).
 

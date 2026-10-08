@@ -1,5 +1,6 @@
--- Scheduled sync. Run this once in the SQL editor, after deploying the Edge
--- Functions and setting the two secrets below.
+-- Scheduled sync. Run this in the SQL editor after deploying the Edge Functions
+-- (re-runnable: cron.schedule replaces a job of the same name), then add the
+-- service-role key as described below.
 --
 -- Vercel's Hobby plan caps cron at once per day, so the safety net lives here
 -- instead: pg_cron has a one-minute floor and fires on time.
@@ -7,10 +8,23 @@
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- Secrets the jobs need. Replace the placeholders, run once, then never again.
-select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
-select vault.create_secret('<service-role-key>', 'service_role_key');
+-- Secrets the jobs need, in the Vault. The URL is filled in below; the key is
+-- added by hand, once, in the SQL editor (Project Settings → API → service_role),
+-- because it must never be committed:
+--
+--   select vault.create_secret('<service-role-key>', 'service_role_key');
+--
+-- Until it is there the jobs run and do nothing (see invoke_edge).
+do $$
+begin
+  if not exists (select 1 from vault.secrets where name = 'project_url') then
+    perform vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+  end if;
+end $$;
 
+-- Calls an Edge Function with the service-role key from the Vault. Without the
+-- key it does nothing and says so in the Postgres log, instead of failing a
+-- cron run every minute.
 create or replace function public.invoke_edge(fn text, payload jsonb default '{}'::jsonb)
 returns bigint
 language plpgsql
@@ -23,7 +37,10 @@ declare
 begin
   select decrypted_secret into base from vault.decrypted_secrets where name = 'project_url';
   select decrypted_secret into key  from vault.decrypted_secrets where name = 'service_role_key';
-
+  if base is null or key is null then
+    raise log 'invoke_edge(%): project_url or service_role_key missing from the Vault', fn;
+    return null;
+  end if;
   return net.http_post(
     url     := base || '/functions/v1/' || fn,
     headers := jsonb_build_object(
