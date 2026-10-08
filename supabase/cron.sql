@@ -95,5 +95,15 @@ select cron.schedule(
       where exists (select 1 from public.users_due_for_push()) $$
 );
 
+-- Block reminders (Web Push) to every device that opted in, lead_minutes
+-- before each planned block. Once a minute, checked in SQL first like the
+-- Google push, so a quiet minute costs a query and no invocation.
+select cron.schedule(
+  'block-reminders-due',
+  '* * * * *',
+  $$ select public.invoke_edge('web-push', '{"due": true}'::jsonb)
+      where exists (select 1 from public.blocks_due_for_reminder(1)) $$
+);
+
 -- Inspect with:  select * from cron.job;
 --                select * from cron.job_run_details order by start_time desc limit 20;
