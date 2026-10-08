@@ -245,6 +245,59 @@ Setup, once:
 Tests: `supabase/tests/block_reminders_test.sql`,
 `supabase/functions/_shared/webpush.test.ts`, `reminders.test.ts`.
 
+## Database backups before migrations
+
+Supabase's GitHub integration applies `supabase/migrations` as soon as they
+reach `main`. Before that happens, `.github/workflows/db-backup.yml` dumps the
+database to Google Drive: it runs on every pull request to `main`, does the
+backup only when the pull request touches `supabase/migrations` (others pass at
+once), and branch protection makes it a required check, so a migration cannot
+be merged without a fresh backup. It can also be run by hand (Actions →
+Database backup → Run workflow).
+
+What is in a backup: the `public` and `auth` schemas and the migration history
+(`supabase_migrations`), as one `pg_dump` custom-format file named
+`aderugy-db_<UTC time>_<commit>.dump`, in the Drive folder
+**aderugy.fr — database backups**. Live sign-in tokens (`auth.sessions`,
+`auth.refresh_tokens`, …) are left out. The 30 newest are kept; older ones go
+to the Drive trash. The token only has `drive.file` access: it sees the files
+it created and nothing else in the Drive.
+
+The repository is public: the job never prints table contents and never
+uploads the dump as a workflow artifact. Keep it that way.
+
+**Migrations go through pull requests.** A direct push to `main` skips the
+check; the integration would still apply the migration, unprotected.
+
+Setup, once:
+
+1. **Google OAuth client.** In Google Cloud Console (the project used for the
+   Calendar connection is fine): enable the *Google Drive API*, then
+   *Credentials → Create credentials → OAuth client ID → Desktop app*. On the
+   *OAuth consent screen*, set the publishing status to **In production** —
+   while it is in *Testing*, Google expires refresh tokens after 7 days and
+   backups would start failing a week later. `drive.file` is not a sensitive
+   scope, so no verification is needed.
+2. **Refresh token.** On your computer:
+   `node scripts/db-backup/auth.mjs <client-id> <client-secret>`, open the URL,
+   approve, copy the token it prints.
+3. **Database URL.** Supabase dashboard → *Connect* → *Session pooler* URI,
+   with the database password filled in. Not the direct connection: it is
+   IPv6-only, and GitHub's runners have no IPv6.
+4. **Secrets.** GitHub → *Settings → Secrets and variables → Actions*:
+   `SUPABASE_DB_URL`, `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`,
+   `GDRIVE_REFRESH_TOKEN`.
+5. **Branch protection.** *Settings → Branches → Add rule* for `main`:
+   *Require status checks to pass before merging* → add **Backup database**.
+6. **Try it.** *Actions → Database backup → Run workflow*, then check the file
+   appeared in Drive.
+
+Restoring: download the file, look before touching anything —
+`pg_restore --list <file>` — and restore into a scratch database first, e.g.
+`pg_restore --no-owner --data-only --table=tasks -d <scratch-url> <file>`.
+Restoring into the live project means stopping the cron jobs first
+(`supabase/cron.sql`) so the Google pusher does not act on half-restored rows.
+
 ## Poker rake presets
 
 `/poker` prices every call net of rake, so the presets it offers — Betclic and

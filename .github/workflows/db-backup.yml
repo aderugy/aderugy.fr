@@ -1,0 +1,152 @@
+# Back the database up to Google Drive before a migration reaches it.
+#
+# Supabase's GitHub integration applies supabase/migrations as soon as they
+# land on main, with no hook to run anything first. So the backup happens on
+# the pull request instead, and branch protection on main requires this job
+# ("Backup database") to pass before the merge button works. A pull request
+# that touches no migration passes straight away, without touching the
+# database.
+#
+# The backup is taken when the job runs, not at merge time: for a pull request
+# that sat open for a while, re-run the job just before merging.
+#
+# The repository is public, so this job never prints table contents and never
+# uploads the dump as a workflow artifact — artifacts of a public repository
+# can be downloaded by anyone signed in to GitHub.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL       Session pooler URI, with the password (the direct
+#                         connection is IPv6-only and runners have no IPv6)
+#   GDRIVE_CLIENT_ID      OAuth client, type "Desktop app"
+#   GDRIVE_CLIENT_SECRET
+#   GDRIVE_REFRESH_TOKEN  from `node scripts/db-backup/auth.mjs`
+# See README → Database backups.
+
+name: Database backup
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Note stored with the backup
+        required: false
+        default: manual backup
+
+permissions:
+  contents: read
+
+# Never two dumps at once; a newer push waits rather than cancelling a dump.
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Does this change touch migrations?
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "origin/$BASE_REF" HEAD -- supabase/migrations)
+          if [ -z "$changed" ]; then
+            echo "No migration in this pull request — nothing to back up."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Migrations in this pull request:"
+            echo "$changed"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "migrations=$(echo "$changed" | xargs -n1 basename | paste -sd, -)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install pg_dump 17
+        if: steps.scope.outputs.needed == 'true'
+        run: |
+          # The server runs Postgres 17; pg_dump refuses a newer server than itself.
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17 > /dev/null
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Dump
+        id: dump
+        if: steps.scope.outputs.needed == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::The SUPABASE_DB_URL secret is missing. See README → Database backups."
+            exit 1
+          fi
+          stamp=$(date -u +%Y-%m-%dT%H%MZ)
+          file="$RUNNER_TEMP/aderugy-db_${stamp}_${HEAD_SHA::7}.dump"
+
+          # Your data and the migration history. Live sign-in tokens are left
+          # out: a backup does not need them, and they would let anyone holding
+          # the file act as you.
+          /usr/lib/postgresql/17/bin/pg_dump \
+            --dbname="$SUPABASE_DB_URL" \
+            --format=custom --compress=9 \
+            --no-owner --no-privileges \
+            --schema=public --schema=auth --schema=supabase_migrations \
+            --exclude-table-data='auth.sessions' \
+            --exclude-table-data='auth.refresh_tokens' \
+            --exclude-table-data='auth.one_time_tokens' \
+            --exclude-table-data='auth.flow_state' \
+            --exclude-table-data='auth.mfa_challenges' \
+            --exclude-table-data='auth.oauth_authorizations' \
+            --file="$file"
+
+          # A dump that cannot be listed, or holds almost nothing, is not a backup.
+          /usr/lib/postgresql/17/bin/pg_restore --list "$file" > "$RUNNER_TEMP/toc.txt"
+          tables=$(grep -c " TABLE DATA public " "$RUNNER_TEMP/toc.txt" || true)
+          echo "Table data entries in public: $tables"
+          if [ "$tables" -lt 10 ]; then
+            echo "::error::The dump holds data for only $tables public tables — refusing to call it a backup."
+            exit 1
+          fi
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Google Drive
+        if: steps.scope.outputs.needed == 'true'
+        env:
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+          FILE: ${{ steps.dump.outputs.file }}
+          MIGRATIONS: ${{ steps.scope.outputs.migrations }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REASON: ${{ inputs.reason }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            note="Before merging PR #$PR_NUMBER ($MIGRATIONS) at ${HEAD_SHA::7}"
+          else
+            note="${REASON:-manual backup} at ${HEAD_SHA::7}"
+          fi
+          node scripts/db-backup/upload.mjs "$FILE" "$note"
+
+      - name: Remove the local copy
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/*.dump "$RUNNER_TEMP/toc.txt"
