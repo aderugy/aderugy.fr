@@ -113,7 +113,7 @@ function CategoryRow({
           <span className="shrink-0 text-xs tabular-nums text-muted">{count}</span>
         )}
 
-        <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
           <ColorPicker
             value={node.color}
             onChange={(color) => commit(() => updateCategory({ id: node.id, color }))}
