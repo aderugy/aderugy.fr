@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DAY_END_MIN,
   DAY_LABELS,
@@ -33,6 +33,28 @@ const GRID_HEIGHT = SLOTS_PER_DAY * PX_PER_SLOT;
  * the day survives and you can still see what you chose to look past.
  */
 const HIDDEN_COLOR = "#9ca3af";
+
+/**
+ * Touch has three gestures on the grid, told apart by time and distance:
+ * - a short tap: select (opens the block to edit it), or clear the selection;
+ * - a touch that starts moving straight away: the browser's own scroll, always;
+ * - a hold of LONG_PRESS_MS, then a drag: move or resize a block, or draw a new
+ *   range on an empty part of the day (released without moving: one hour).
+ * A finger drifting more than TOUCH_SLOP before the hold completes is a scroll.
+ */
+const LONG_PRESS_MS = 350;
+const TOUCH_SLOP = 8;
+/** Distance from the top or bottom of the scroll area at which a held drag scrolls it. */
+const AUTOSCROLL_EDGE = 56;
+
+type TouchPress = {
+  x: number;
+  y: number;
+  timer: number;
+  /** The hold completed: the grid owns the finger, the page no longer scrolls. */
+  armed: boolean;
+  raf: number | null;
+};
 
 /**
  * A block has no category, so it only reads as hidden once everything inside it
@@ -223,6 +245,12 @@ export function WeekGrid({
   onFocusDay,
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  /** A finger on the grid, before we know whether it is a tap, a scroll or a hold. */
+  const press = useRef<TouchPress | null>(null);
+  const lastTouch = useRef<{ x: number; y: number } | null>(null);
+  /** The current move handler, for the autoscroll loop to call between events. */
+  const moveRef = useRef<((x: number, y: number) => void) | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [hover, setHover] = useState<{ dayIndex: number; startMin: number } | null>(
     null,
@@ -321,6 +349,80 @@ export function WeekGrid({
       }
     : null;
 
+  // Once a hold has armed, the page must stop scrolling under the finger.
+  // `touch-action` is decided when the touch starts — and it has to allow
+  // scrolling then — so the only way to take it back is a non-passive listener.
+  useEffect(() => {
+    const onTouchMove = (e: TouchEvent) => {
+      if (press.current?.armed && e.cancelable) e.preventDefault();
+    };
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => document.removeEventListener("touchmove", onTouchMove);
+  }, []);
+
+  /**
+   * Start waiting for a hold. `onArm` runs when it completes and returns false
+   * to decline it (a read-only item): the touch then stays a tap or a scroll.
+   */
+  function startPress(e: React.PointerEvent, onArm: () => boolean) {
+    endPress();
+    lastTouch.current = { x: e.clientX, y: e.clientY };
+    const state: TouchPress = {
+      x: e.clientX,
+      y: e.clientY,
+      armed: false,
+      raf: null,
+      timer: window.setTimeout(() => {
+        if (press.current !== state || !onArm()) return;
+        state.armed = true;
+        navigator.vibrate?.(12);
+        state.raf = requestAnimationFrame(autoScroll);
+      }, LONG_PRESS_MS),
+    };
+    press.current = state;
+  }
+
+  function endPress() {
+    const p = press.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    if (p.raf !== null) cancelAnimationFrame(p.raf);
+    press.current = null;
+  }
+
+  /**
+   * Feeds a touch move to the pending press. Returns true when the event is
+   * the press's business (not yet armed) and should go no further.
+   */
+  function pressSwallows(e: React.PointerEvent): boolean {
+    const p = press.current;
+    if (e.pointerType !== "touch" || !p) return false;
+    lastTouch.current = { x: e.clientX, y: e.clientY };
+    if (p.armed) return false;
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > TOUCH_SLOP) endPress();
+    return true;
+  }
+
+  /** While a held drag sits near an edge, scroll the day and keep the drag under the finger. */
+  function autoScroll() {
+    const p = press.current;
+    if (!p?.armed) return;
+    const el = scrollRef.current;
+    const pt = lastTouch.current;
+    if (el && pt) {
+      const r = el.getBoundingClientRect();
+      let dy = 0;
+      if (pt.y < r.top + AUTOSCROLL_EDGE) dy = -(r.top + AUTOSCROLL_EDGE - pt.y) / 5;
+      else if (pt.y > r.bottom - AUTOSCROLL_EDGE) dy = (pt.y - (r.bottom - AUTOSCROLL_EDGE)) / 5;
+      if (dy !== 0) {
+        const before = el.scrollTop;
+        el.scrollTop += Math.round(dy);
+        if (el.scrollTop !== before) moveRef.current?.(pt.x, pt.y);
+      }
+    }
+    p.raf = requestAnimationFrame(autoScroll);
+  }
+
   function slotFromPointer(clientX: number, clientY: number) {
     const rect = colsRef.current!.getBoundingClientRect();
     const colWidth = rect.width / colCount;
@@ -344,6 +446,15 @@ export function WeekGrid({
     if (e.target !== e.currentTarget) return;
     if (e.button !== 0) return;
 
+    if (e.pointerType === "touch") {
+      const { startMin } = slotFromPointer(e.clientX, e.clientY);
+      startPress(e, () => {
+        setDraw({ dayIndex, anchorMin: startMin, currentMin: startMin + SLOT_MIN, moved: false });
+        return true;
+      });
+      return;
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId);
     const { startMin } = slotFromPointer(e.clientX, e.clientY);
     setDraw({
@@ -355,10 +466,15 @@ export function WeekGrid({
   }
 
   function onColumnPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (pressSwallows(e)) return;
+    applyColumnMove(e.clientY);
+  }
+
+  function applyColumnMove(clientY: number) {
     if (!draw) return;
     const rect = colsRef.current!.getBoundingClientRect();
     const currentMin = clamp(
-      yToMinutes(e.clientY - rect.top),
+      yToMinutes(clientY - rect.top),
       DAY_START_MIN,
       DAY_END_MIN,
     );
@@ -367,8 +483,25 @@ export function WeekGrid({
   }
 
   function onColumnPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "touch" && press.current) {
+      const armed = press.current.armed;
+      endPress();
+      if (!armed) {
+        // A tap on an empty slot only clears the selection.
+        onSelect(null);
+        return;
+      }
+      if (draw && !draw.moved) {
+        // Held but never dragged: a one-hour draft, like a double click.
+        setDraw(null);
+        openDraw(draw.dayIndex, draw.anchorMin, Math.min(draw.anchorMin + 60, DAY_END_MIN));
+        return;
+      }
+    }
     if (!draw || !drawnRange) return;
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
 
     const span = drawnRange.endMin - drawnRange.startMin;
     const current = draw;
@@ -407,6 +540,21 @@ export function WeekGrid({
     if (e.button !== 0) return;
     e.stopPropagation();
 
+    const target = e.target as HTMLElement;
+    const mode: "move" | "resize" = target.dataset.resize === "true" ? "resize" : "move";
+
+    // By touch nothing is decided yet: a tap selects on release, a quick move
+    // is the page scrolling, and only a hold picks the block up.
+    if (e.pointerType === "touch") {
+      const grabAt = e.clientY;
+      startPress(e, () => {
+        if (!item.movable) return false;
+        beginItemDrag(item, mode, grabAt);
+        return true;
+      });
+      return;
+    }
+
     // Read-only items still select — you can look at one — but never move.
     if (!item.movable) {
       e.preventDefault();
@@ -414,12 +562,12 @@ export function WeekGrid({
       return;
     }
 
-    const target = e.target as HTMLElement;
-    const mode: "move" | "resize" = target.dataset.resize === "true" ? "resize" : "move";
-
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
+    beginItemDrag(item, mode, e.clientY);
+  }
 
+  function beginItemDrag(item: GridItem, mode: "move" | "resize", clientY: number) {
     const rect = colsRef.current!.getBoundingClientRect();
     const { dayIndex, startMin, endMin } = positionOf(item);
     const itemTop = rect.top + slotToY(startMin);
@@ -430,12 +578,17 @@ export function WeekGrid({
       dayIndex,
       startMin,
       endMin,
-      grabY: e.clientY - itemTop,
+      grabY: clientY - itemTop,
       moved: false,
     });
   }
 
   function onItemPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (pressSwallows(e)) return;
+    applyItemMove(e.clientX, e.clientY);
+  }
+
+  function applyItemMove(clientX: number, clientY: number) {
     if (!drag) return;
     const rect = colsRef.current!.getBoundingClientRect();
     const colWidth = rect.width / colCount;
@@ -443,13 +596,13 @@ export function WeekGrid({
 
     if (drag.mode === "move") {
       const column = clamp(
-        Math.floor((e.clientX - rect.left) / colWidth),
+        Math.floor((clientX - rect.left) / colWidth),
         0,
         colCount - 1,
       );
       const dayIndex = days[column] ?? drag.dayIndex;
       const startMin = clamp(
-        yToMinutes(e.clientY - rect.top - drag.grabY),
+        yToMinutes(clientY - rect.top - drag.grabY),
         DAY_START_MIN,
         DAY_END_MIN - duration,
       );
@@ -457,7 +610,7 @@ export function WeekGrid({
       setDrag({ ...drag, dayIndex, startMin, endMin: startMin + duration, moved: true });
     } else {
       const endMin = clamp(
-        yToMinutes(e.clientY - rect.top),
+        yToMinutes(clientY - rect.top),
         drag.startMin + SLOT_MIN,
         DAY_END_MIN,
       );
@@ -467,8 +620,18 @@ export function WeekGrid({
   }
 
   function onItemPointerUp(e: React.PointerEvent<HTMLDivElement>, item: GridItem) {
+    if (e.pointerType === "touch" && press.current) {
+      const armed = press.current.armed;
+      endPress();
+      if (!armed) {
+        onSelect(item.id === selectedId ? null : item.id);
+        return;
+      }
+    }
     if (!drag || drag.id !== item.id) return;
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
 
     if (!drag.moved) {
       onSelect(item.id === selectedId ? null : item.id);
@@ -488,15 +651,32 @@ export function WeekGrid({
    * state and paints the block where the finger last was, for good.
    */
   function onItemPointerCancel() {
+    endPress();
     setDrag(null);
   }
 
   function onColumnPointerCancel() {
+    endPress();
     setDraw(null);
   }
 
+  // The autoscroll loop runs between pointer events, so it reaches the move
+  // handler of the latest render through a ref.
+  useEffect(() => {
+    moveRef.current = (x, y) => {
+      if (drag) applyItemMove(x, y);
+      else if (draw) applyColumnMove(y);
+    };
+  });
+
   return (
-    <div className="flex h-full flex-col no-select">
+    <div
+      className="flex h-full flex-col no-select"
+      // A hold would otherwise open the browser's own menu (Android) on release.
+      onContextMenu={(e) => {
+        if (press.current) e.preventDefault();
+      }}
+    >
       {/* Day headers. With fewer columns than days these double as the picker
           for which day the body is showing, so they stay seven wide. */}
       <div className="flex border-b border-line pr-1 sm:pr-3">
@@ -621,7 +801,7 @@ export function WeekGrid({
       )}
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain">
         <div className="flex pr-1 sm:pr-3">
           {/* Time gutter */}
           <div
@@ -698,14 +878,12 @@ export function WeekGrid({
                 <div
                   key={dayIndex}
                   /**
-                   * `touch-pan-y` rather than `touch-none`: the empty parts of a
-                   * column are most of the grid on a phone, and taking the
-                   * browser's scroll away from them leaves the day unscrollable.
-                   * Drawing a range by finger goes with it — double-tap opens a
-                   * one-hour draft instead — while dragging a block still works,
-                   * because the blocks themselves keep `touch-none`.
+                   * The browser keeps its scroll everywhere on the grid, blocks
+                   * included: a finger that moves straight away is always
+                   * navigation. Drawing a range or moving a block by touch
+                   * starts with a hold instead (see LONG_PRESS_MS).
                    */
-                  className="relative touch-pan-y border-l border-line md:touch-none"
+                  className="relative touch-manipulation border-l border-line"
                   onPointerDown={(e) => onColumnPointerDown(e, dayIndex)}
                   onPointerMove={onColumnPointerMove}
                   onPointerUp={onColumnPointerUp}
@@ -780,7 +958,7 @@ export function WeekGrid({
                         onPointerUp={(e) => onItemPointerUp(e, item)}
                         onPointerCancel={onItemPointerCancel}
                         title={itemTitle(item, startMin, endMin)}
-                        className={`absolute touch-none overflow-hidden rounded-md text-[11px] leading-tight ${
+                        className={`absolute touch-manipulation overflow-hidden rounded-md text-[11px] leading-tight ${
                           external
                             ? `cursor-default border-l-[3px] border-y border-r px-1.5 py-0.5 ${
                                 // Dotted, and hatched below: an archive is time
@@ -792,7 +970,7 @@ export function WeekGrid({
                                 ? "cursor-grab border border-dashed p-[2px]"
                                 : "cursor-grab py-0.5"
                               : "cursor-grab border border-dashed px-1.5 py-0.5"
-                        } ${isDragging ? "z-20 cursor-grabbing opacity-90" : "z-10"} ${
+                        } ${isDragging ? "z-20 cursor-grabbing opacity-90 shadow-lg" : "z-10"} ${
                           isSelected ? "ring-2 ring-accent" : ""
                         } ${
                           dimmed && !filled
