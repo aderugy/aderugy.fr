@@ -85,6 +85,10 @@ export function HandEditor({
   const [actions, setActions] = useState<HandAction[]>(initial.actions);
   const [board, setBoard] = useState<string[]>(initial.board);
   const [skipped, setSkipped] = useState<Set<Street>>(new Set());
+  /** Seats whose cards were not shown at showdown (mucked), so they are not asked for. */
+  const [mucked, setMucked] = useState<Set<number>>(new Set());
+  /** In the result: the board or a seat's shown cards being picked. */
+  const [resultEditing, setResultEditing] = useState<"board" | number | null>(null);
   const [shown, setShown] = useState<Record<number, string[]>>(
     Object.fromEntries(Object.entries(initial.shown).map(([k, v]) => [Number(k), splitCards(v) ?? []])),
   );
@@ -136,6 +140,15 @@ export function HandEditor({
   const needBoard =
     state && !state.end && board.length < BOARD_SIZE[state.street] && !skipped.has(state.street) ? state.street : null;
 
+  // At showdown — on the river, or an all-in that runs the board out — ask
+  // for the rest of the board, then the cards of each opponent still in.
+  const atShowdown = state?.end?.reason === "showdown";
+  const needRunout = atShowdown && board.length < 5 && !skipped.has("river");
+  const needShown =
+    atShowdown && !needRunout
+      ? (state!.seats.find((x) => !x.folded && x.seat !== hero && (shown[x.seat]?.length ?? 0) < 2 && !mucked.has(x.seat))?.seat ?? null)
+      : null;
+
   /* -------------------------------------------------------------- seats */
 
   function seatViews(): SeatView[] {
@@ -171,6 +184,11 @@ export function HandEditor({
     if (phase === "setup") {
       if (tapMode === "button") return setButton(n);
       setDealt((d) => (d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort((a, b) => a - b)));
+      return;
+    }
+    if (phase === "result" && state) {
+      const s = state.seats.find((x) => x.seat === n);
+      if (s && !s.folded && n !== hero) setResultEditing((e) => (e === n ? null : n));
       return;
     }
     if (phase === "action" && state && !needBoard && state.toAct !== null && n !== state.toAct) {
@@ -322,6 +340,25 @@ export function HandEditor({
                   onChange={setBoard}
                   onSkip={() => setSkipped((s) => new Set(s).add(needBoard))}
                 />
+              ) : needRunout ? (
+                <BoardPrompt
+                  key={`runout-${board.length}`}
+                  street="river"
+                  title={board.length ? "Rest of the board" : "The board"}
+                  from={board.length}
+                  board={board}
+                  used={usedCards}
+                  onChange={setBoard}
+                  onSkip={() => setSkipped((s) => new Set(s).add("river"))}
+                />
+              ) : needShown !== null ? (
+                <ShownPrompt
+                  key={`shown-${needShown}`}
+                  label={seatLabel(needShown, pos, names, hero)}
+                  used={usedCards}
+                  onPick={(cards) => setShown((x) => ({ ...x, [needShown]: cards }))}
+                  onMuck={() => setMucked((m) => new Set(m).add(needShown))}
+                />
               ) : state.end ? (
                 <div className="rounded-lg border border-line bg-surface p-3 text-sm">
                   <p className="font-medium">
@@ -354,6 +391,8 @@ export function HandEditor({
 
           {phase === "result" && state && settlement && (
             <ResultPanel
+              editing={resultEditing}
+              setEditing={setResultEditing}
               state={state}
               settlement={settlement}
               winners={winners}
@@ -556,21 +595,26 @@ function BoardPrompt({
   used,
   onChange,
   onSkip,
+  from,
+  title,
 }: {
   street: Street;
   board: string[];
   used: Set<string>;
   onChange: (b: string[]) => void;
   onSkip: () => void;
+  /** Cards already on the board that stay; by default the street's own cards are picked. */
+  from?: number;
+  title?: string;
 }) {
-  const before = board.slice(0, BOARD_SIZE[street] === 3 ? 0 : BOARD_SIZE[street] - 1);
+  const before = board.slice(0, from ?? (BOARD_SIZE[street] === 3 ? 0 : BOARD_SIZE[street] - 1));
   const need = BOARD_SIZE[street] - before.length;
   const [picks, setPicks] = useState<string[]>(board.slice(before.length, BOARD_SIZE[street]));
   const dead = new Set([...used].filter((c) => !picks.includes(c)));
   return (
     <div className="rounded-lg border border-line bg-surface p-3">
       <div className="mb-2 flex items-center gap-2 text-sm">
-        <span className="font-medium">{STREET_LABELS[street]}</span>
+        <span className="font-medium">{title ?? STREET_LABELS[street]}</span>
         <span className="text-xs text-muted">pick {need}</span>
         <span className="flex gap-0.5">
           {picks.map((c) => (
@@ -588,6 +632,46 @@ function BoardPrompt({
         onChange={(next) => {
           setPicks(next);
           if (next.length === need) onChange([...before, ...next]);
+        }}
+      />
+    </div>
+  );
+}
+
+/** The cards an opponent showed down: pick two, or say they were not shown. */
+function ShownPrompt({
+  label,
+  used,
+  onPick,
+  onMuck,
+}: {
+  label: string;
+  used: Set<string>;
+  onPick: (cards: string[]) => void;
+  onMuck: () => void;
+}) {
+  const [picks, setPicks] = useState<string[]>([]);
+  const dead = new Set([...used].filter((c) => !picks.includes(c)));
+  return (
+    <div className="rounded-lg border border-line bg-surface p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm">
+        <span className="min-w-0 truncate font-medium">{label} shows</span>
+        <span className="flex gap-0.5">
+          {picks.map((c) => (
+            <PlayingCard key={c} card={c} size="xs" />
+          ))}
+        </span>
+        <button type="button" onClick={onMuck} className="ml-auto shrink-0 rounded-full border border-line px-2.5 py-1 text-xs text-muted">
+          Not shown
+        </button>
+      </div>
+      <CardGrid
+        count={2}
+        selected={picks}
+        dead={dead}
+        onChange={(next) => {
+          setPicks(next);
+          if (next.length === 2) onPick(next);
         }}
       />
     </div>
@@ -782,6 +866,8 @@ function ActionLog({
 /* -------------------------------------------------------------- result */
 
 function ResultPanel(props: {
+  editing: "board" | number | null;
+  setEditing: (e: "board" | number | null) => void;
   state: HandState;
   settlement: ReturnType<typeof settle>;
   winners: number[][];
@@ -802,8 +888,7 @@ function ResultPanel(props: {
   notes: string;
   setNotes: (v: string) => void;
 }) {
-  const { state, settlement } = props;
-  const [editing, setEditing] = useState<"board" | number | null>(null);
+  const { state, settlement, editing, setEditing } = props;
   const live = state.seats.filter((s) => !s.folded).map((s) => s.seat);
   const showdown = state.end?.reason === "showdown" || (!state.end && live.length > 1);
 
@@ -826,8 +911,12 @@ function ResultPanel(props: {
               <PlayingCard key={c} card={c} size="xs" />
             ))}
           </span>
-          <button type="button" onClick={() => setEditing(editing === "board" ? null : "board")} className="ml-auto text-xs text-muted underline">
-            {editing === "board" ? "done" : "edit"}
+          <button
+            type="button"
+            onClick={() => setEditing(editing === "board" ? null : "board")}
+            className="ml-auto rounded-full border border-line px-3 py-1 text-xs"
+          >
+            {editing === "board" ? "Done" : props.board.length ? "Change" : "Add the board"}
           </button>
         </div>
         {editing === "board" && (
@@ -844,7 +933,7 @@ function ResultPanel(props: {
 
       {showdown && (
         <section>
-          <h3 className="text-xs font-medium tracking-wide text-muted uppercase">Shown</h3>
+          <h3 className="text-xs font-medium tracking-wide text-muted uppercase">Shown · tap a seat or “Add cards”</h3>
           <ul className="mt-1 space-y-1">
             {live
               .filter((s) => s !== props.hero)
@@ -859,8 +948,12 @@ function ResultPanel(props: {
                           <PlayingCard key={c} card={c} size="xs" />
                         ))}
                       </span>
-                      <button type="button" onClick={() => setEditing(editing === s ? null : s)} className="text-xs text-muted underline">
-                        {editing === s ? "done" : cards.length ? "edit" : "add"}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(editing === s ? null : s)}
+                        className="shrink-0 rounded-full border border-line px-3 py-1 text-xs"
+                      >
+                        {editing === s ? "Done" : cards.length ? "Change" : "Add cards"}
                       </button>
                     </div>
                     {editing === s && (
