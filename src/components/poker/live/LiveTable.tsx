@@ -30,6 +30,8 @@ export type SeatView = {
   cards?: string | null;
   /** Face-down cards in front of a seat still in the hand. */
   hidden?: boolean;
+  /** No cards yet, but they can be added: an empty slot to tap. */
+  addCards?: boolean;
 };
 
 const fmt = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(2).replace(/0$/, ""));
@@ -53,9 +55,12 @@ export function LiveTable({
   onSeat,
   selected,
   label,
+  onCards,
 }: {
   size: number;
   seats: SeatView[];
+  /** Tapping a seat's cards (or its empty card slot) — distinct from tapping the seat. */
+  onCards?: (seat: number) => void;
   button?: number | null;
   toAct?: number | null;
   center?: ReactNode;
@@ -118,17 +123,35 @@ export function LiveTable({
               style={at(p)}
               aria-label={`Seat ${n}${s.name ? `, ${s.name}` : s.kind === "empty" ? ", empty" : ""}`}
             >
-              {(cards || s.hidden) && (
-                <span className={`mb-0.5 flex gap-0.5 ${s.out ? "opacity-40" : ""}`}>
+              {(cards || s.hidden || (s.addCards && onCards)) && (
+                <span
+                  role={onCards ? "button" : undefined}
+                  tabIndex={onCards ? 0 : undefined}
+                  aria-label={onCards ? `Cards of seat ${n}` : undefined}
+                  onClick={
+                    onCards
+                      ? (e) => {
+                          e.stopPropagation();
+                          onCards(n);
+                        }
+                      : undefined
+                  }
+                  className={`mb-0.5 flex gap-0.5 ${onCards ? "-m-1.5 cursor-pointer p-1.5" : ""} ${s.out && !cards ? "opacity-40" : ""}`}
+                >
                   {cards ? (
                     <>
                       <PlayingCard card={cards[0]} size="xs" />
                       <PlayingCard card={cards[1]} size="xs" />
                     </>
-                  ) : (
+                  ) : s.hidden ? (
                     <>
                       <CardBack size="xs" />
                       <CardBack size="xs" />
+                    </>
+                  ) : (
+                    <>
+                      <EmptySlot size="xs" />
+                      <EmptySlot size="xs" />
                     </>
                   )}
                 </span>
@@ -188,15 +211,66 @@ function SeatChip({ s, dim, toAct, selected }: { s: SeatView; dim: boolean; toAc
   );
 }
 
-/** The board and the pot, for the middle of the felt. */
-export function FeltCenter({ board, pot, note }: { board: string[]; pot?: number | null; note?: string | null }) {
+export type BoardStreet = "flop" | "turn" | "river";
+
+/** Which street a board card belongs to: the first three are the flop. */
+export function streetOfCard(i: number): BoardStreet {
+  return i < 3 ? "flop" : i === 3 ? "turn" : "river";
+}
+
+function EmptySlot({ size }: { size: "xs" | "sm" }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center border border-dashed border-white/60 bg-black/15 text-white/80 ${
+        size === "xs" ? "h-5 w-4 rounded-[3px] text-[9px]" : "h-9 w-7 rounded text-sm"
+      }`}
+    >
+      +
+    </span>
+  );
+}
+
+/**
+ * The board and the pot, for the middle of the felt. With `onBoard`, each
+ * card is a button for its street, and `slots` (up to five) draws empty
+ * places for the cards still to come.
+ */
+export function FeltCenter({
+  board,
+  pot,
+  note,
+  onBoard,
+  slots = 0,
+}: {
+  board: string[];
+  pot?: number | null;
+  note?: string | null;
+  onBoard?: (street: BoardStreet) => void;
+  slots?: number;
+}) {
+  const shown = Math.max(board.length, onBoard ? Math.min(slots, 5) : 0);
   return (
     <>
-      {board.length > 0 && (
+      {shown > 0 && (
         <span className="inline-flex gap-0.5">
-          {board.map((c) => (
-            <PlayingCard key={c} card={c} size="sm" />
-          ))}
+          {Array.from({ length: shown }, (_, i) => {
+            const c = board[i];
+            // An empty place is only open for the next street to fill.
+            const open = c || i === board.length || (board.length < 3 && i < 3);
+            const face = c ? <PlayingCard card={c} size="sm" /> : <EmptySlot size="sm" />;
+            if (!onBoard || !open) return <span key={c ?? `slot-${i}`} className={c ? "" : "opacity-40"}>{face}</span>;
+            return (
+              <button
+                key={c ?? `slot-${i}`}
+                type="button"
+                onClick={() => onBoard(streetOfCard(i))}
+                aria-label={c ? `Change the ${streetOfCard(i)}` : `Add the ${streetOfCard(i)}`}
+                className="rounded"
+              >
+                {face}
+              </button>
+            );
+          })}
         </span>
       )}
       {pot != null && pot > 0 && (

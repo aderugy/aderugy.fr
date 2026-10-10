@@ -151,9 +151,11 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
           seats={views}
           button={hand.button_seat}
           toAct={atEnd ? null : state.toAct}
+          onCards={() => setEditing(true)}
           center={
             <FeltCenter
               board={boardShown}
+              onBoard={() => setEditing(true)}
               pot={state.pot + state.seats.reduce((t, s) => t + s.street, 0)}
               note={state.end && atEnd ? (state.end.reason === "fold" ? `${label(state.end.winner)} wins` : "Showdown") : STREET_LABELS[state.street]}
             />
