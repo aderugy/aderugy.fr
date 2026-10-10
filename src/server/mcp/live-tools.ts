@@ -134,6 +134,12 @@ export function registerLiveTools(server: McpServer) {
         `${fmtDateTime(s.started_at)} → ${s.ended_at ? fmtDateTime(s.ended_at) : "still running"} · played ${fmtDuration(sum.playedMs)}`,
         `Money: ${money.join(", ")}${s.ended_at ? ` · cash-out ${fmtMoney(s.cash_out ?? 0, s.currency)} · result ${sum.net! >= 0 ? "+" : ""}${fmtMoney(sum.net!, s.currency)}${sum.hourly !== null ? ` (${fmtMoney(Math.round(sum.hourly), s.currency)}/h)` : ""}` : ""}`,
         breaks.length ? `Breaks: ${breaks.join(", ")}` : "",
+        !s.ended_at && Object.keys(s.stacks).length
+          ? `Stacks now: ${Object.entries(s.stacks)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([seat, v]) => `seat ${seat}${Number(seat) === s.hero_seat ? " (Arthur)" : ""} ${v}`)
+              .join(", ")}`
+          : "",
         "",
         "## Session notes",
         s.notes ?? "_(none)_",

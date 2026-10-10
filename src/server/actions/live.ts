@@ -30,6 +30,7 @@ import {
   reopenSession as reopenSessionRow,
   replaceOccupant,
   seatUnknown as seatUnknownRow,
+  setStack as setStackRow,
   setOccupant,
   setPlayerTags,
   startSession as startSessionRow,
@@ -172,6 +173,11 @@ export async function identifyAsUnknown(sessionId: string, seat: number): Promis
     if (!r.ok) await removePlayer(supabase, user.id, created.value.id);
     return r;
   });
+}
+
+/** What a seat has in front of it now; empty clears it. */
+export async function setStack(sessionId: string, seat: number, value: number | string | null): Promise<ActionResult> {
+  return act(({ supabase, user }) => setStackRow(supabase, user.id, sessionId, seat, value));
 }
 
 /** Where the button is for the next hand: a seat, or one seat on. */

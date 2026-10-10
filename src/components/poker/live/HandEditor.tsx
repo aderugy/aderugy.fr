@@ -412,7 +412,8 @@ function SetupPanel(props: {
   setupError: string | null;
   onNext: () => void;
 }) {
-  const [showStacks, setShowStacks] = useState(Object.keys(props.stacks).length > 0);
+  // Open by default: stacks matter (all-ins, effective stacks) and come prefilled from the table.
+  const [showStacks, setShowStacks] = useState(true);
   const [showPosts, setShowPosts] = useState(Object.keys(props.postsBy).length > 0);
   // Anyone dealt in but the blinds may be buying them back.
   // (A seat already marked stays listed, so a mark that no longer fits can be cleared.)
@@ -481,6 +482,28 @@ function SetupPanel(props: {
       </section>
 
       <section>
+        <button type="button" onClick={() => setShowStacks((s) => !s)} className="text-xs text-muted">
+          {showStacks ? "▾" : "▸"} Stacks — from the table, change them if needed
+        </button>
+        {showStacks && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {props.dealt.map((s) => (
+              <label key={s} className="text-xs text-muted">
+                {s === props.hero ? "You" : (props.names.get(s)?.name ?? `Seat ${s}`)} · {s}
+                <input
+                  inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
+                  value={props.stacks[s] ?? ""}
+                  placeholder="?"
+                  onChange={(e) => props.setStacks((x) => ({ ...x, [s]: e.target.value }))}
+                  className={INPUT}
+                />
+              </label>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
         <button type="button" onClick={() => setShowPosts((s) => !s)} className="text-xs text-muted">
           {showPosts ? "▾" : "▸"} Blinds bought back
           {Object.keys(props.postsBy).length > 0 ? ` · ${Object.keys(props.postsBy).length}` : ""}
@@ -509,28 +532,6 @@ function SetupPanel(props: {
               })}
             </div>
           </>
-        )}
-      </section>
-
-      <section>
-        <button type="button" onClick={() => setShowStacks((s) => !s)} className="text-xs text-muted">
-          {showStacks ? "▾" : "▸"} Stacks (optional — needed for all-ins and effective stacks)
-        </button>
-        {showStacks && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {props.dealt.map((s) => (
-              <label key={s} className="text-xs text-muted">
-                {s === props.hero ? "You" : (props.names.get(s)?.name ?? `Seat ${s}`)} · {s}
-                <input
-                  inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
-                  value={props.stacks[s] ?? ""}
-                  placeholder="?"
-                  onChange={(e) => props.setStacks((x) => ({ ...x, [s]: e.target.value }))}
-                  className={INPUT}
-                />
-              </label>
-            ))}
-          </div>
         )}
       </section>
 

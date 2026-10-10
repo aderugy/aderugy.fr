@@ -1,5 +1,5 @@
 -- Migration 0022: unknown players, merging an unknown into a known player,
--- blinds bought back on a hand.
+-- stacks on the session, blinds bought back on a hand.
 --
 -- Run after stub.sql and every migration (see oauth_scope_test.sql for the
 -- commands), from the repository root:
@@ -49,6 +49,16 @@ select pg_temp.check(
 select pg_temp.check(
   (select posts from public.live_hands where id = '24000000-0000-4000-8000-0000000000f1') = '[]'::jsonb,
   'a hand has no blinds bought back by default');
+
+select pg_temp.check(
+  (select stacks from public.live_sessions where id = '23000000-0000-4000-8000-0000000000f1') = '{}'::jsonb,
+  'a session starts with no stacks');
+
+do $$ begin
+  update public.live_sessions set stacks = '[250]' where id = '23000000-0000-4000-8000-0000000000f1';
+  raise exception 'FAIL: stacks that are not seat → chips';
+exception when check_violation then raise notice 'ok   stacks are an object, seat → chips';
+end $$;
 
 do $$ begin
   update public.live_hands set posts = '{"seat": 2}' where id = '24000000-0000-4000-8000-0000000000f1';

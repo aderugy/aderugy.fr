@@ -21,6 +21,7 @@ import {
 import { buttonFor, checkSeatEvent, dealtIn, heroSeatAt, nextButton, seatedTogether, tableAt } from "./table";
 import { fmtDuration, summarize, totals } from "./session";
 import type { HandAction, SeatEvent, SessionEvent } from "./types";
+import { addToStack, moveStack, stackOf, stacksAfterHand, withStack } from "./stacks";
 import { fmtMoney, isBlankUnknown, parseAmount, splitCards, unknownLabel, unknownName } from "./types";
 
 const seats = (nums: number[], stacks: Record<number, number> = {}) =>
@@ -520,4 +521,59 @@ test("a hand with blinds bought back is checked and written out", () => {
   assert.deepEqual(c.input.posts, [{ seat: 5, live: 2, dead: 1 }], "empty posts are dropped");
   const hand = { ...base, ...c.input, id: "h", session_id: "s", number: 1, played_at: "", created_at: "", updated_at: "" } as LiveHand;
   assert.match(handText(hand, () => null, "€"), /Blinds bought back: seat 5 \(BTN\) posts 2 \+ 1 dead/);
+});
+
+/* ----------------------------------------------------------------- stacks */
+
+test("stacks follow the table: set, cleared, moved, topped up", () => {
+  let st = withStack({}, 4, 200);
+  assert.equal(stackOf(st, 4), 200);
+  assert.equal(stackOf(st, 5), null);
+  st = addToStack(st, 4, 100);
+  assert.equal(stackOf(st, 4), 300, "a rebuy adds to a known stack");
+  assert.equal(stackOf(addToStack({}, 2, 150), 2), 150, "or becomes the stack");
+  st = moveStack(st, 4, 9);
+  assert.deepEqual(st, { "9": 300 }, "a change of seat carries it");
+  assert.deepEqual(withStack(st, 9, null), {}, "cleared when they leave");
+  assert.deepEqual(withStack(st, 9, 0), {}, "nothing left is no stack");
+});
+
+test("after a hand each known stack moves by what the seat won or lost", () => {
+  // Button 5, SB 6, BB 7: seat 2 raises, 7 calls, seat 2 bets and takes it.
+  const handSeats = [
+    { seat: 2, player_id: null, stack: 300 },
+    { seat: 5, player_id: null, stack: 150 },
+    { seat: 6, player_id: null, stack: null },
+    { seat: 7, player_id: null, stack: 200 },
+  ];
+  const r = playHand({ seats: handSeats, button: 5, sb: 1, bb: 2 }, [
+    { seat: 2, kind: "raise", to: 6 },
+    { seat: 5, kind: "fold" },
+    { seat: 6, kind: "fold" },
+    { seat: 7, kind: "call" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "bet", to: 10 },
+    { seat: 7, kind: "fold" },
+  ]);
+  assert.equal(r.ok, true, r.error ?? "");
+  const before = { "2": 300, "5": 150, "6": 80, "7": 200 };
+  const after = stacksAfterHand(before, handSeats, settle(r.state));
+  assert.deepEqual(after, { "2": 307, "5": 150, "6": 80, "7": 194 }, "6 had no stack in the hand: the table's is kept");
+
+  // An unsettled pot (a showdown nobody was named for) changes nothing.
+  const sd = playHand({ seats: handSeats, button: 5, sb: 1, bb: 2 }, [
+    { seat: 2, kind: "call" },
+    { seat: 5, kind: "fold" },
+    { seat: 6, kind: "fold" },
+    { seat: 7, kind: "check" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "check" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "check" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "check" },
+  ]);
+  assert.equal(sd.state.end?.reason, "showdown");
+  assert.deepEqual(stacksAfterHand(before, handSeats, settle(sd.state)), before);
+  assert.deepEqual(stacksAfterHand(before, handSeats, settle(sd.state, [[7]])), { ...before, "2": 298, "7": 203 });
 });

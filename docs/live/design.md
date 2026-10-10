@@ -8,7 +8,7 @@ hands entered action by action, then replayed.
 
 | Table | What it holds |
 |---|---|
-| `live_sessions` | Venue, game, blinds, currency, 9 or 10 seats, Arthur's current seat, where the button is for the next hand, start/end, cash-out, notes. **At most one running** per user (partial unique index). An ended session must have a cash-out. |
+| `live_sessions` | Venue, game, blinds, currency, 9 or 10 seats, Arthur's current seat, where the button is for the next hand, each seat's stack now (`stacks`), start/end, cash-out, notes. **At most one running** per user (partial unique index). An ended session must have a cash-out. |
 | `live_session_events` | `buy_in`, `rebuy` (with an amount), `break_start`, `break_end`. |
 | `live_seat_events` | The table's log: `sit`, `sit_out`, `back`, `leave`, `hero_move`. `player_id` null = nobody on file (sessions from before unknown players). A seat must exist at the session's table (trigger). |
 | `live_players` | Name or nickname, description (how to recognise them), `known` (false for an unknown player). |
@@ -41,6 +41,16 @@ Upgrading one, from the seat sheet or the player page:
   description (taken, or appended to theirs). Then the unknown is deleted.
   Refused when the two sat at the same table at the same time. Security
   invoker, so RLS applies; a connected app (Claude) may not call it.
+
+## Stacks
+
+`live_sessions.stacks` (seat → chips, rules in `src/lib/live/stacks.ts`) is what
+each seat has in front of it now. Set it from any seat sheet ("Stack", typed
+straight in), Arthur's included; it shows under each name on the table. Arthur
+starts with his buy-in and each rebuy is added. A change of seat carries the
+stack; a seat that empties or gets someone new is cleared. A new hand starts
+from these stacks (editable in its setup), and saving a hand moves each known
+stack by what the seat won or lost — once every pot has a taker, before rake.
 
 ## The table is a log
 

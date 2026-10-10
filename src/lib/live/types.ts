@@ -31,6 +31,8 @@ export type LiveSession = {
   hero_seat: number;
   /** Where the button is for the next hand; null before the first one. */
   button_seat: number | null;
+  /** What each seat has in front of it now, seat number → chips (see stacks.ts). */
+  stacks: Record<string, number>;
   started_at: string;
   ended_at: string | null;
   cash_out: number | null;

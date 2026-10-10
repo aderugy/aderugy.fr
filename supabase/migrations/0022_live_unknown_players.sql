@@ -1,5 +1,5 @@
 -- /poker/live — unknown players are players, the button is the next hand's,
--- and a hand can carry blinds bought back.
+-- the table knows everyone's stack, and a hand can carry blinds bought back.
 --
 -- Unknown players. Until now someone not identified was a seat with no
 -- player (`player_id` null): no tags, no description, no notes. Now they are
@@ -13,6 +13,12 @@
 -- hand entered; it is now where the button is for the next hand. Saving a hand
 -- moves it on one seat, and Arthur can move it himself. When that seat is no
 -- longer dealt in, the next hand takes the first seat dealt in after it.
+--
+-- Stacks. `live_sessions.stacks` is what each seat has in front of it now,
+-- {"4": 250, "7": 410}: set from the table, Arthur's from his buy-in and
+-- rebuys, carried by a change of seat, cleared when the player leaves, and
+-- moved by each hand saved (stack + what the seat won or lost). A new hand
+-- starts from them.
 --
 -- Blinds bought back. A player back from missing the blinds posts them before
 -- the cards: the big blind live (it counts as their bet, they keep the option)
@@ -32,6 +38,15 @@ create index if not exists live_players_user_known_idx on public.live_players (u
 
 comment on column public.live_sessions.button_seat is
   'Where the button is for the next hand. Saving a hand moves it to the next seat dealt in; null before the first hand (the lowest seat dealt in).';
+
+-- ------------------------------------------------------------------ stacks
+
+alter table public.live_sessions
+  add column if not exists stacks jsonb not null default '{}';
+
+alter table public.live_sessions drop constraint if exists live_sessions_stacks_object;
+alter table public.live_sessions
+  add constraint live_sessions_stacks_object check (jsonb_typeof(stacks) = 'object');
 
 -- ------------------------------------------------------- blinds bought back
 

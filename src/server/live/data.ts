@@ -19,6 +19,7 @@ import {
 } from "@/lib/live/types";
 import { buttonFor, checkSeatEvent, dealtIn, heroSeatAt, nextButton, seatedTogether, sortSeatEvents, tableAt } from "@/lib/live/table";
 import { breaksOf } from "@/lib/live/session";
+import { addToStack, moveStack, stacksAfterHand, withStack, type Stacks } from "@/lib/live/stacks";
 import { checkHand } from "@/lib/live/validate";
 
 /**
@@ -33,7 +34,7 @@ import { checkHand } from "@/lib/live/validate";
  */
 
 const SESSION_COLUMNS =
-  "id, venue, game, small_blind, big_blind, currency, seats, hero_seat, button_seat, started_at, ended_at, cash_out, notes, created_at, updated_at";
+  "id, venue, game, small_blind, big_blind, currency, seats, hero_seat, button_seat, stacks, started_at, ended_at, cash_out, notes, created_at, updated_at";
 const EVENT_COLUMNS = "id, session_id, kind, amount, at";
 const SEAT_EVENT_COLUMNS = "id, session_id, seat, kind, player_id, at, created_at";
 const PLAYER_COLUMNS = "id, name, description, known, created_at, updated_at";
@@ -95,7 +96,17 @@ function asSession(row: Record<string, unknown>): LiveSession {
     small_blind: num(row.small_blind),
     big_blind: num(row.big_blind),
     cash_out: numOrNull(row.cash_out),
+    stacks: Object.fromEntries(
+      Object.entries((row.stacks as Record<string, unknown> | null) ?? {})
+        .map(([k, v]) => [k, Number(v)] as const)
+        .filter(([, v]) => Number.isFinite(v) && v > 0),
+    ),
   };
+}
+
+async function saveStacks(db: SupabaseClient, userId: string, sessionId: string, stacks: Stacks): Promise<void> {
+  const { error } = await db.from("live_sessions").update({ stacks }).eq("user_id", userId).eq("id", sessionId);
+  if (error) throw error;
 }
 
 function asEvent(row: Record<string, unknown>): SessionEvent {
@@ -266,7 +277,7 @@ export async function startSession(db: SupabaseClient, userId: string, input: Ne
 
   const { data, error } = await db
     .from("live_sessions")
-    .insert({ user_id: userId, ...fields, seats, hero_seat: hero, started_at: startedAt })
+    .insert({ user_id: userId, ...fields, seats, hero_seat: hero, started_at: startedAt, stacks: { [String(hero)]: buyIn } })
     .select(SESSION_COLUMNS)
     .single();
   if (error) {
@@ -446,6 +457,9 @@ export async function addMoney(
     .from("live_session_events")
     .insert({ user_id: userId, session_id: sessionId, kind: input.kind, amount: value, at });
   if (error) throw error;
+  // Money in during the session lands on Arthur's stack.
+  const session = await getSession(db, userId, sessionId);
+  if (session && !session.ended_at) await saveStacks(db, userId, sessionId, addToStack(session.stacks, session.hero_seat, value));
   return { ok: true };
 }
 
@@ -557,9 +571,38 @@ export async function logSeatEvent(
     throw error;
   }
   if (input.kind === "hero_move") {
-    const { error: e2 } = await db.from("live_sessions").update({ hero_seat: seat }).eq("user_id", userId).eq("id", sessionId);
+    const { error: e2 } = await db
+      .from("live_sessions")
+      .update({ hero_seat: seat, stacks: moveStack(ctx.session.stacks, ctx.session.hero_seat, seat) })
+      .eq("user_id", userId)
+      .eq("id", sessionId);
     if (e2) throw e2;
+  } else if (input.kind === "leave" || input.kind === "sit") {
+    // A seat that empties, or fills with someone new, starts with no known stack.
+    await saveStacks(db, userId, sessionId, withStack(ctx.session.stacks, seat, null));
   }
+  return { ok: true };
+}
+
+/** What a seat has in front of it now; null or "" clears it. */
+export async function setStack(
+  db: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  seat: number,
+  raw: number | string | null,
+): Promise<Result> {
+  const session = await getSession(db, userId, sessionId);
+  if (!session) return { ok: false, error: "No such session." };
+  if (session.ended_at) return { ok: false, error: "This session has ended." };
+  if (!Number.isInteger(seat) || seat < 1 || seat > session.seats) return { ok: false, error: `There is no seat ${seat}.` };
+  let value: number | null = null;
+  if (raw !== null && String(raw).trim() !== "") {
+    const v = amount(raw, "A stack");
+    if (typeof v === "string") return { ok: false, error: v };
+    value = v;
+  }
+  await saveStacks(db, userId, sessionId, withStack(session.stacks, seat, value));
   return { ok: true };
 }
 
@@ -597,6 +640,7 @@ export async function replaceOccupant(db: SupabaseClient, userId: string, sessio
     await db.from("live_players").delete().eq("user_id", userId).eq("id", created.value.id);
     throw error;
   }
+  await saveStacks(db, userId, sessionId, withStack(ctx.session.stacks, seat, null));
   return { ok: true };
 }
 
@@ -648,6 +692,7 @@ export async function moveSeat(
   // One insert: all or nothing.
   const { error } = await db.from("live_seat_events").insert(rows);
   if (error) throw error;
+  await saveStacks(db, userId, sessionId, moveStack(ctx.session.stacks, from, to));
   return { ok: true };
 }
 
@@ -1154,8 +1199,10 @@ export async function createHand(
   const session = await getSession(db, userId, sessionId);
   if (!session) return { ok: false, error: "No such session." };
   let input: HandInput;
+  let checked: ReturnType<typeof checkHand>;
   try {
-    input = checkHand(raw, session.seats).input;
+    checked = checkHand(raw, session.seats);
+    input = checked.input;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -1167,12 +1214,13 @@ export async function createHand(
     .select(HAND_COLUMNS)
     .single();
   if (error) throw error;
-  // The button moves on: to the next seat that was dealt into this hand.
+  // The button moves on, to the next seat that was dealt into this hand, and
+  // the stacks move by what each seat won or lost.
   if (!session.ended_at) {
     const next = nextButton(input.button_seat, input.seats.map((s) => s.seat));
     const { error: e2 } = await db
       .from("live_sessions")
-      .update({ button_seat: next })
+      .update({ button_seat: next, stacks: stacksAfterHand(session.stacks, input.seats, checked.settlement) })
       .eq("user_id", userId)
       .eq("id", sessionId);
     if (e2) throw e2;

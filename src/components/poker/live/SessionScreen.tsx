@@ -14,7 +14,8 @@ import { ErrorLine } from "@/components/jobs/bits";
 import { DEFAULT_COLOR } from "@/lib/categories";
 import { buttonFor, dealtIn, emptySeats, tableAt, type Table } from "@/lib/live/table";
 import { fmtDuration, summarize } from "@/lib/live/session";
-import { fmtChips, fmtMoney, fmtStakes, unknownLabel, type HandInput } from "@/lib/live/types";
+import { fmtChips, fmtMoney, fmtStakes, parseAmount, unknownLabel, type HandInput } from "@/lib/live/types";
+import { stackOf } from "@/lib/live/stacks";
 import type { SessionBundle } from "@/server/live/data";
 import {
   addMoney,
@@ -31,6 +32,7 @@ import {
   seatEvent,
   seatNewPlayer,
   seatUnknown,
+  setStack,
   setTags,
   toggleBreak,
   updatePlayer,
@@ -62,8 +64,9 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
 
   const views: SeatView[] = [];
   for (let n = 1; n <= session.seats; n++) {
+    const stack = stackOf(session.stacks, n);
     if (n === session.hero_seat) {
-      views.push({ seat: n, kind: "hero" });
+      views.push({ seat: n, kind: "hero", sub: stack !== null ? fmtChips(stack) : undefined });
       continue;
     }
     const o = table.get(n);
@@ -75,7 +78,7 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
       name: p ? (p.known ? p.name : unknownLabel(p)) : undefined,
       colors: colorsOf(o.player_id),
       sittingOut: o.sittingOut,
-      sub: o.sittingOut ? `out ${fmtClock(o.statusSince)}` : undefined,
+      sub: o.sittingOut ? `out ${fmtClock(o.statusSince)}` : stack !== null ? fmtChips(stack) : undefined,
     });
   }
 
@@ -247,7 +250,8 @@ function newHand(session: SessionBundle["session"], table: Table, button: number
     big_blind: session.big_blind,
     straddle: null,
     posts: [],
-    seats: dealt.map((seat) => ({ seat, player_id: table.get(seat)?.player_id ?? null, stack: null })),
+    // Each seat starts with the stack the table knows.
+    seats: dealt.map((seat) => ({ seat, player_id: table.get(seat)?.player_id ?? null, stack: stackOf(session.stacks, seat) })),
     actions: [],
     hero_cards: null,
     board: [],
@@ -307,7 +311,14 @@ function SeatSheet({
   if (seat === session.hero_seat) {
     return (
       <Sheet open onClose={onClose} title={`You · seat ${seat}`}>
-        <p className="mb-2 text-sm text-muted">Changing seat? Pick the new one.</p>
+        <StackField
+          key={`stack-${seat}-${stackOf(session.stacks, seat) ?? ""}`}
+          value={stackOf(session.stacks, seat)}
+          currency={session.currency}
+          pending={pending}
+          onSave={(v) => run(() => setStack(session.id, seat, v))}
+        />
+        <p className="mb-2 mt-4 text-sm text-muted">Changing seat? Pick the new one.</p>
         <SeatButtons seats={empties} pending={pending} onPick={(to) => run(() => seatEvent(session.id, { kind: "hero_move", seat: to }), onClose)} />
         <ErrorLine error={error} />
         {buttonLine}
@@ -449,6 +460,13 @@ function SeatSheet({
   return (
     <Sheet open onClose={onClose} title={title}>
       <div className={`space-y-4 ${pending ? "opacity-70" : ""}`}>
+        <StackField
+          key={`stack-${seat}-${stackOf(session.stacks, seat) ?? ""}`}
+          value={stackOf(session.stacks, seat)}
+          currency={session.currency}
+          pending={pending}
+          onSave={(v) => run(() => setStack(session.id, seat, v))}
+        />
         {!player.known && (
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -526,6 +544,52 @@ function SeatActions({
         </BarButton>
       )}
     </div>
+  );
+}
+
+/**
+ * The stack in front of a seat, typed straight in: saved on Enter or when the
+ * field loses focus. Empty clears it. Hands move it by themselves afterwards.
+ */
+function StackField({
+  value,
+  currency,
+  pending,
+  onSave,
+}: {
+  value: number | null;
+  currency: string;
+  pending: boolean;
+  onSave: (v: string | null) => void;
+}) {
+  const [draft, setDraft] = useState(value !== null ? fmtChips(value) : "");
+  const save = () => {
+    const parsed = parseAmount(draft);
+    if (parsed === value || (parsed === null && value === null)) return;
+    onSave(draft.trim() ? draft : null);
+  };
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <span className="w-14 shrink-0 text-xs font-medium tracking-wide text-muted uppercase">Stack</span>
+      <input
+        inputMode="decimal"
+        enterKeyHint="done"
+        value={draft}
+        placeholder="?"
+        disabled={pending}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+        className={`${INPUT} text-base tabular-nums`}
+      />
+      <span className="text-sm text-muted">{currency}</span>
+    </label>
   );
 }
 
