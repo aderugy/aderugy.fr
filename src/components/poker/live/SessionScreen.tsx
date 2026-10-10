@@ -12,19 +12,25 @@ import { HandRow, Timeline } from "./SessionParts";
 import { useAction } from "@/components/jobs/controls";
 import { ErrorLine } from "@/components/jobs/bits";
 import { DEFAULT_COLOR } from "@/lib/categories";
-import { dealtIn, emptySeats, nextButton, tableAt, type Table } from "@/lib/live/table";
+import { buttonFor, dealtIn, emptySeats, tableAt, type Table } from "@/lib/live/table";
 import { fmtDuration, summarize } from "@/lib/live/session";
-import { fmtChips, fmtMoney, fmtStakes, type HandInput } from "@/lib/live/types";
+import { fmtChips, fmtMoney, fmtStakes, unknownLabel, type HandInput } from "@/lib/live/types";
 import type { SessionBundle } from "@/server/live/data";
 import {
   addMoney,
   createHand,
   endSession,
   identifyAsNewPlayer,
+  identifyAsUnknown,
   identifySeat,
+  mergePlayers,
+  moveButton,
   moveSeat,
+  promotePlayer,
+  replaceWithUnknown,
   seatEvent,
   seatNewPlayer,
+  seatUnknown,
   setTags,
   toggleBreak,
   updatePlayer,
@@ -65,15 +71,17 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
     const p = o.player_id ? playerById.get(o.player_id) : null;
     views.push({
       seat: n,
-      kind: p ? "player" : "unknown",
-      name: p?.name,
+      kind: p?.known ? "player" : "unknown",
+      name: p ? (p.known ? p.name : unknownLabel(p)) : undefined,
       colors: colorsOf(o.player_id),
       sittingOut: o.sittingOut,
       sub: o.sittingOut ? `out ${fmtClock(o.statusSince)}` : undefined,
     });
   }
 
-  const nextHandButton = nextButton(session.button_seat, dealtIn(table, session.hero_seat));
+  // The button for the next hand: it moves on each time a hand is saved, or
+  // with "Hand played" for one not entered.
+  const nextHandButton = buttonFor(session.button_seat, dealtIn(table, session.hero_seat));
 
   const close = () => {
     setPanel(null);
@@ -105,10 +113,25 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
           <LiveTable
             size={session.seats}
             seats={views}
-            button={session.button_seat}
+            button={nextHandButton}
             onSeat={(seat) => setPanel({ kind: "seat", seat })}
             center={<FeltCenter board={[]} note="Tap a seat" />}
           />
+        </div>
+        <div className="flex items-center justify-center gap-3 px-3 text-xs text-muted">
+          <span>
+            Button: seat {nextHandButton}
+            {nextHandButton === session.hero_seat ? " (you)" : ""}
+          </span>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => moveButton(session.id, "next"))}
+            className="rounded-full border border-line px-2.5 py-1 text-foreground disabled:opacity-50"
+            title="A hand was played without being entered: the button moves on"
+          >
+            Hand played ›
+          </button>
         </div>
         <ErrorLine error={panel === null ? error : null} />
 
@@ -157,6 +180,7 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
           data={data}
           table={table}
           seated={seated}
+          button={nextHandButton}
           onClose={close}
         />
       )}
@@ -191,7 +215,7 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
           size={session.seats}
           currency={session.currency}
           heroSeat={session.hero_seat}
-          names={namesFromTable(table, (id) => playerById.get(id)?.name ?? null, colorsOf)}
+          names={namesFromTable(table, (id) => playerById.get(id) ?? null, colorsOf)}
           initial={newHand(session, table, nextHandButton)}
           onSave={(input) => createHand(session.id, input)}
           onClose={close}
@@ -203,12 +227,13 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
 
 export function namesFromTable(
   table: Table,
-  nameOf: (id: string) => string | null,
+  playerOf: (id: string) => { name: string; known: boolean } | null,
   colorsOf: (id: string | null) => string[],
 ): Map<number, SeatName> {
   const out = new Map<number, SeatName>();
   for (const o of table.values()) {
-    out.set(o.seat, { playerId: o.player_id, name: o.player_id ? nameOf(o.player_id) : null, colors: colorsOf(o.player_id) });
+    const p = o.player_id ? playerOf(o.player_id) : null;
+    out.set(o.seat, { playerId: o.player_id, name: p?.name ?? null, known: p?.known ?? true, colors: colorsOf(o.player_id) });
   }
   return out;
 }
@@ -221,6 +246,7 @@ function newHand(session: SessionBundle["session"], table: Table, button: number
     small_blind: session.small_blind,
     big_blind: session.big_blind,
     straddle: null,
+    posts: [],
     seats: dealt.map((seat) => ({ seat, player_id: table.get(seat)?.player_id ?? null, stack: null })),
     actions: [],
     hero_cards: null,
@@ -240,20 +266,42 @@ function SeatSheet({
   data,
   table,
   seated,
+  button,
   onClose,
 }: {
   seat: number;
   data: SessionBundle;
   table: Table;
   seated: Map<string, number>;
+  /** Where the button is for the next hand. */
+  button: number;
   onClose: () => void;
 }) {
   const { session, players, tags, notes } = data;
   const { pending, error, run } = useAction();
-  const [mode, setMode] = useState<"main" | "identify" | "move">("main");
+  const [mode, setMode] = useState<"main" | "identify" | "move" | "name" | "merge">("main");
+  const [newName, setNewName] = useState("");
   const occupant = table.get(seat);
   const player = occupant?.player_id ? players.find((p) => p.id === occupant.player_id) : null;
   const empties = emptySeats(table, session.seats, session.hero_seat);
+  const back = (
+    <button type="button" onClick={() => setMode("main")} className="mt-3 text-xs text-muted underline">
+      Back
+    </button>
+  );
+  const buttonLine =
+    seat === button ? (
+      <p className="mt-3 text-center text-xs text-muted">The button is here for the next hand.</p>
+    ) : (
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => run(() => moveButton(session.id, seat), onClose)}
+        className="mt-3 block w-full text-center text-xs text-muted underline"
+      >
+        Put the button here
+      </button>
+    );
 
   // Arthur's own seat: he can move.
   if (seat === session.hero_seat) {
@@ -262,11 +310,12 @@ function SeatSheet({
         <p className="mb-2 text-sm text-muted">Changing seat? Pick the new one.</p>
         <SeatButtons seats={empties} pending={pending} onPick={(to) => run(() => seatEvent(session.id, { kind: "hero_move", seat: to }), onClose)} />
         <ErrorLine error={error} />
+        {buttonLine}
       </Sheet>
     );
   }
 
-  // Nobody there: someone sits down.
+  // Nobody there: someone sits down — a stranger most of the time.
   if (!occupant) {
     return (
       <Sheet open onClose={onClose} title={`Seat ${seat} · someone sits`}>
@@ -278,7 +327,8 @@ function SeatSheet({
           pending={pending}
           onPick={(id) => run(() => seatEvent(session.id, { kind: "sit", seat, player_id: id }), onClose)}
           onCreate={(input) => run(() => seatNewPlayer(session.id, seat, input), onClose)}
-          onUnknown={() => run(() => seatEvent(session.id, { kind: "sit", seat, player_id: null }), onClose)}
+          onUnknown={() => run(() => seatUnknown(session.id, seat), onClose)}
+          unknownLabel="Someone I don’t know"
         />
         <ErrorLine error={error} />
       </Sheet>
@@ -289,21 +339,37 @@ function SeatSheet({
     <span className="flex items-center gap-2">
       <span className="tabular-nums text-muted">{seat}</span>
       {player ? (
-        <Link href={`/poker/live/players/${player.id}`} className="truncate underline-offset-2 hover:underline">
+        <Link href={`/poker/live/players/${player.id}`} className={`truncate underline-offset-2 hover:underline ${player.known ? "" : "italic"}`}>
           {player.name}
         </Link>
       ) : (
         <span>Not identified</span>
       )}
+      {player && !player.known && <span className="rounded bg-line/60 px-1.5 text-[11px] font-normal">unknown</span>}
       {occupant.sittingOut && <span className="rounded bg-amber-500/15 px-1.5 text-[11px] font-normal">sitting out</span>}
     </span>
   );
 
+  const actions = (
+    <SeatActions
+      occupant={occupant}
+      pending={pending}
+      onOut={() => run(() => seatEvent(session.id, { kind: occupant.sittingOut ? "back" : "sit_out", seat }), onClose)}
+      onLeave={() => run(() => seatEvent(session.id, { kind: "leave", seat }), onClose)}
+      onReplace={() => run(() => replaceWithUnknown(session.id, seat), onClose)}
+      onMove={() => setMode("move")}
+      onIdentify={player?.known ? () => setMode("identify") : undefined}
+    />
+  );
+
+  // Someone with no player at all (seated before unknowns were players), or
+  // a wrong pick to correct: say who it is.
   if (mode === "identify" || !player) {
     return (
       <Sheet open onClose={onClose} title={title}>
         <p className="mb-2 text-xs text-muted">
-          {player ? "Wrong person? Pick who it really is." : "Who is it? Pick them, or add them."} Their whole stay in this seat is updated.
+          {player ? "Wrong person? Pick who it really is." : "Who is it? Pick them, add them, or keep them as an unknown to tag and note."} Their whole stay in
+          this seat is updated.
         </p>
         <PlayerPicker
           players={players}
@@ -313,22 +379,12 @@ function SeatSheet({
           pending={pending}
           onPick={(id) => run(() => identifySeat(session.id, seat, id), onClose)}
           onCreate={(input) => run(() => identifyAsNewPlayer(session.id, seat, input), onClose)}
+          onUnknown={() => run(() => identifyAsUnknown(session.id, seat), () => setMode("main"))}
+          unknownLabel="Someone I don’t know"
         />
         <ErrorLine error={error} />
-        {!player && (
-          <SeatActions
-            occupant={occupant}
-            pending={pending}
-            onOut={() => run(() => seatEvent(session.id, { kind: occupant.sittingOut ? "back" : "sit_out", seat }), onClose)}
-            onLeave={() => run(() => seatEvent(session.id, { kind: "leave", seat }), onClose)}
-            onMove={() => setMode("move")}
-          />
-        )}
-        {mode === "identify" && (
-          <button type="button" onClick={() => setMode("main")} className="mt-3 text-xs text-muted underline">
-            Back
-          </button>
-        )}
+        {!player && actions}
+        {mode === "identify" && back}
       </Sheet>
     );
   }
@@ -339,9 +395,52 @@ function SeatSheet({
         <p className="mb-2 text-sm text-muted">Moves to…</p>
         <SeatButtons seats={empties} pending={pending} onPick={(to) => run(() => moveSeat(session.id, seat, to), onClose)} />
         <ErrorLine error={error} />
-        <button type="button" onClick={() => setMode("main")} className="mt-3 text-xs text-muted underline">
-          Back
-        </button>
+        {back}
+      </Sheet>
+    );
+  }
+
+  // An unknown gets a name: they join the known players, notes and tags kept.
+  if (mode === "name") {
+    return (
+      <Sheet open onClose={onClose} title={title}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            run(() => promotePlayer(player.id, newName), () => setMode("main"));
+          }}
+          className="space-y-2"
+        >
+          <p className="text-xs text-muted">They join your known players, with their tags, notes and description.</p>
+          <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name or nickname" className={INPUT} />
+          <ErrorLine error={error} />
+          <button type="submit" disabled={pending || !newName.trim()} className="w-full rounded-lg bg-accent py-2.5 text-sm font-medium text-white disabled:opacity-50">
+            Save the name
+          </button>
+        </form>
+        {back}
+      </Sheet>
+    );
+  }
+
+  // An unknown turns out to be someone already known: merge into them.
+  if (mode === "merge") {
+    return (
+      <Sheet open onClose={onClose} title={title}>
+        <p className="mb-2 text-xs text-muted">
+          Who is it? Their tags, notes, description and hands move to that player, everywhere this unknown appears.
+        </p>
+        <PlayerPicker
+          players={players}
+          tags={tags}
+          exclude={seated}
+          venue={session.venue}
+          pending={pending}
+          knownOnly
+          onPick={(id) => run(() => mergePlayers(player.id, id), onClose)}
+        />
+        <ErrorLine error={error} />
+        {back}
       </Sheet>
     );
   }
@@ -350,6 +449,23 @@ function SeatSheet({
   return (
     <Sheet open onClose={onClose} title={title}>
       <div className={`space-y-4 ${pending ? "opacity-70" : ""}`}>
+        {!player.known && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setNewName("");
+                setMode("name");
+              }}
+              className="rounded-lg border border-accent py-2 text-sm font-medium text-accent"
+            >
+              Name them
+            </button>
+            <button type="button" onClick={() => setMode("merge")} className="rounded-lg border border-line py-2 text-sm">
+              It’s someone I know
+            </button>
+          </div>
+        )}
         <Description
           key={player.id}
           value={player.description}
@@ -366,14 +482,8 @@ function SeatSheet({
           <PlayerNotes playerId={player.id} notes={theirNotes} sessionId={session.id} limit={5} />
         </section>
         <ErrorLine error={error} />
-        <SeatActions
-          occupant={occupant}
-          pending={pending}
-          onOut={() => run(() => seatEvent(session.id, { kind: occupant.sittingOut ? "back" : "sit_out", seat }), onClose)}
-          onLeave={() => run(() => seatEvent(session.id, { kind: "leave", seat }), onClose)}
-          onMove={() => setMode("move")}
-          onIdentify={() => setMode("identify")}
-        />
+        {actions}
+        {buttonLine}
       </div>
     </Sheet>
   );
@@ -384,6 +494,7 @@ function SeatActions({
   pending,
   onOut,
   onLeave,
+  onReplace,
   onMove,
   onIdentify,
 }: {
@@ -391,6 +502,7 @@ function SeatActions({
   pending: boolean;
   onOut: () => void;
   onLeave: () => void;
+  onReplace: () => void;
   onMove: () => void;
   onIdentify?: () => void;
 }) {
@@ -404,6 +516,9 @@ function SeatActions({
       </BarButton>
       <BarButton tone="danger" onClick={onLeave} disabled={pending}>
         Leaves
+      </BarButton>
+      <BarButton onClick={onReplace} disabled={pending}>
+        Leaves · new player sits
       </BarButton>
       {onIdentify && (
         <BarButton onClick={onIdentify} disabled={pending}>

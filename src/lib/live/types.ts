@@ -29,6 +29,7 @@ export type LiveSession = {
   currency: string;
   seats: TableSize;
   hero_seat: number;
+  /** Where the button is for the next hand; null before the first one. */
   button_seat: number | null;
   started_at: string;
   ended_at: string | null;
@@ -73,6 +74,12 @@ export type LivePlayer = {
   id: string;
   name: string;
   description: string | null;
+  /**
+   * False for someone not identified yet: seated as "Unknown 4", tagged and
+   * noted like anyone, kept out of the known players' lists until named or
+   * merged into the player they turn out to be.
+   */
+  known: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -127,6 +134,17 @@ export type HandAction = {
   all_in?: boolean;
 };
 
+/**
+ * Blinds bought back: a player who missed them posts before the cards. `live`
+ * counts as their bet on the street (usually a big blind — they keep the
+ * option); `dead` goes straight to the pot (usually the small blind).
+ */
+export type HandPost = {
+  seat: number;
+  live: number;
+  dead: number;
+};
+
 /** A seat dealt into the hand. The stack is optional: live, it is an estimate. */
 export type HandSeat = {
   seat: number;
@@ -144,6 +162,7 @@ export type LiveHand = {
   small_blind: number;
   big_blind: number;
   straddle: number | null;
+  posts: HandPost[];
   seats: HandSeat[];
   actions: HandAction[];
   hero_cards: string | null;
@@ -166,6 +185,8 @@ export type HandInput = {
   small_blind: number;
   big_blind: number;
   straddle: number | null;
+  /** Optional: older callers send none. */
+  posts?: HandPost[];
   seats: HandSeat[];
   actions: HandAction[];
   hero_cards: string | null;
@@ -178,6 +199,28 @@ export type HandInput = {
 };
 
 /* ---------------------------------------------------------------- helpers */
+
+/** The name an unknown player gets when seated: "Unknown 4". */
+export function unknownName(seat: number): string {
+  return `Unknown ${seat}`;
+}
+
+const DEFAULT_UNKNOWN = /^Unknown \d+$/;
+
+/**
+ * What the table shows for an unknown: a nickname if given, else the start of
+ * how to recognise them ("red cap"), else "?" — the seat number is already on
+ * the chip.
+ */
+export function unknownLabel(p: Pick<LivePlayer, "name" | "description">): string {
+  if (!DEFAULT_UNKNOWN.test(p.name)) return p.name;
+  return p.description?.split(/[,.;\n]/)[0].trim() || "?";
+}
+
+/** Whether a player has anything on them beyond the default name. */
+export function isBlankUnknown(p: Pick<PlayerSummary, "known" | "name" | "description" | "tag_ids" | "note_count">): boolean {
+  return !p.known && !p.description && p.tag_ids.length === 0 && p.note_count === 0 && DEFAULT_UNKNOWN.test(p.name);
+}
 
 export const CARD_RE = /^[2-9TJQKA][shdc]$/;
 

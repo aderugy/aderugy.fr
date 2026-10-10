@@ -11,7 +11,7 @@ import { useAction } from "@/components/jobs/controls";
 import { ErrorLine } from "@/components/jobs/bits";
 import { NotesEditor } from "@/components/ui/NotesEditor";
 import { DEFAULT_COLOR } from "@/lib/categories";
-import { behind, describeStep, playHand, positions, settle, stepsByStreet, type HandState, type Step } from "@/lib/live/hand";
+import { behind, describePost, describeStep, playHand, positions, settle, stepsByStreet, type HandState, type Step } from "@/lib/live/hand";
 import { BOARD_SIZE, STREET_LABELS, fmtChips, type LiveHand, type Street } from "@/lib/live/types";
 import type { SessionBundle } from "@/server/live/data";
 import { deleteHand, updateHand, updateHandFlags } from "@/server/actions/live";
@@ -36,6 +36,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
       m.set(s.seat, {
         playerId: s.player_id,
         name: p?.name ?? null,
+        known: p?.known ?? true,
         colors: p ? p.tag_ids.map((id) => tagById.get(id)?.color ?? DEFAULT_COLOR) : [],
       });
     }
@@ -45,7 +46,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
   const play = useMemo(() => {
     try {
       return playHand(
-        { seats: hand.seats, button: hand.button_seat, sb: hand.small_blind, bb: hand.big_blind, straddle: hand.straddle },
+        { seats: hand.seats, button: hand.button_seat, sb: hand.small_blind, bb: hand.big_blind, straddle: hand.straddle, posts: hand.posts },
         hand.actions,
       );
     } catch {
@@ -92,7 +93,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
     const left = behind(st);
     return {
       seat: s.seat,
-      kind: isHero ? "hero" : nm?.playerId ? "player" : "unknown",
+      kind: isHero ? "hero" : nm?.playerId && nm.known !== false ? "player" : "unknown",
       name: nm?.name ?? undefined,
       colors: nm?.colors,
       position: pos.get(s.seat),
@@ -181,6 +182,11 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
       )}
 
       <section className="mt-4 rounded-lg border border-line bg-surface p-3 text-sm">
+        {hand.posts.length > 0 && (
+          <p className="mb-1 text-xs text-muted">
+            Blinds bought back: {hand.posts.map((p) => `${label(p.seat)} ${describePost(p)}`).join(", ")}
+          </p>
+        )}
         {play.steps.length === 0 ? (
           <p className="text-xs text-muted">No action entered.</p>
         ) : (

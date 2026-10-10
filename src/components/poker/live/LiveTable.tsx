@@ -13,6 +13,7 @@ import { splitCards } from "@/lib/live/types";
 
 export type SeatView = {
   seat: number;
+  /** "unknown": someone not identified — a named unknown player, or nobody on file. */
   kind: "hero" | "player" | "unknown" | "empty";
   name?: string;
   /** Tag colours, shown as dots. */
@@ -177,8 +178,8 @@ function SeatChip({ s, dim, toAct, selected }: { s: SeatView; dim: boolean; toAc
           </span>
         )}
       </span>
-      <span className="w-full truncate text-[11px] font-semibold leading-tight">
-        {hero ? "You" : s.kind === "unknown" ? "?" : s.name}
+      <span className={`w-full truncate text-[11px] leading-tight ${s.kind === "unknown" ? "font-medium italic text-muted" : "font-semibold"}`}>
+        {hero ? "You" : s.kind === "unknown" ? (s.name ?? "?") : s.name}
       </span>
       {(s.sub || s.sittingOut) && (
         <span className="w-full truncate text-[9px] leading-tight text-muted">{s.sub ?? "sitting out"}</span>

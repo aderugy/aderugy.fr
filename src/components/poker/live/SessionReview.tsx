@@ -23,12 +23,15 @@ export function SessionReview({ data }: { data: SessionBundle }) {
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
   // Everyone who sat at this table, in order of arrival.
-  const met: { id: string; name: string; seat: number; at: string }[] = [];
+  // Known players first, then the unknowns — still worth naming afterwards.
+  const met: { id: string; name: string; seat: number; at: string; known: boolean }[] = [];
   for (const e of seatEvents) {
     if (e.kind === "sit" && e.player_id && !met.some((m) => m.id === e.player_id)) {
-      met.push({ id: e.player_id, name: playerById.get(e.player_id)?.name ?? "?", seat: e.seat, at: e.at });
+      const p = playerById.get(e.player_id);
+      met.push({ id: e.player_id, name: p?.name ?? "?", seat: e.seat, at: e.at, known: p?.known ?? true });
     }
   }
+  met.sort((a, b) => Number(b.known) - Number(a.known));
   const unknown = seatEvents.filter((e) => e.kind === "sit" && !e.player_id).length;
   const starred = hands.filter((h) => h.starred).length;
 
@@ -100,8 +103,12 @@ export function SessionReview({ data }: { data: SessionBundle }) {
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {met.map((m) => (
-              <Link key={m.id} href={`/poker/live/players/${m.id}`} className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs">
-                <span className="text-muted tabular-nums">{m.seat}</span> {m.name}
+              <Link
+                key={m.id}
+                href={`/poker/live/players/${m.id}`}
+                className={`rounded-full border px-2.5 py-1 text-xs ${m.known ? "border-line bg-surface" : "border-dashed border-line italic text-muted"}`}
+              >
+                <span className="not-italic tabular-nums text-muted">{m.seat}</span> {m.name}
               </Link>
             ))}
             {unknown > 0 && <span className="px-1 py-1 text-xs text-muted">+ {unknown} not identified</span>}
