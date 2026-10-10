@@ -16,7 +16,7 @@
 -- the functions the current app calls are untouched, except two that become
 -- supersets and keep working for both: `users_due_for_push` (the cron calls it
 -- by name) and `category_usage`. Phase 2 deploys the code that reads sessions;
--- phase 3 (0022) drops the blocks.
+-- phase 3 (0024) drops the blocks.
 --
 -- Google: the event id is derived from the row id (see push-events.ts), so a
 -- session that takes over a block reuses the block's id and its Google event
@@ -28,7 +28,7 @@
 --   * multi-task block    → one session per task, back to back in block order,
 --                           each as long as its planned minutes; the first one
 --                           keeps the block's id (and its Google event);
---   * empty block         → not carried over (its event goes in 0022);
+--   * empty block         → not carried over (its event goes in 0024);
 --   * block done          → session done, task done;
 --   * block skipped       → session skipped, task back to the backlog;
 --   * block planned, over → a backlog task: session skipped, back to the
@@ -60,7 +60,7 @@ create table if not exists public.task_sessions (
                      check (sync_state in ('pending', 'synced', 'failed')),
   push_attempts    int not null default 0,
   push_error       text,
-  -- Where the row came from, for checking the backfill. Dropped in 0022.
+  -- Where the row came from, for checking the backfill. Dropped in 0024.
   legacy_block_id  uuid,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
@@ -421,7 +421,7 @@ create trigger task_sessions_push_delete
   after delete on public.task_sessions
   for each row execute function public.push_on_session_delete();
 
--- The cron calls this by name. Blocks stay in until 0022 so either pusher
+-- The cron calls this by name. Blocks stay in until 0024 so either pusher
 -- version finds its work during the switch.
 create or replace function public.users_due_for_push(p_max_attempts int default 8)
 returns table (user_id uuid)
@@ -525,7 +525,7 @@ $$;
 grant execute on function public.task_session_summary(uuid[]) to authenticated;
 
 -- What a category is used by. "scheduled" now counts sessions, which is what
--- blocks holding its tasks amounted to; templates stay until 0022.
+-- blocks holding its tasks amounted to; templates stay until 0024.
 create or replace function public.category_usage(p_id uuid)
 returns table (tasks bigint, scheduled bigint, templates bigint, descendants bigint)
 language sql
