@@ -76,6 +76,10 @@ big blind: they keep the option when nobody raises); the dead part goes to the
 main pot and is never refunded as an uncalled bet. In the editor's setup, tap a
 seat under "Blinds bought back" to cycle BB → BB + SB dead → none.
 
+At a showdown — on the river, or an all-in before it that runs the board out —
+the editor asks for the rest of the board, then each opponent's cards (or "Not
+shown"), before the result. In the result, tapping a seat edits its shown cards.
+
 The editor (setup → action → result) replays the action list on every change;
 the server replays it again before saving (`src/lib/live/validate.ts`) and
 refuses anything that does not fit. Tapping a later seat during the action folds
