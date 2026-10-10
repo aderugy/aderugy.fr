@@ -53,6 +53,20 @@ export function tableAt(events: SeatEvent[], at?: string): Table {
   return table;
 }
 
+/** Whether two players were ever seated at this table at the same time. */
+export function seatedTogether(events: SeatEvent[], a: string, b: string): boolean {
+  const seatOf = new Map<string, number>();
+  for (const e of sortSeatEvents(events)) {
+    if (!e.player_id || (e.player_id !== a && e.player_id !== b)) continue;
+    // Keyed by player, so a change of seat (a leave and a sit at the same
+    // instant, in either order) never shows them twice.
+    if (e.kind === "sit") seatOf.set(e.player_id, e.seat);
+    else if (e.kind === "leave" && seatOf.get(e.player_id) === e.seat) seatOf.delete(e.player_id);
+    if (seatOf.has(a) && seatOf.has(b)) return true;
+  }
+  return false;
+}
+
 /** Where Arthur sat at `at`: the last hero_move up to then, else `fallback`. */
 export function heroSeatAt(events: SeatEvent[], fallback: number, at?: string): number {
   const limit = at ? Date.parse(at) : Infinity;
@@ -89,6 +103,16 @@ export function nextButton(prev: number | null, dealt: number[]): number {
   if (!sorted.length) return prev ?? 1;
   if (prev === null) return sorted[0];
   return sorted.find((s) => s > prev) ?? sorted[0];
+}
+
+/**
+ * Where the button is for the next hand: the session's button seat when that
+ * seat is dealt in, else the first dealt-in seat clockwise after it (its
+ * player left or sits out). With none set yet, the lowest dealt-in seat.
+ */
+export function buttonFor(stored: number | null, dealt: number[]): number {
+  if (stored === null) return nextButton(null, dealt);
+  return dealt.includes(stored) ? stored : nextButton(stored, dealt);
 }
 
 /** Seats with nobody, in order, never Arthur's. */

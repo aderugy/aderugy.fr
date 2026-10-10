@@ -25,16 +25,25 @@ import {
   splitCards,
   type HandAction,
   type HandInput,
+  type HandPost,
   type Street,
 } from "@/lib/live/types";
 import { computedHeroNet } from "@/lib/live/validate";
 
-export type SeatName = { playerId: string | null; name: string | null; colors?: string[] };
+/** Who sits in a seat, for the editor; `known: false` for an unknown player. */
+export type SeatName = { playerId: string | null; name: string | null; colors?: string[]; known?: boolean };
 
 type Phase = "setup" | "action" | "result";
 const PHASE_LABELS: Record<Phase, string> = { setup: "Setup", action: "Action", result: "Result" };
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
+
+/** A blind bought back: the big blind live, or the big blind live and the small blind dead. */
+type PostMode = "bb" | "both";
+
+function postModes(posts: HandPost[] | undefined): Record<number, PostMode> {
+  return Object.fromEntries((posts ?? []).map((p) => [p.seat, p.dead > 0 ? "both" : "bb"]));
+}
 
 /**
  * Enter a hand action by action, full screen. Setup (who is dealt in, the
@@ -68,6 +77,7 @@ export function HandEditor({
   const [sb, setSb] = useState(fmtChips(initial.small_blind));
   const [bb, setBb] = useState(fmtChips(initial.big_blind));
   const [straddle, setStraddle] = useState(initial.straddle ? fmtChips(initial.straddle) : "");
+  const [postsBy, setPostsBy] = useState<Record<number, PostMode>>(postModes(initial.posts));
   const [stacks, setStacks] = useState<Record<number, string>>(
     Object.fromEntries(initial.seats.filter((s) => s.stack != null).map((s) => [s.seat, fmtChips(s.stack!)])),
   );
@@ -94,6 +104,9 @@ export function HandEditor({
     bb: parseAmount(bb),
     straddle: straddle.trim() ? parseAmount(straddle) : null,
   };
+  const posts: HandPost[] = dealt
+    .filter((seat) => postsBy[seat])
+    .map((seat) => ({ seat, live: setupNums.bb ?? 0, dead: postsBy[seat] === "both" ? (setupNums.sb ?? 0) : 0 }));
   const seats = dealt.map((seat) => {
     const st = parseAmount(stacks[seat] ?? "");
     return { seat, player_id: names.get(seat)?.playerId ?? null, stack: st && st > 0 ? st : null };
@@ -104,7 +117,7 @@ export function HandEditor({
     try {
       if (!(setupNums.sb! > 0) || !(setupNums.bb! > 0)) return { result: null, error: "Set the blinds." };
       return {
-        result: playHand({ seats, button, sb: setupNums.sb!, bb: setupNums.bb!, straddle: setupNums.straddle }, actions),
+        result: playHand({ seats, button, sb: setupNums.sb!, bb: setupNums.bb!, straddle: setupNums.straddle, posts }, actions),
         error: null,
       };
     } catch (e) {
@@ -130,13 +143,13 @@ export function HandEditor({
     for (let n = 1; n <= size; n++) {
       const nm = names.get(n);
       const isDealt = dealt.includes(n);
-      const kind: SeatView["kind"] = n === hero || (!isDealt && n === heroSeat) ? "hero" : nm ? (nm.playerId ? "player" : "unknown") : isDealt ? "unknown" : "empty";
+      const kind: SeatView["kind"] = n === hero || (!isDealt && n === heroSeat) ? "hero" : nm ? (nm.playerId && nm.known !== false ? "player" : "unknown") : isDealt ? "unknown" : "empty";
       const v: SeatView = { seat: n, kind, name: nm?.name ?? undefined, colors: nm?.colors, position: isDealt ? pos.get(n) : undefined };
       if (!isDealt) {
         v.out = true;
       } else if (phase === "setup" || !state) {
         const st = parseAmount(stacks[n] ?? "");
-        v.sub = st ? fmtChips(st) : undefined;
+        v.sub = postsBy[n] ? (postsBy[n] === "both" ? "posts BB+SB" : "posts BB") : st ? fmtChips(st) : undefined;
         v.cards = n === hero && heroCards.length === 2 ? heroCards.join("") : null;
       } else {
         const s = state.seats.find((x) => x.seat === n)!;
@@ -180,6 +193,7 @@ export function HandEditor({
       small_blind: setupNums.sb ?? 0,
       big_blind: setupNums.bb ?? 0,
       straddle: setupNums.straddle,
+      posts,
       seats,
       actions,
       hero_cards: heroCards.length === 2 ? heroCards.join("") : null,
@@ -285,6 +299,8 @@ export function HandEditor({
               setSb={setSb}
               setBb={setBb}
               setStraddle={setStraddle}
+              postsBy={postsBy}
+              setPostsBy={setPostsBy}
               stacks={stacks}
               setStacks={setStacks}
               heroCards={heroCards}
@@ -386,6 +402,8 @@ function SetupPanel(props: {
   setSb: (v: string) => void;
   setBb: (v: string) => void;
   setStraddle: (v: string) => void;
+  postsBy: Record<number, PostMode>;
+  setPostsBy: (f: (p: Record<number, PostMode>) => Record<number, PostMode>) => void;
   stacks: Record<number, string>;
   setStacks: (f: (s: Record<number, string>) => Record<number, string>) => void;
   heroCards: string[];
@@ -394,7 +412,20 @@ function SetupPanel(props: {
   setupError: string | null;
   onNext: () => void;
 }) {
-  const [showStacks, setShowStacks] = useState(Object.keys(props.stacks).length > 0);
+  // Open by default: stacks matter (all-ins, effective stacks) and come prefilled from the table.
+  const [showStacks, setShowStacks] = useState(true);
+  const [showPosts, setShowPosts] = useState(Object.keys(props.postsBy).length > 0);
+  // Anyone dealt in but the blinds may be buying them back.
+  // (A seat already marked stays listed, so a mark that no longer fits can be cleared.)
+  const canPost = props.dealt.filter((s) => (props.pos.get(s) !== "SB" && props.pos.get(s) !== "BB") || props.postsBy[s]);
+  const cyclePost = (seat: number) =>
+    props.setPostsBy((p) => {
+      const next = { ...p };
+      if (!p[seat]) next[seat] = "bb";
+      else if (p[seat] === "bb") next[seat] = "both";
+      else delete next[seat];
+      return next;
+    });
   return (
     <>
       <div className="flex items-center gap-2 text-xs">
@@ -452,7 +483,7 @@ function SetupPanel(props: {
 
       <section>
         <button type="button" onClick={() => setShowStacks((s) => !s)} className="text-xs text-muted">
-          {showStacks ? "▾" : "▸"} Stacks (optional — needed for all-ins and effective stacks)
+          {showStacks ? "▾" : "▸"} Stacks — from the table, change them if needed
         </button>
         {showStacks && (
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -469,6 +500,38 @@ function SetupPanel(props: {
               </label>
             ))}
           </div>
+        )}
+      </section>
+
+      <section>
+        <button type="button" onClick={() => setShowPosts((s) => !s)} className="text-xs text-muted">
+          {showPosts ? "▾" : "▸"} Blinds bought back
+          {Object.keys(props.postsBy).length > 0 ? ` · ${Object.keys(props.postsBy).length}` : ""}
+        </button>
+        {showPosts && (
+          <>
+            <p className="mt-1 text-[11px] text-muted">
+              Back from missing the blinds? Tap their seat: posts the big blind (live, they keep the option), tap again for big blind + small blind
+              dead, again to clear.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {canPost.map((s) => {
+                const mode = props.postsBy[s];
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => cyclePost(s)}
+                    aria-pressed={Boolean(mode)}
+                    className={`rounded-full border px-2.5 py-1 text-xs ${mode ? "border-accent bg-accent text-white" : "border-line"}`}
+                  >
+                    {s === props.hero ? "You" : (props.names.get(s)?.name ?? `Seat ${s}`)} · {s}
+                    {mode ? ` · ${mode === "both" ? "BB + SB dead" : "BB"}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
       </section>
 
