@@ -447,7 +447,11 @@ export function cardsLostBy(current: { kind: NoteKind; front: string; back: stri
   return current.cards.filter((c) => !want.includes(c.ord) && c.reps > 0).map((c) => c.ord);
 }
 
-export type SaveNoteInput = NoteInput & { deckId: string };
+export type SaveNoteInput = NoteInput & {
+  deckId: string;
+  /** New notes only: wait in the inbox, without cards, until accepted. Default false. */
+  inbox?: boolean;
+};
 
 /**
  * Create or update a note. A new note gets its cards at once, unless it goes
@@ -473,7 +477,11 @@ export async function saveNote(
     if (!data) return no("Note not found.");
     inbox = Boolean(data.inbox);
   } else {
-    const { data, error } = await db.from("fc_notes").insert({ ...row, user_id: userId }).select("id, inbox").single();
+    const { data, error } = await db
+      .from("fc_notes")
+      .insert({ ...row, user_id: userId, inbox: Boolean(input.inbox) })
+      .select("id, inbox")
+      .single();
     if (error) return no(error.message);
     id = data.id as string;
     inbox = Boolean(data.inbox);
@@ -596,6 +604,8 @@ export type SearchFilters = {
   source?: boolean;
   createdBy?: "user" | "claude";
   trash?: boolean;
+  /** Notes waiting in the inbox instead of accepted ones. */
+  inbox?: boolean;
 };
 
 export type NoteRow = Note & { deck_path: string; cards: Card[] };
@@ -619,7 +629,7 @@ export async function searchNotes(
     .from("fc_notes")
     .select(`${NOTE_COLUMNS}, fc_cards${cardFilter ? "!inner" : ""}(${CARD_COLUMNS})`)
     .eq("user_id", userId)
-    .eq("inbox", false);
+    .eq("inbox", Boolean(f.inbox));
   q = f.trash ? q.not("deleted_at", "is", null) : q.is("deleted_at", null);
   if (f.deckId) q = q.in("deck_id", subtreeIds(decks, f.deckId));
   if (f.kind) q = q.eq("kind", f.kind);
@@ -877,23 +887,65 @@ export async function undoReview(db: SupabaseClient, userId: string, reviewId: n
   return ok({ card: card as Card, note, deckPath: deckPath(decks, note.deck_id) ?? "?" });
 }
 
-/** Suspend, flag or bury one card. Burying lasts until the next review day. */
+export type CardPatch = {
+  suspended?: boolean;
+  flagged?: boolean;
+  bury?: boolean;
+  /** Forget the card: back to new, its history kept in the journal. */
+  reset?: boolean;
+  /** Review day ("YYYY-MM-DD") the card is next due; puts a card in steps back in review. */
+  dueDay?: string;
+};
+
+/**
+ * Suspend, flag, bury, reset or reschedule one card. Burying lasts until the
+ * next review day. A new card cannot be given a due date: it is introduced by
+ * the daily limit.
+ */
 export async function patchCard(
   db: SupabaseClient,
   userId: string,
   id: string,
-  patch: { suspended?: boolean; flagged?: boolean; bury?: boolean },
+  patch: CardPatch,
   now = new Date(),
 ): Promise<Result> {
   const row: Record<string, unknown> = {};
   if (patch.suspended !== undefined) row.suspended = patch.suspended;
   if (patch.flagged !== undefined) row.flagged = patch.flagged;
-  if (patch.bury !== undefined) {
-    const settings = await loadSettings(db, userId);
-    row.buried_until = patch.bury ? reviewDay(now, settings) : null;
+  const settings = patch.bury !== undefined || patch.dueDay ? await loadSettings(db, userId) : null;
+  if (patch.bury !== undefined) row.buried_until = patch.bury ? reviewDay(now, settings!) : null;
+  if (patch.reset && patch.dueDay) return no("Reset or reschedule a card, not both.");
+  if (patch.reset) {
+    Object.assign(row, {
+      state: "new",
+      step: 0,
+      stability: 0,
+      difficulty: 0,
+      due: now.toISOString(),
+      last_review: null,
+      reps: 0,
+      lapses: 0,
+      buried_until: null,
+    });
   }
-  const { error } = await db.from("fc_cards").update(row).eq("user_id", userId).eq("id", id);
+  if (patch.dueDay) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.dueDay) || Number.isNaN(Date.parse(`${patch.dueDay}T00:00:00Z`))) {
+      return no(`"${patch.dueDay}" is not a date (YYYY-MM-DD).`);
+    }
+    const { data, error } = await db.from("fc_cards").select("state, stability").eq("user_id", userId).eq("id", id).maybeSingle();
+    check(error);
+    if (!data) return no("Card not found.");
+    if (data.state === "new" || Number(data.stability) <= 0) return no("A new card has no due date yet: it comes in with the daily new-card limit.");
+    row.due = dayStart(patch.dueDay, settings!).toISOString();
+    if (data.state !== "review") {
+      row.state = "review";
+      row.step = 0;
+    }
+  }
+  if (Object.keys(row).length === 0) return ok(undefined);
+  const { data, error } = await db.from("fc_cards").update(row).eq("user_id", userId).eq("id", id).select("id");
   check(error);
+  if (!data?.length) return no("Card not found.");
   return ok(undefined);
 }
 
