@@ -5,7 +5,7 @@ import { fmtDateTime } from "@/lib/jobs/format";
 import { handText } from "@/lib/live/describe";
 import { breaksOf, fmtDuration, summarize } from "@/lib/live/session";
 import { describeMove, describeSeatEvent, readableSeatLog } from "@/lib/live/table";
-import { LIVE_LIMITS, fmtMoney, fmtStakes, type LiveTag, type PlayerSummary } from "@/lib/live/types";
+import { LIVE_LIMITS, fmtMoney, fmtStakes, isBlankUnknown, type LiveTag, type PlayerSummary } from "@/lib/live/types";
 import {
   addNote,
   getSessionBundle,
@@ -36,8 +36,10 @@ export const LIVE_INSTRUCTIONS = `Arthur's live poker sessions (aderugy.fr/poker
 
 How the data works:
 - A session is one sitting: venue, stakes, buy-in and rebuys, breaks, cash-out. The result is cash-out − buy-ins; time played leaves out breaks.
-- The table is a log of seat events: who sat where, sat out, came back, changed seat, left. Some seats hold someone not identified yet.
+- The table is a log of seat events: who sat where, sat out, came back, changed seat, left.
 - Players are a database reused across sessions: a name or nickname, a description (how to recognise them), tags (Arthur's, e.g. fish, reg, nit) and timestamped notes. A note may point at the session or hand it was taken in.
+- Someone not identified yet is an unknown player ("Unknown 4", marked unknown): a player like any other — tags, description, notes — kept apart from the known ones until Arthur names them or merges them into who they turn out to be. New sessions seat one in every seat. Many share a name, so refer to them by id.
+- Hands may carry blinds bought back: a player returning after missing the blinds posts the big blind live and sometimes the small blind dead.
 - Hands are entered action by action. Amounts are chips in the session's currency; "raises to 15" is the total on that street. Arthur's net per hand is before rake.
 
 What you may do: read everything; add notes on players (add_player_note), edit or delete the notes you wrote (never Arthur's); tag and untag players with existing tags (tag_player). You cannot create sessions, players or tags, change the table, or edit hands.
@@ -61,7 +63,7 @@ function findPlayer(players: PlayerSummary[], ref: string): PlayerSummary | stri
   if (byId) return byId;
   const named = players.filter((p) => p.name.toLowerCase() === r);
   if (named.length === 1) return named[0];
-  if (named.length > 1) return `Several players are named "${ref}": ${named.map((p) => `${p.name} (${p.description ?? "no description"}, id ${p.id})`).join("; ")}. Use the id.`;
+  if (named.length > 1) return `Several players are named "${ref}": ${named.slice(0, 10).map((p) => `${p.name} (${p.description ?? "no description"}, id ${p.id})`).join("; ")}. Use the id.`;
   const close = players.filter((p) => p.name.toLowerCase().includes(r)).slice(0, 8);
   return `No player "${ref}".${close.length ? ` Close: ${close.map((p) => `${p.name} (id ${p.id})`).join(", ")}.` : ""}`;
 }
@@ -132,12 +134,23 @@ export function registerLiveTools(server: McpServer) {
         `${fmtDateTime(s.started_at)} → ${s.ended_at ? fmtDateTime(s.ended_at) : "still running"} · played ${fmtDuration(sum.playedMs)}`,
         `Money: ${money.join(", ")}${s.ended_at ? ` · cash-out ${fmtMoney(s.cash_out ?? 0, s.currency)} · result ${sum.net! >= 0 ? "+" : ""}${fmtMoney(sum.net!, s.currency)}${sum.hourly !== null ? ` (${fmtMoney(Math.round(sum.hourly), s.currency)}/h)` : ""}` : ""}`,
         breaks.length ? `Breaks: ${breaks.join(", ")}` : "",
+        !s.ended_at && Object.keys(s.stacks).length
+          ? `Stacks now: ${Object.entries(s.stacks)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([seat, v]) => `seat ${seat}${Number(seat) === s.hero_seat ? " (Arthur)" : ""} ${v}`)
+              .join(", ")}`
+          : "",
         "",
         "## Session notes",
         s.notes ?? "_(none)_",
         "",
         "## Players met",
-        met.length ? met.map((p) => `- ${p.name} — ${tagNames(p, tags)}${p.description ? ` — ${p.description}` : ""} (player ${p.id})`).join("\n") : "_(nobody identified)_",
+        met.length
+          ? [...met]
+              .sort((a, b) => Number(b.known) - Number(a.known))
+              .map((p) => `- ${p.name}${p.known ? "" : " (unknown)"} — ${tagNames(p, tags)}${p.description ? ` — ${p.description}` : ""} (player ${p.id})`)
+              .join("\n")
+          : "_(nobody recorded)_",
         "",
         "## The table's history",
         log.join("\n"),
@@ -154,14 +167,19 @@ export function registerLiveTools(server: McpServer) {
     {
       title: "List live poker players",
       description:
-        "Arthur's player database, most recently seen first: name, tags, description, where last seen, number of notes. Filter by text (name or description) or tags.",
+        "Arthur's player database, most recently seen first: name, tags, description, where last seen, number of notes. Filter by text (name or description), tags, or known/unknown. Unknown players with nothing on them (default name, no tag, note or description) are left out unless asked for.",
       inputSchema: z.object({
+        category: z
+          .enum(["known", "unknown", "all"])
+          .optional()
+          .describe("Known players (named), unknown ones (not identified yet), or both. Default: all."),
+        include_blank: z.boolean().optional().describe("Also list unknowns with nothing on them. Default false."),
         query: z.string().max(200).optional().describe("Text to find in names and descriptions."),
         tags: z.array(z.string()).optional().describe("Keep players carrying every one of these tags (names or ids)."),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async ({ query, tags: tagRefs }, ctx) => {
+    async ({ query, tags: tagRefs, category = "all", include_blank = false }, ctx) => {
       const { db, userId } = callerOf(ctx.http?.authInfo);
       const [players, tags] = await Promise.all([loadPlayers(db, userId), loadTags(db, userId)]);
       let wanted: string[] = [];
@@ -174,13 +192,15 @@ export function registerLiveTools(server: McpServer) {
       const rows = players
         .filter((p) => !q || p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q))
         .filter((p) => wanted.every((t) => p.tag_ids.includes(t)))
+        .filter((p) => (category === "known" ? p.known : category === "unknown" ? !p.known : true))
+        .filter((p) => include_blank || !isBlankUnknown(p))
         .sort((a, b) => (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? ""));
       if (!rows.length) return ok(players.length ? "No player matches." : "No players yet.");
       return ok(
         rows
           .map(
             (p) =>
-              `- ${p.name} — ${tagNames(p, tags)}${p.description ? ` — ${p.description}` : ""} · ${p.last_seen_at ? `last seen ${fmtDateTime(p.last_seen_at)}${p.last_seen_venue ? ` at ${p.last_seen_venue}` : ""}` : "never seated"} · ${p.note_count} note${p.note_count === 1 ? "" : "s"} (player ${p.id})`,
+              `- ${p.name}${p.known ? "" : " (unknown)"} — ${tagNames(p, tags)}${p.description ? ` — ${p.description}` : ""} · ${p.last_seen_at ? `last seen ${fmtDateTime(p.last_seen_at)}${p.last_seen_venue ? ` at ${p.last_seen_venue}` : ""}` : "never seated"} · ${p.note_count} note${p.note_count === 1 ? "" : "s"} (player ${p.id})`,
           )
           .join("\n"),
       );
@@ -209,7 +229,7 @@ export function registerLiveTools(server: McpServer) {
       const nameOf = (pid: string | null) => (pid ? (byId.get(pid)?.name ?? null) : null);
       const venueOf = new Map(sessions.map((s) => [s.id, `${s.venue}, ${fmtDateTime(s.started_at)}`]));
       const out = [
-        `# ${p.name} (player ${p.id})`,
+        `# ${p.name}${p.known ? "" : " — unknown player, not identified yet"} (player ${p.id})`,
         `Tags: ${tagNames(p, tags)}`,
         `Description: ${p.description ?? "_(none)_"}`,
         "",

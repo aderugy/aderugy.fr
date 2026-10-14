@@ -29,7 +29,7 @@ answer is a sentence:
 | `scheduled_blocks` | read all; insert; update/delete only `created_by = 'claude'` |
 | `scheduled_block_tasks` | read all; write only inside Claude's blocks |
 | `weeks` | read; insert a bare row (no theme/guidelines); no update/delete |
-| `objectives`, `blocks`, `block_items`, `calendar_sources`, `external_events` | read only |
+| `objectives`, `blocks`, `block_items`, `calendar_sources`, `external_events`, `hidden_external_events` | read only |
 | `google_*` | nothing |
 
 For everyone, a block must sit in one of the caller's weeks and a link must join
@@ -38,6 +38,18 @@ the caller's block to the caller's task.
 Claude's blocks are pushed to Google like Arthur's: the triggers of 0011 mark
 them pending and the cron sweep pushes them within a minute (the push function
 does not accept connector tokens, so there is no immediate nudge).
+
+## Hidden events
+
+Arthur can hide an event mirrored from a calendar, from its detail on the week:
+that occurrence, or every event with its title in that calendar (a class he
+skips). The rules live in `hidden_external_events` (migration 0024), apart from
+the mirror, so a resync that rebuilds `external_events` never brings one back.
+Hidden events are dropped where events are loaded (`withoutHidden` in
+`src/lib/external.ts`, used by the week page and `loadEvents`), and the
+`week_category_minutes` view leaves them out of the totals. For the connector
+that time is free: `get_week` and `find_free_slots` do not see them. They are
+listed in the settings, each with "Show again".
 
 ## Shared code
 

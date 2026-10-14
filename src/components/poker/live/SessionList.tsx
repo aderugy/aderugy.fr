@@ -107,6 +107,7 @@ function StartForm({ last, venues, onCancel }: { last: SessionRow | null; venues
   const [buyIn, setBuyIn] = useState(firstBuyIn ? fmtChips(firstBuyIn) : "");
   const [startedAt, setStartedAt] = useState(() => toLocalInput(null));
   const [moreOpen, setMoreOpen] = useState(false);
+  const [fill, setFill] = useState(true);
 
   const submit = () => {
     setError(null);
@@ -122,6 +123,7 @@ function StartForm({ last, venues, onCancel }: { last: SessionRow | null; venues
         hero_seat: hero,
         buy_in: buyIn,
         started_at: fromLocalInput(startedAt),
+        fill_unknowns: fill,
       });
       if (!r.ok) setError(r.error);
       else router.push(`/poker/live/${r.id}`);
@@ -187,6 +189,13 @@ function StartForm({ last, venues, onCancel }: { last: SessionRow | null; venues
           ))}
         </div>
       </Field>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" checked={fill} onChange={(e) => setFill(e.target.checked)} className="mt-0.5 size-4 accent-[var(--accent)]" />
+        <span>
+          Fill the other seats with unknown players
+          <span className="block text-xs text-muted">Tag and note them right away; name them when you know who they are.</span>
+        </span>
+      </label>
       <button type="button" onClick={() => setMoreOpen((x) => !x)} className="text-xs text-muted">
         {moreOpen ? "▾" : "▸"} Game, currency, start time
       </button>

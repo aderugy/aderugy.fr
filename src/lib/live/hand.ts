@@ -10,11 +10,12 @@
  *
  * What is enforced: turn order, check only when nothing is owed, bet only on
  * an unopened street, a raise at least the last full raise (unless all-in),
- * no more than the stack when it is known. What is not: dead blinds, missed
- * blinds, string bets — they are notes, not rules.
+ * no more than the stack when it is known, and blinds bought back (a live
+ * post that counts as a bet, a dead one that goes to the pot). What is not:
+ * string bets, a dead button's dead small blind — they are notes, not rules.
  */
 
-import type { ActionKind, HandAction, HandSeat, Street } from "./types";
+import type { ActionKind, HandAction, HandPost, HandSeat, Street } from "./types";
 import { STREETS } from "./types";
 
 export type HandSetup = {
@@ -24,6 +25,8 @@ export type HandSetup = {
   sb: number;
   bb: number;
   straddle?: number | null;
+  /** Blinds bought back by players returning after missing them. */
+  posts?: HandPost[];
 };
 
 export type SeatState = {
@@ -33,6 +36,8 @@ export type SeatState = {
   committed: number;
   /** Put in on the current street. */
   street: number;
+  /** Of `committed`, what went in dead (a small blind bought back): pot money, never a bet. */
+  dead: number;
   folded: boolean;
   allIn: boolean;
   /** Has acted since the last full bet or raise on this street. */
@@ -59,6 +64,8 @@ export type HandState = {
   bbSeat: number;
   straddleSeat: number | null;
   bb: number;
+  /** Dead money posted before the cards (blinds bought back), already in `pot`. */
+  dead: number;
 };
 
 /** What one entered action did, for the replay and the written line. */
@@ -156,22 +163,62 @@ export function startHand(setup: HandSetup): HandState {
     end: null,
     seats: order.map((n) => {
       const s = setup.seats.find((x) => x.seat === n)!;
-      return { seat: n, stack: s.stack ?? null, committed: 0, street: 0, folded: false, allIn: false, acted: false };
+      return { seat: n, stack: s.stack ?? null, committed: 0, street: 0, dead: 0, folded: false, allIn: false, acted: false };
     }),
     sbSeat,
     bbSeat,
     straddleSeat,
     bb: setup.bb,
+    dead: 0,
   };
   put(seatOf(state, sbSeat), setup.sb);
   put(seatOf(state, bbSeat), setup.bb);
   if (straddleSeat !== null) put(seatOf(state, straddleSeat), setup.straddle!);
+  for (const p of checkPosts(setup.posts ?? [], nums, [sbSeat, bbSeat, straddleSeat], setup.bb)) {
+    const s = seatOf(state, p.seat);
+    if (p.live > 0) put(s, p.live);
+    if (p.dead > 0) {
+      const left = behind(s);
+      const dead = left === null ? p.dead : Math.min(p.dead, left);
+      s.committed = r2(s.committed + dead);
+      s.dead = r2(s.dead + dead);
+      if (left !== null && dead >= left) s.allIn = true;
+      state.dead = r2(state.dead + dead);
+      state.pot = r2(state.pot + dead);
+    }
+  }
   state.currentBet = Math.max(...state.seats.map((s) => s.street));
   if (straddleSeat !== null) state.lastRaise = setup.straddle!;
 
   state.toAct = nextToAct(state, straddleSeat ?? bbSeat);
   if (state.toAct === null) closeStreet(state);
   return state;
+}
+
+/**
+ * Blinds bought back, checked: a seat dealt in, not already in a blind, once
+ * each; a live post at most the big blind (it is one), a dead one at most the
+ * big blind too. Throws a sentence.
+ */
+function checkPosts(posts: HandPost[], dealt: number[], blinds: (number | null)[], bb: number): HandPost[] {
+  const seen = new Set<number>();
+  for (const p of posts) {
+    if (!dealt.includes(p.seat)) throw new Error(`Seat ${p.seat} posts but is not dealt in.`);
+    if (blinds.includes(p.seat)) throw new Error(`Seat ${p.seat} is already in a blind: it does not post another.`);
+    if (seen.has(p.seat)) throw new Error(`Seat ${p.seat} posts twice.`);
+    seen.add(p.seat);
+    if (!(p.live >= 0) || !(p.dead >= 0) || !(p.live + p.dead > 0)) throw new Error(`Seat ${p.seat}: a post is a positive amount.`);
+    if (p.live > bb) throw new Error(`Seat ${p.seat}: a live post is at most the big blind.`);
+    if (p.dead > bb) throw new Error(`Seat ${p.seat}: a dead post is at most the big blind.`);
+  }
+  return posts;
+}
+
+/** "posts 2", "posts 2 + 1 dead", "posts 1 dead" */
+export function describePost(p: HandPost): string {
+  if (p.live > 0 && p.dead > 0) return `posts ${fmt(p.live)} + ${fmt(p.dead)} dead`;
+  if (p.live > 0) return `posts ${fmt(p.live)}`;
+  return `posts ${fmt(p.dead)} dead`;
 }
 
 function owes(state: HandState, s: SeatState): number {
@@ -450,7 +497,10 @@ export type Settlement = {
  * showdown. A pot nobody is named for stays unassigned.
  */
 export function settle(state: HandState, winners: number[][] = []): Settlement {
-  const contrib = new Map(state.seats.map((s) => [s.seat, s.committed]));
+  // Bets make the pots; dead money (blinds bought back) joins the main pot.
+  const contrib = new Map(state.seats.map((s) => [s.seat, r2(s.committed - (s.dead ?? 0))]));
+  const deadOf = new Map(state.seats.map((s) => [s.seat, s.dead ?? 0]));
+  const dead = r2(state.seats.reduce((t, s) => t + (s.dead ?? 0), 0));
   const live = state.seats.filter((s) => !s.folded).map((s) => s.seat);
 
   // Uncalled: the top contributor gets back what nobody else matched.
@@ -476,6 +526,10 @@ export function settle(state: HandState, winners: number[][] = []): Settlement {
   let extra = 0;
   for (const c of contrib.values()) extra += Math.max(0, c - prev);
   if (extra > 0 && pots.length) pots[pots.length - 1].amount = r2(pots[pots.length - 1].amount + extra);
+  if (dead > 0) {
+    if (pots.length) pots[0].amount = r2(pots[0].amount + dead);
+    else pots.push({ amount: dead, eligible: live, takers: [] });
+  }
 
   pots.forEach((p, i) => {
     const named = (winners[i] ?? []).filter((s) => p.eligible.includes(s));
@@ -483,7 +537,7 @@ export function settle(state: HandState, winners: number[][] = []): Settlement {
   });
 
   const net = new Map<number, number>();
-  for (const [seat, c] of contrib) net.set(seat, -c);
+  for (const [seat, c] of contrib) net.set(seat, -r2(c + (deadOf.get(seat) ?? 0)));
   for (const p of pots) {
     for (const t of p.takers) net.set(t, r2((net.get(t) ?? 0) + p.amount / p.takers.length));
   }

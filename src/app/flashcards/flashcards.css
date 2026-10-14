@@ -1,0 +1,65 @@
+/* /flashcards — card text and code highlighting. Colours come from the site's
+   variables, so light and dark follow the system like the rest. */
+
+.fc-rich .katex {
+  font-size: 1.05em;
+}
+.fc-rich .katex-display {
+  margin: 0.75em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.1em 0;
+}
+.fc-rich strong {
+  font-weight: 600;
+}
+
+/* highlight.js classes, a quiet palette in both themes. */
+.fc-rich .hljs-comment,
+.fc-rich .hljs-quote {
+  color: var(--muted);
+  font-style: italic;
+}
+.fc-rich .hljs-keyword,
+.fc-rich .hljs-selector-tag,
+.fc-rich .hljs-built_in,
+.fc-rich .hljs-type {
+  color: var(--accent);
+}
+.fc-rich .hljs-string,
+.fc-rich .hljs-attr,
+.fc-rich .hljs-template-string {
+  color: #2f855a;
+}
+.fc-rich .hljs-number,
+.fc-rich .hljs-literal {
+  color: #b7791f;
+}
+.fc-rich .hljs-title,
+.fc-rich .hljs-title.function_ {
+  color: #9f4fb8;
+}
+@media (prefers-color-scheme: dark) {
+  .fc-rich .hljs-string,
+  .fc-rich .hljs-attr,
+  .fc-rich .hljs-template-string {
+    color: #7cc796;
+  }
+  .fc-rich .hljs-number,
+  .fc-rich .hljs-literal {
+    color: #e3b462;
+  }
+  .fc-rich .hljs-title,
+  .fc-rich .hljs-title.function_ {
+    color: #d29be3;
+  }
+}
+
+/* The review card: no text selection or callout while a hold opens the menu. */
+.fc-card {
+  -webkit-touch-callout: none;
+}
+.fc-card.fc-holding {
+  user-select: none;
+  -webkit-user-select: none;
+}

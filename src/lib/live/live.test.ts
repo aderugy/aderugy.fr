@@ -18,10 +18,11 @@ import {
   startHand,
   type HandSetup,
 } from "./hand";
-import { checkSeatEvent, dealtIn, heroSeatAt, nextButton, tableAt } from "./table";
+import { buttonFor, checkSeatEvent, dealtIn, heroSeatAt, nextButton, seatedTogether, tableAt } from "./table";
 import { fmtDuration, summarize, totals } from "./session";
 import type { HandAction, SeatEvent, SessionEvent } from "./types";
-import { fmtMoney, parseAmount, splitCards } from "./types";
+import { addToStack, moveStack, stackOf, stacksAfterHand, withStack } from "./stacks";
+import { fmtMoney, isBlankUnknown, parseAmount, splitCards, unknownLabel, unknownName } from "./types";
 
 const seats = (nums: number[], stacks: Record<number, number> = {}) =>
   nums.map((seat) => ({ seat, player_id: null, stack: stacks[seat] ?? null }));
@@ -418,4 +419,161 @@ test("a hand reads like a hand history", () => {
   assert.match(text, /Preflop: Marco \(UTG\) raises to 6, seat 5 \(BTN\) folds, Arthur \(SB\) folds, seat 7 \(BB\) folds/);
   assert.match(text, /Pot 5 → Marco \(UTG\)/);
   assert.match(text, /Arthur's net: -1 €/);
+});
+
+/* ------------------------------------------ unknowns, button, blinds back */
+
+test("an unknown player is blank until something is put on them", () => {
+  const p = { known: false, name: unknownName(4), description: null, tag_ids: [] as string[], note_count: 0 };
+  assert.equal(p.name, "Unknown 4");
+  assert.equal(isBlankUnknown(p), true);
+  assert.equal(isBlankUnknown({ ...p, tag_ids: ["fish"] }), false);
+  assert.equal(isBlankUnknown({ ...p, description: "red cap" }), false);
+  assert.equal(isBlankUnknown({ ...p, note_count: 1 }), false);
+  assert.equal(isBlankUnknown({ ...p, name: "Red cap" }), false, "renamed while still unknown");
+  assert.equal(isBlankUnknown({ ...p, known: true }), false);
+  assert.equal(unknownLabel(p), "?");
+  assert.equal(unknownLabel({ ...p, description: "red cap, 50s. Calls a lot" }), "red cap");
+  assert.equal(unknownLabel({ ...p, name: "Cap guy" }), "Cap guy");
+});
+
+test("the button for the next hand skips seats no longer dealt in", () => {
+  assert.equal(buttonFor(5, [1, 3, 5, 8]), 5);
+  assert.equal(buttonFor(6, [1, 3, 5, 8]), 8, "its player left");
+  assert.equal(buttonFor(9, [1, 3, 5, 8]), 1, "wraps");
+  assert.equal(buttonFor(null, [3, 5]), 3, "before the first hand");
+  // Saving a hand moves it on one seat, then the next hand starts there.
+  assert.equal(buttonFor(nextButton(5, [1, 3, 5, 8]), [1, 3, 5, 8]), 8);
+});
+
+test("two players seated together are two people; a change of seat is not", () => {
+  const apart = [
+    ev(2, "sit", "2026-10-07T18:00:00Z", "a"),
+    ev(2, "leave", "2026-10-07T19:00:00Z", "a"),
+    ev(5, "sit", "2026-10-07T19:30:00Z", "b"),
+  ];
+  assert.equal(seatedTogether(apart, "a", "b"), false);
+  const moved = [
+    ev(2, "sit", "2026-10-07T18:00:00Z", "a"),
+    // a change of seat: the sit can be logged before the leave
+    ev(6, "sit", "2026-10-07T19:00:00Z", "a"),
+    ev(2, "leave", "2026-10-07T19:00:00Z", "a"),
+    ev(2, "sit", "2026-10-07T19:10:00Z", "b"),
+  ];
+  assert.equal(seatedTogether(moved, "a", "b"), true, "a is in 6 when b sits in 2");
+  assert.equal(seatedTogether(moved.slice(0, 3), "a", "b"), false, "a alone, moving");
+  const together = [ev(2, "sit", "2026-10-07T18:00:00Z", "a"), ev(5, "sit", "2026-10-07T18:00:00Z", "b")];
+  assert.equal(seatedTogether(together, "a", "b"), true);
+});
+
+test("blinds bought back: the big blind live with the option, the small blind dead", () => {
+  // Button 5: SB 6, BB 7. Seat 2 comes back and posts 2 + 1 dead.
+  const setup: HandSetup = { ...nine, posts: [{ seat: 2, live: 2, dead: 1 }] };
+  const s = startHand(setup);
+  assert.equal(s.pot, 1, "the dead small blind is in the pot");
+  assert.equal(s.dead, 1);
+  assert.equal(s.currentBet, 2);
+  const two = s.seats.find((x) => x.seat === 2)!;
+  assert.equal(two.street, 2);
+  assert.equal(two.committed, 3);
+
+  // Everyone limps or folds round to seat 2: it has the option, like the big blind.
+  const r = playHand(setup, [
+    { seat: 8, kind: "fold" },
+    { seat: 9, kind: "fold" },
+    { seat: 1, kind: "fold" },
+    { seat: 2, kind: "check" },
+    { seat: 3, kind: "fold" },
+    { seat: 4, kind: "fold" },
+    { seat: 5, kind: "call" },
+    { seat: 6, kind: "fold" },
+    { seat: 7, kind: "check" },
+  ]);
+  assert.equal(r.ok, true, r.error ?? "");
+  assert.equal(r.state.street, "flop");
+  assert.equal(r.state.pot, 1 + 2 + 2 + 1 + 2, "dead 1, seat 2's 2, button 2, SB 1, BB 2");
+  const out = settle(r.state, [[2]]);
+  assert.equal(out.refund, null, "dead money is not an uncalled bet");
+  assert.equal(out.total, 8);
+  assert.equal(out.net.get(2), 5, "seat 2 put in 3 and takes 8");
+  assert.equal(out.net.get(6), -1);
+});
+
+test("blinds bought back that do not fit are refused", () => {
+  assert.throws(() => startHand({ ...nine, posts: [{ seat: 6, live: 2, dead: 0 }] }), /already in a blind/);
+  assert.throws(() => startHand({ ...nine, seats: seats([1, 5, 6, 7]), posts: [{ seat: 2, live: 2, dead: 0 }] }), /not dealt in/);
+  assert.throws(() => startHand({ ...nine, posts: [{ seat: 2, live: 5, dead: 0 }] }), /at most the big blind/);
+  assert.throws(
+    () =>
+      startHand({
+        ...nine,
+        posts: [
+          { seat: 2, live: 2, dead: 0 },
+          { seat: 2, live: 2, dead: 0 },
+        ],
+      }),
+    /posts twice/,
+  );
+});
+
+test("a hand with blinds bought back is checked and written out", () => {
+  const c = checkHand({ ...base, posts: [{ seat: 5, live: 2, dead: 1 }, { seat: 7, live: 0, dead: 0 }] }, 9);
+  assert.deepEqual(c.input.posts, [{ seat: 5, live: 2, dead: 1 }], "empty posts are dropped");
+  const hand = { ...base, ...c.input, id: "h", session_id: "s", number: 1, played_at: "", created_at: "", updated_at: "" } as LiveHand;
+  assert.match(handText(hand, () => null, "€"), /Blinds bought back: seat 5 \(BTN\) posts 2 \+ 1 dead/);
+});
+
+/* ----------------------------------------------------------------- stacks */
+
+test("stacks follow the table: set, cleared, moved, topped up", () => {
+  let st = withStack({}, 4, 200);
+  assert.equal(stackOf(st, 4), 200);
+  assert.equal(stackOf(st, 5), null);
+  st = addToStack(st, 4, 100);
+  assert.equal(stackOf(st, 4), 300, "a rebuy adds to a known stack");
+  assert.equal(stackOf(addToStack({}, 2, 150), 2), 150, "or becomes the stack");
+  st = moveStack(st, 4, 9);
+  assert.deepEqual(st, { "9": 300 }, "a change of seat carries it");
+  assert.deepEqual(withStack(st, 9, null), {}, "cleared when they leave");
+  assert.deepEqual(withStack(st, 9, 0), {}, "nothing left is no stack");
+});
+
+test("after a hand each known stack moves by what the seat won or lost", () => {
+  // Button 5, SB 6, BB 7: seat 2 raises, 7 calls, seat 2 bets and takes it.
+  const handSeats = [
+    { seat: 2, player_id: null, stack: 300 },
+    { seat: 5, player_id: null, stack: 150 },
+    { seat: 6, player_id: null, stack: null },
+    { seat: 7, player_id: null, stack: 200 },
+  ];
+  const r = playHand({ seats: handSeats, button: 5, sb: 1, bb: 2 }, [
+    { seat: 2, kind: "raise", to: 6 },
+    { seat: 5, kind: "fold" },
+    { seat: 6, kind: "fold" },
+    { seat: 7, kind: "call" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "bet", to: 10 },
+    { seat: 7, kind: "fold" },
+  ]);
+  assert.equal(r.ok, true, r.error ?? "");
+  const before = { "2": 300, "5": 150, "6": 80, "7": 200 };
+  const after = stacksAfterHand(before, handSeats, settle(r.state));
+  assert.deepEqual(after, { "2": 307, "5": 150, "6": 80, "7": 194 }, "6 had no stack in the hand: the table's is kept");
+
+  // An unsettled pot (a showdown nobody was named for) changes nothing.
+  const sd = playHand({ seats: handSeats, button: 5, sb: 1, bb: 2 }, [
+    { seat: 2, kind: "call" },
+    { seat: 5, kind: "fold" },
+    { seat: 6, kind: "fold" },
+    { seat: 7, kind: "check" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "check" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "check" },
+    { seat: 7, kind: "check" },
+    { seat: 2, kind: "check" },
+  ]);
+  assert.equal(sd.state.end?.reason, "showdown");
+  assert.deepEqual(stacksAfterHand(before, handSeats, settle(sd.state)), before);
+  assert.deepEqual(stacksAfterHand(before, handSeats, settle(sd.state, [[7]])), { ...before, "2": 298, "7": 203 });
 });

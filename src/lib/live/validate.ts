@@ -61,6 +61,10 @@ export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
   const sb = r2(Number(raw.small_blind));
   const bb = r2(Number(raw.big_blind));
   const straddle = raw.straddle == null ? null : r2(Number(raw.straddle));
+  const posts = (raw.posts ?? [])
+    .map((p) => ({ seat: Number(p.seat), live: r2(Number(p.live) || 0), dead: r2(Number(p.dead) || 0) }))
+    .filter((p) => p.live > 0 || p.dead > 0)
+    .sort((a, b) => a.seat - b.seat);
   const actions = (raw.actions ?? []).map((a) => {
     const out: HandInput["actions"][number] = { seat: Number(a.seat), kind: a.kind };
     if (a.kind === "bet" || a.kind === "raise") out.to = r2(Number(a.to));
@@ -70,7 +74,7 @@ export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
 
   let play: PlayResult;
   try {
-    play = playHand({ seats, button, sb, bb, straddle }, actions);
+    play = playHand({ seats, button, sb, bb, straddle, posts }, actions);
   } catch (e) {
     throw e instanceof Error ? e : new Error(String(e));
   }
@@ -100,6 +104,7 @@ export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
       small_blind: sb,
       big_blind: bb,
       straddle,
+      posts,
       seats,
       actions,
       hero_cards: heroCards,

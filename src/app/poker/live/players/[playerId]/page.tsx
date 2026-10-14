@@ -1,6 +1,6 @@
 import { notFound, unstable_rethrow } from "next/navigation";
 import { requireUser } from "@/server/auth";
-import { getPlayer, handsWithPlayer, loadNotes, loadTags, sessionsWithPlayer } from "@/server/live/data";
+import { getPlayer, handsWithPlayer, loadNotes, loadPlayers, loadTags, sessionsWithPlayer } from "@/server/live/data";
 import { PlayerView } from "@/components/poker/live/PlayerView";
 import { LoadError, UUID } from "../../load-error";
 
@@ -20,12 +20,14 @@ export default async function PlayerPage({ params }: PageProps<"/poker/live/play
   try {
     const player = await getPlayer(supabase, user.id, playerId);
     if (!player) notFound();
-    const [tags, links, notes, sessions, hands] = await Promise.all([
+    const [tags, links, notes, sessions, hands, everyone] = await Promise.all([
       loadTags(supabase, user.id),
       supabase.from("live_player_tags").select("tag_id").eq("user_id", user.id).eq("player_id", playerId),
       loadNotes(supabase, user.id, { playerId }),
       sessionsWithPlayer(supabase, user.id, playerId),
       handsWithPlayer(supabase, user.id, playerId),
+      // Who an unknown may turn out to be.
+      player.known ? Promise.resolve([]) : loadPlayers(supabase, user.id),
     ]);
     if (links.error) throw links.error;
     detail = {
@@ -35,6 +37,7 @@ export default async function PlayerPage({ params }: PageProps<"/poker/live/play
       notes,
       sessions,
       hands,
+      knownPlayers: everyone.filter((p) => p.known),
     };
   } catch (e) {
     unstable_rethrow(e); // notFound() is a throw too

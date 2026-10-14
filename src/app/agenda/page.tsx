@@ -4,6 +4,7 @@ import { LOGIN_PATH } from "@/lib/supabase/session";
 import { ensureWeek } from "@/server/weeks";
 import { addDays, fromISODate, isoWeekStartInTimeZone, toISODate } from "@/lib/time";
 import { WeekPlanner } from "@/components/agenda/WeekPlanner";
+import { withoutHidden } from "@/lib/external";
 import type { InterviewOnBlock } from "@/lib/jobs/types";
 import type {
   Block,
@@ -11,6 +12,7 @@ import type {
   Category,
   ExternalEvent,
   GoogleAccount,
+  HiddenEventRule,
   Objective,
   ScheduledBlock,
   Task,
@@ -87,6 +89,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
     sourcesRes,
     googleRes,
     syncRes,
+    hiddenRes,
   ] = await Promise.all([
       supabase
         .from("categories")
@@ -161,6 +164,11 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
         .from("google_sync_state")
         .select("google_calendar_id, last_synced_at")
         .eq("user_id", user.id),
+      // Events Arthur hid. Unreadable rules hide nothing rather than fail the week.
+      supabase
+        .from("hidden_external_events")
+        .select("id, calendar_source_id, external_event_id, title, label, starts_at, created_at")
+        .eq("user_id", user.id),
     ]);
 
   // Calendar errors are deliberately excluded: a broken integration degrades the
@@ -204,7 +212,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       blocks={(blocksRes.data ?? []) as unknown as Block[]}
       scheduled={scheduled}
       objectives={(objectivesRes.data ?? []) as Objective[]}
-      externalEvents={(externalRes.data ?? []) as ExternalEvent[]}
+      externalEvents={withoutHidden((externalRes.data ?? []) as ExternalEvent[], (hiddenRes.data ?? []) as HiddenEventRule[])}
       calendarSources={(sourcesRes.data ?? []) as CalendarSource[]}
       googleAccount={(googleRes.data ?? null) as GoogleAccount | null}
       oldestSyncAt={oldestSyncAt}

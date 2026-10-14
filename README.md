@@ -2,7 +2,7 @@
 
 Personal website and utility tools. Next.js (App Router) · Tailwind · Supabase · Vercel.
 
-Five tools live here so far:
+Six tools live here so far:
 
 - **`/agenda`** — a weekly planner: typed tasks in a backlog, reusable blocks,
   and a week grid you assemble by hand. Claude can read the week and plan blocks of its own
@@ -21,6 +21,11 @@ Five tools live here so far:
 - **`/jobs`** — the internship search: applications with their companies,
   type-of-job tags, notes and a saved copy of each offer; interviews that go on
   the agenda; Claude tools to prepare them. See [docs/jobs/design.md](docs/jobs/design.md).
+- **`/flashcards`** — spaced-repetition flash cards: a deck tree, notes in
+  Markdown with KaTeX and code (basic, reversed, cloze, typed answer), FSRS
+  reviews with learning steps and an adjustable target retention, cram, stats,
+  CSV import/export; Claude writes notes into an inbox you approve. See
+  [docs/flashcards/design.md](docs/flashcards/design.md).
 
 ## Getting started
 
@@ -297,6 +302,20 @@ Restoring: download the file, look before touching anything —
 `pg_restore --no-owner --data-only --table=tasks -d <scratch-url> <file>`.
 Restoring into the live project means stopping the cron jobs first
 (`supabase/cron.sql`) so the Google pusher does not act on half-restored rows.
+
+## Migration numbers
+
+Supabase reads a migration's version from the number before the first `_`.
+Two pull requests that each add a `0023_*.sql` both look fine; the second one
+merged fails to apply. `.github/workflows/migration-numbers.yml` sets a
+**Migration numbers** status on every pull request into `main`, failing when
+the migrations `main` would hold after the merge use a number twice. Because
+the clash usually appears when *another* pull request is merged, every push to
+`main` re-checks all open pull requests. Fix a failure by renaming the file to
+the next free number.
+
+Setup, once: in the branch protection rule for `main`, add **Migration
+numbers** to the required status checks, next to **Backup database**.
 
 ## Poker rake presets
 

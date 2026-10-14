@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { flattenTree, buildTree } from "@/lib/categories";
 import { fmtDuration, fmtTime, minutesOfDay } from "@/lib/time";
-import { deleteArchivedEvent } from "@/server/actions/google";
+import { deleteArchivedEvent, hideExternalEvent } from "@/server/actions/google";
 import type { CalendarSource, Category, ExternalEvent } from "@/lib/types";
 
 /**
@@ -19,6 +19,10 @@ import type { CalendarSource, Category, ExternalEvent } from "@/lib/types";
  * The provider has forgotten it, so no sync will bring it back and none will
  * take it away. Removing it is the one decision left to you, and it is final —
  * hence a confirmation rather than a single stray click.
+ *
+ * Hiding is the other one, and it is not an edit: the calendar keeps the
+ * event, the planner stops showing and counting it — this occurrence, or every
+ * event with its title in this calendar. Undone from the settings.
  */
 export function ExternalDetail({
   event,
@@ -43,6 +47,20 @@ export function ExternalDetail({
   const category = source.category_id
     ? flattenTree(buildTree(categories)).find((c) => c.id === source.category_id)
     : undefined;
+
+  function onHide(scope: "event" | "title") {
+    setError(null);
+    startTransition(async () => {
+      const result = await hideExternalEvent({
+        calendarSourceId: event.calendar_source_id,
+        externalEventId: event.external_event_id,
+        scope,
+      });
+      // The page refreshes without it: nothing left to show here.
+      if (result.ok) onClose();
+      else setError(result.error);
+    });
+  }
 
   function onDelete() {
     setError(null);
@@ -125,6 +143,37 @@ export function ExternalDetail({
       )}
 
       {error && <p className="text-red-500">{error}</p>}
+
+      <div className="space-y-1.5">
+        <span className="text-muted">Not for you?</span>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onHide("event")}
+            className="rounded border border-line px-2 py-1 hover:border-foreground disabled:opacity-50"
+          >
+            Hide this event
+          </button>
+          {event.title?.trim() && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onHide("title")}
+              className="max-w-full truncate rounded border border-line px-2 py-1 hover:border-foreground disabled:opacity-50"
+            >
+              Hide every “{event.title}”
+            </button>
+          )}
+        </div>
+        <p className="text-muted">
+          Off the grid and out of the totals — your calendar keeps it. Show it again from{" "}
+          <Link href="/agenda/settings#hidden-events" className="underline hover:text-foreground">
+            settings
+          </Link>
+          .
+        </p>
+      </div>
 
       {archived ? (
         <div className="mt-auto space-y-2">

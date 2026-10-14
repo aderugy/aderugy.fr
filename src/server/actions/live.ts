@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
-import type { HandInput, SeatEventKind } from "@/lib/live/types";
+import { unknownName, type HandInput, type SeatEventKind } from "@/lib/live/types";
 import {
   addMoney as addMoneyRow,
   addNote as addNoteRow,
@@ -11,6 +11,8 @@ import {
   endSession as endSessionRow,
   insertTag,
   logSeatEvent,
+  mergePlayers as mergePlayersRow,
+  moveButton as moveButtonRow,
   moveSeat as moveSeatRow,
   patchHandFlags,
   patchMoney,
@@ -26,6 +28,9 @@ import {
   removeSessionEvent,
   removeTag,
   reopenSession as reopenSessionRow,
+  replaceOccupant,
+  seatUnknown as seatUnknownRow,
+  setStack as setStackRow,
   setOccupant,
   setPlayerTags,
   startSession as startSessionRow,
@@ -149,6 +154,37 @@ export async function identifyAsNewPlayer(
   }
 }
 
+/** Someone nobody knows sits down: a fresh unknown player. */
+export async function seatUnknown(sessionId: string, seat: number): Promise<ActionResult> {
+  return act(({ supabase, user }) => seatUnknownRow(supabase, user.id, sessionId, seat));
+}
+
+/** The player leaves and someone new takes the seat at once. */
+export async function replaceWithUnknown(sessionId: string, seat: number): Promise<ActionResult> {
+  return act(({ supabase, user }) => replaceOccupant(supabase, user.id, sessionId, seat));
+}
+
+/** The wrong person was picked and nobody knows who it is: a fresh unknown for the whole stay. */
+export async function identifyAsUnknown(sessionId: string, seat: number): Promise<ActionResult> {
+  return act(async ({ supabase, user }) => {
+    const created = await createPlayerRow(supabase, user.id, { name: unknownName(seat), known: false });
+    if (!created.ok) return created;
+    const r = await setOccupant(supabase, user.id, sessionId, seat, created.value.id);
+    if (!r.ok) await removePlayer(supabase, user.id, created.value.id);
+    return r;
+  });
+}
+
+/** What a seat has in front of it now; empty clears it. */
+export async function setStack(sessionId: string, seat: number, value: number | string | null): Promise<ActionResult> {
+  return act(({ supabase, user }) => setStackRow(supabase, user.id, sessionId, seat, value));
+}
+
+/** Where the button is for the next hand: a seat, or one seat on. */
+export async function moveButton(sessionId: string, to: number | "next"): Promise<ActionResult> {
+  return act(({ supabase, user }) => moveButtonRow(supabase, user.id, sessionId, to));
+}
+
 export async function identifySeat(sessionId: string, seat: number, playerId: string): Promise<ActionResult> {
   return act(({ supabase, user }) => setOccupant(supabase, user.id, sessionId, seat, playerId));
 }
@@ -177,6 +213,27 @@ export async function createPlayer(input: { name: string; description?: string |
 
 export async function updatePlayer(id: string, input: { name?: string; description?: string | null }): Promise<ActionResult> {
   return act(({ supabase, user }) => patchPlayer(supabase, user.id, id, input));
+}
+
+/** An unknown gets a name and joins the known players. */
+export async function promotePlayer(id: string, name: string): Promise<ActionResult> {
+  return act(({ supabase, user }) => patchPlayer(supabase, user.id, id, { name, known: true }));
+}
+
+/**
+ * "That unknown is Marco": everything on the unknown moves to Marco. From the
+ * unknown's own page (`refreshPage: false`), the caller navigates away instead:
+ * refreshing a page whose player was just deleted would show a 404.
+ */
+export async function mergePlayers(fromId: string, intoId: string, refreshPage = true): Promise<ActionResult> {
+  if (refreshPage) return act(({ supabase, user }) => mergePlayersRow(supabase, user.id, fromId, intoId));
+  try {
+    const { supabase, user } = await requireUser();
+    const r = await mergePlayersRow(supabase, user.id, fromId, intoId);
+    return r.ok ? { ok: true } : { ok: false, error: r.error };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function deletePlayer(id: string): Promise<ActionResult> {

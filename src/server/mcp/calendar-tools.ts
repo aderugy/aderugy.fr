@@ -61,7 +61,7 @@ export const CALENDAR_INSTRUCTIONS = `Arthur's week grid (aderugy.fr/agenda), in
 
 How the data works:
 - The grid holds blocks: spans of time. A block has no category of its own; the tasks inside it do, each with its planned minutes — that is what the week's totals count. A block can come from a template ("Morning routine") or hold an interview from /jobs.
-- His Google calendars (school timetable, etc.) are mirrored in as events: read-only, and they count towards their calendar's category.
+- His Google calendars (school timetable, etc.) are mirrored in as events: read-only, and they count towards their calendar's category. Events he hid (a class he skips, a meeting he is not going to) are left out: that time is free.
 - Each week can have a theme, guidelines and objectives (read-only here).
 - Block status: planned, done, skipped. A backlog task inside a skipped block is back in the backlog.
 

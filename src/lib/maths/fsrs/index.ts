@@ -105,13 +105,13 @@ export const difficulteInitiale = (note: Note) =>
   borne(W[4] - W[5] * (note - 3), D_MIN, D_MAX);
 
 /** Mise à jour de la difficulté, avec retour à la moyenne vers D_0(facile). */
-function prochaineDifficulte(d: number, note: Note): number {
+export function prochaineDifficulte(d: number, note: Note): number {
   const apresNote = d - W[6] * (note - 3);
   const retourMoyenne = W[7] * difficulteInitiale(4) + (1 - W[7]) * apresNote;
   return borne(retourMoyenne, D_MIN, D_MAX);
 }
 
-function stabiliteApresSucces(
+export function stabiliteApresSucces(
   s: number,
   d: number,
   r: number,
@@ -129,7 +129,7 @@ function stabiliteApresSucces(
   return borne(s * (1 + gain), S_MIN, S_MAX);
 }
 
-function stabiliteApresOubli(s: number, d: number, r: number): number {
+export function stabiliteApresOubli(s: number, d: number, r: number): number {
   const brut =
     W[11] *
     Math.pow(d, -W[12]) *

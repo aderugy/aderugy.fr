@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalFooter } from "@/components/legal/LegalPage";
 
 const tools = [
   {
@@ -15,6 +16,11 @@ const tools = [
     href: "/maths",
     name: "Maths",
     description: "Probability & statistics path: a DAG of concepts, courses, exercises, spaced repetition.",
+  },
+  {
+    href: "/flashcards",
+    name: "Flashcards",
+    description: "Spaced-repetition cards: decks, Markdown and maths, FSRS reviews, stats, Claude-written cards to approve.",
   },
   {
     href: "/jobs",
@@ -44,6 +50,8 @@ export default function Home() {
           </li>
         ))}
       </ul>
+
+      <LegalFooter className="mt-16" />
     </main>
   );
 }

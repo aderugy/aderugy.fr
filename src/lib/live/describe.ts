@@ -3,11 +3,10 @@
  * like a hand history, with names, positions and the result.
  */
 
-import { describeStep, playHand, positions, settle } from "./hand";
+import { describePost, describeStep, playHand, positions, settle } from "./hand";
 import { BOARD_SIZE, STREET_LABELS, fmtChips, type LiveHand, type Street } from "./types";
 
-export function handText(hand: LiveHand, nameOf: (playerId: string | null) => string | null, currency: string): string {
-  const pos = positions(
+export function handText(hand: LiveHand, nameOf: (playerId: string | null) => string | null, currency: string): string {  const pos = positions(
     hand.seats.map((s) => s.seat),
     hand.button_seat,
   );
@@ -24,12 +23,13 @@ export function handText(hand: LiveHand, nameOf: (playerId: string | null) => st
       .map((s) => `${s.seat} ${who(s.seat)}${s.stack != null ? ` ${fmtChips(s.stack)}` : ""}`)
       .join(", ")}`,
   ];
+  if (hand.posts?.length) head.push(`Blinds bought back: ${hand.posts.map((p) => `${who(p.seat)} ${describePost(p)}`).join(", ")}`);
   if (hand.hero_cards) head.push(`Arthur holds ${hand.hero_cards}`);
 
   let play;
   try {
     play = playHand(
-      { seats: hand.seats, button: hand.button_seat, sb: hand.small_blind, bb: hand.big_blind, straddle: hand.straddle },
+      { seats: hand.seats, button: hand.button_seat, sb: hand.small_blind, bb: hand.big_blind, straddle: hand.straddle, posts: hand.posts },
       hand.actions,
     );
   } catch (e) {

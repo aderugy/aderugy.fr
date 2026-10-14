@@ -1,0 +1,58 @@
+# Refuse two migrations with the same number.
+#
+# Supabase reads a migration's version from the number before the first "_",
+# and the GitHub integration applies supabase/migrations as soon as they reach
+# main. Two pull requests that each add a 0023_*.sql look fine on their own;
+# the second one merged fails to apply.
+#
+# The verdict is a commit status, "Migration numbers", on each pull request's
+# head. Branch protection on main requires it. It is set:
+#   * on the pull request itself, whenever it is opened or pushed to;
+#   * on every open pull request into main, whenever main moves — GitHub never
+#     re-runs a pull request's checks when its base changes, and that is
+#     exactly when a clash appears (another pull request took the number).
+#
+# Fix a failure by renaming the migration to the next free number.
+# See scripts/ci/migration-numbers.mjs.
+
+name: Migration numbers
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: migration-numbers-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check migration numbers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/ci
+
+      - name: This pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: node scripts/ci/migration-numbers.mjs pr "$PR"
+
+      - name: Every open pull request into main
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/migration-numbers.mjs all

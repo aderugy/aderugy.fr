@@ -6,14 +6,22 @@ import { useMemo, useState } from "react";
 import { INPUT, TagDots, TagToggles, fmtDay } from "./ui";
 import { useAction } from "@/components/jobs/controls";
 import { ErrorLine, TagChip } from "@/components/jobs/bits";
-import type { LiveTag, PlayerSummary } from "@/lib/live/types";
+import { isBlankUnknown, type LiveTag, type PlayerSummary } from "@/lib/live/types";
 import { createPlayer } from "@/server/actions/live";
 
-/** The player database: search by name or looks, filter by tag. */
+/**
+ * The player database: search by name or looks, filter by tag. Known players
+ * and unknowns (seated without a name) are two lists, so the strangers of
+ * every session never bury the people Arthur knows. Unknowns with nothing on
+ * them — the default name, no tag, note or description — are hidden unless
+ * asked for.
+ */
 export function PlayerList({ players, tags }: { players: PlayerSummary[]; tags: LiveTag[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<string[]>([]);
+  const [category, setCategory] = useState<"known" | "unknown">("known");
+  const [showBlank, setShowBlank] = useState(false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -21,13 +29,18 @@ export function PlayerList({ players, tags }: { players: PlayerSummary[]; tags: 
   const { pending, error, run } = useAction();
   const tagById = new Map(tags.map((t) => [t.id, t]));
 
+  const known = players.filter((p) => p.known);
+  const unknowns = players.filter((p) => !p.known);
+  const blank = unknowns.filter(isBlankUnknown).length;
+
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return players
+      .filter((p) => (category === "known" ? p.known : !p.known && (showBlank || !isBlankUnknown(p))))
       .filter((p) => !needle || p.name.toLowerCase().includes(needle) || (p.description ?? "").toLowerCase().includes(needle))
       .filter((p) => filter.every((t) => p.tag_ids.includes(t)))
       .sort((a, b) => (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? "") || a.name.localeCompare(b.name));
-  }, [players, q, filter]);
+  }, [players, q, filter, category, showBlank]);
 
   return (
     <main className="mx-auto h-full w-full max-w-2xl overflow-y-auto px-4 py-5 sm:px-6 sm:py-8">
@@ -60,7 +73,25 @@ export function PlayerList({ players, tags }: { players: PlayerSummary[]; tags: 
         </form>
       )}
 
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or description" className={`${INPUT} mt-4`} />
+      <div className="mt-4 flex items-center gap-1 text-xs">
+        {(["known", "unknown"] as const).map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setCategory(c)}
+            aria-pressed={category === c}
+            className={`rounded-full border px-3 py-1 ${category === c ? "border-accent bg-accent text-white" : "border-line text-muted"}`}
+          >
+            {c === "known" ? `Known · ${known.length}` : `Unknown · ${unknowns.length - blank}`}
+          </button>
+        ))}
+        {category === "unknown" && blank > 0 && (
+          <button type="button" onClick={() => setShowBlank((x) => !x)} className="ml-auto text-muted underline">
+            {showBlank ? "Hide" : "Show"} {blank} blank
+          </button>
+        )}
+      </div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or description" className={`${INPUT} mt-2`} />
       {tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {tags.map((t) => (
@@ -80,7 +111,7 @@ export function PlayerList({ players, tags }: { players: PlayerSummary[]; tags: 
             <Link href={`/poker/live/players/${p.id}`} className="flex items-center gap-3 px-3 py-2.5">
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{p.name}</span>
+                  <span className={`truncate text-sm font-medium ${p.known ? "" : "italic"}`}>{p.name}</span>
                   <TagDots tags={p.tag_ids.map((id) => tagById.get(id)).filter((t): t is LiveTag => Boolean(t))} />
                 </span>
                 {p.description && <span className="block truncate text-xs text-muted">{p.description}</span>}
@@ -101,7 +132,13 @@ export function PlayerList({ players, tags }: { players: PlayerSummary[]; tags: 
         ))}
         {list.length === 0 && (
           <li className="px-3 py-8 text-center text-xs text-muted">
-            {players.length ? "Nobody matches." : "No players yet. They are added from the table, or with + New."}
+            {category === "unknown"
+              ? unknowns.length
+                ? "No unknown matches. Tag, describe or note an unknown at the table and it shows here."
+                : "No unknown players yet. Every new session seats one per empty seat."
+              : players.length
+                ? "Nobody matches."
+                : "No players yet. They are added from the table, or with + New."}
           </li>
         )}
       </ul>

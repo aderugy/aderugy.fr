@@ -5,6 +5,7 @@ import {
   LIVE_LIMITS,
   TABLE_SIZES,
   type HandInput,
+  type HandPost,
   type LiveHand,
   type LivePlayer,
   type LiveSession,
@@ -14,9 +15,11 @@ import {
   type SeatEvent,
   type SeatEventKind,
   type SessionEvent,
+  unknownName,
 } from "@/lib/live/types";
-import { checkSeatEvent, heroSeatAt, sortSeatEvents, tableAt } from "@/lib/live/table";
+import { buttonFor, checkSeatEvent, dealtIn, heroSeatAt, nextButton, seatedTogether, sortSeatEvents, tableAt } from "@/lib/live/table";
 import { breaksOf } from "@/lib/live/session";
+import { addToStack, moveStack, stacksAfterHand, withStack, type Stacks } from "@/lib/live/stacks";
 import { checkHand } from "@/lib/live/validate";
 
 /**
@@ -31,14 +34,14 @@ import { checkHand } from "@/lib/live/validate";
  */
 
 const SESSION_COLUMNS =
-  "id, venue, game, small_blind, big_blind, currency, seats, hero_seat, button_seat, started_at, ended_at, cash_out, notes, created_at, updated_at";
+  "id, venue, game, small_blind, big_blind, currency, seats, hero_seat, button_seat, stacks, started_at, ended_at, cash_out, notes, created_at, updated_at";
 const EVENT_COLUMNS = "id, session_id, kind, amount, at";
 const SEAT_EVENT_COLUMNS = "id, session_id, seat, kind, player_id, at, created_at";
-const PLAYER_COLUMNS = "id, name, description, created_at, updated_at";
+const PLAYER_COLUMNS = "id, name, description, known, created_at, updated_at";
 const TAG_COLUMNS = "id, name, color, position";
 const NOTE_COLUMNS = "id, player_id, session_id, hand_id, body, source, created_at, updated_at";
 const HAND_COLUMNS =
-  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, seats, actions, hero_cards, board, shown, winners, hero_net, starred, notes, created_at, updated_at";
+  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, posts, seats, actions, hero_cards, board, shown, winners, hero_net, starred, notes, created_at, updated_at";
 
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -93,7 +96,17 @@ function asSession(row: Record<string, unknown>): LiveSession {
     small_blind: num(row.small_blind),
     big_blind: num(row.big_blind),
     cash_out: numOrNull(row.cash_out),
+    stacks: Object.fromEntries(
+      Object.entries((row.stacks as Record<string, unknown> | null) ?? {})
+        .map(([k, v]) => [k, Number(v)] as const)
+        .filter(([, v]) => Number.isFinite(v) && v > 0),
+    ),
   };
+}
+
+async function saveStacks(db: SupabaseClient, userId: string, sessionId: string, stacks: Stacks): Promise<void> {
+  const { error } = await db.from("live_sessions").update({ stacks }).eq("user_id", userId).eq("id", sessionId);
+  if (error) throw error;
 }
 
 function asEvent(row: Record<string, unknown>): SessionEvent {
@@ -109,6 +122,7 @@ function asHand(row: Record<string, unknown>): LiveHand {
     straddle: numOrNull(row.straddle),
     hero_net: numOrNull(row.hero_net),
     seats: (h.seats ?? []).map((s) => ({ seat: num(s.seat), player_id: s.player_id ?? null, stack: numOrNull(s.stack) })),
+    posts: ((h.posts ?? []) as HandPost[]).map((p) => ({ seat: num(p.seat), live: num(p.live ?? 0), dead: num(p.dead ?? 0) })),
     board: h.board ?? [],
     shown: h.shown ?? {},
     winners: Array.isArray(h.winners) ? h.winners : [],
@@ -194,6 +208,8 @@ export type NewSession = {
   hero_seat: number;
   buy_in: number | string;
   started_at?: string | null;
+  /** Seat a fresh unknown player in every other seat (the default). */
+  fill_unknowns?: boolean;
 };
 
 type SessionFields = {
@@ -261,7 +277,7 @@ export async function startSession(db: SupabaseClient, userId: string, input: Ne
 
   const { data, error } = await db
     .from("live_sessions")
-    .insert({ user_id: userId, ...fields, seats, hero_seat: hero, started_at: startedAt })
+    .insert({ user_id: userId, ...fields, seats, hero_seat: hero, started_at: startedAt, stacks: { [String(hero)]: buyIn } })
     .select(SESSION_COLUMNS)
     .single();
   if (error) {
@@ -278,6 +294,23 @@ export async function startSession(db: SupabaseClient, userId: string, input: Ne
   if (money.error || seat.error) {
     await db.from("live_sessions").delete().eq("user_id", userId).eq("id", session.id);
     throw money.error ?? seat.error;
+  }
+
+  // A full table of strangers: one unknown player per seat, sat a moment
+  // after Arthur so the log reads in that order.
+  if (input.fill_unknowns !== false) {
+    const others = Array.from({ length: seats }, (_, i) => i + 1).filter((n) => n !== hero);
+    const { data: created, error: e1 } = await db
+      .from("live_players")
+      .insert(others.map((n) => ({ user_id: userId, name: unknownName(n), known: false })))
+      .select("id, name");
+    if (e1) throw e1;
+    const byName = new Map((created ?? []).map((p) => [p.name as string, p.id as string]));
+    const at = new Date(Date.parse(startedAt) + 1).toISOString();
+    const { error: e2 } = await db.from("live_seat_events").insert(
+      others.map((n) => ({ user_id: userId, session_id: session.id, seat: n, kind: "sit", player_id: byName.get(unknownName(n)) ?? null, at })),
+    );
+    if (e2) throw e2;
   }
   return { ok: true, value: session };
 }
@@ -424,6 +457,9 @@ export async function addMoney(
     .from("live_session_events")
     .insert({ user_id: userId, session_id: sessionId, kind: input.kind, amount: value, at });
   if (error) throw error;
+  // Money in during the session lands on Arthur's stack.
+  const session = await getSession(db, userId, sessionId);
+  if (session && !session.ended_at) await saveStacks(db, userId, sessionId, addToStack(session.stacks, session.hero_seat, value));
   return { ok: true };
 }
 
@@ -535,10 +571,98 @@ export async function logSeatEvent(
     throw error;
   }
   if (input.kind === "hero_move") {
-    const { error: e2 } = await db.from("live_sessions").update({ hero_seat: seat }).eq("user_id", userId).eq("id", sessionId);
+    const { error: e2 } = await db
+      .from("live_sessions")
+      .update({ hero_seat: seat, stacks: moveStack(ctx.session.stacks, ctx.session.hero_seat, seat) })
+      .eq("user_id", userId)
+      .eq("id", sessionId);
     if (e2) throw e2;
+  } else if (input.kind === "leave" || input.kind === "sit") {
+    // A seat that empties, or fills with someone new, starts with no known stack.
+    await saveStacks(db, userId, sessionId, withStack(ctx.session.stacks, seat, null));
   }
   return { ok: true };
+}
+
+/** What a seat has in front of it now; null or "" clears it. */
+export async function setStack(
+  db: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  seat: number,
+  raw: number | string | null,
+): Promise<Result> {
+  const session = await getSession(db, userId, sessionId);
+  if (!session) return { ok: false, error: "No such session." };
+  if (session.ended_at) return { ok: false, error: "This session has ended." };
+  if (!Number.isInteger(seat) || seat < 1 || seat > session.seats) return { ok: false, error: `There is no seat ${seat}.` };
+  let value: number | null = null;
+  if (raw !== null && String(raw).trim() !== "") {
+    const v = amount(raw, "A stack");
+    if (typeof v === "string") return { ok: false, error: v };
+    value = v;
+  }
+  await saveStacks(db, userId, sessionId, withStack(session.stacks, seat, value));
+  return { ok: true };
+}
+
+/** Someone nobody knows sits down: a fresh unknown player, seated. */
+export async function seatUnknown(db: SupabaseClient, userId: string, sessionId: string, seat: number): Promise<Result<LivePlayer>> {
+  const created = await createPlayer(db, userId, { name: unknownName(Number(seat)), known: false });
+  if (!created.ok) return created;
+  const r = await logSeatEvent(db, userId, sessionId, { kind: "sit", seat, player_id: created.value.id });
+  if (!r.ok) {
+    await db.from("live_players").delete().eq("user_id", userId).eq("id", created.value.id);
+    return r;
+  }
+  return created;
+}
+
+/**
+ * One player leaves and someone new takes the seat straight away: a leave,
+ * then a fresh unknown sitting down a millisecond later.
+ */
+export async function replaceOccupant(db: SupabaseClient, userId: string, sessionId: string, seat: number): Promise<Result> {
+  const ctx = await tableContext(db, userId, sessionId);
+  if (!ctx) return { ok: false, error: "No such session." };
+  if (ctx.session.ended_at) return { ok: false, error: "This session has ended." };
+  const occupant = ctx.table.get(seat);
+  if (!occupant) return { ok: false, error: `Nobody sits in seat ${seat}.` };
+  const created = await createPlayer(db, userId, { name: unknownName(seat), known: false });
+  if (!created.ok) return created;
+  const at = new Date().toISOString();
+  const later = new Date(Date.parse(at) + 1).toISOString();
+  const { error } = await db.from("live_seat_events").insert([
+    { user_id: userId, session_id: sessionId, seat, kind: "leave", player_id: occupant.player_id, at },
+    { user_id: userId, session_id: sessionId, seat, kind: "sit", player_id: created.value.id, at: later },
+  ]);
+  if (error) {
+    await db.from("live_players").delete().eq("user_id", userId).eq("id", created.value.id);
+    throw error;
+  }
+  await saveStacks(db, userId, sessionId, withStack(ctx.session.stacks, seat, null));
+  return { ok: true };
+}
+
+/**
+ * Put the button somewhere for the next hand: on `seat`, or (`"next"`) one
+ * seat on, for a hand played without being entered.
+ */
+export async function moveButton(db: SupabaseClient, userId: string, sessionId: string, to: number | "next"): Promise<Result<number>> {
+  const ctx = await tableContext(db, userId, sessionId);
+  if (!ctx) return { ok: false, error: "No such session." };
+  if (ctx.session.ended_at) return { ok: false, error: "This session has ended." };
+  const dealt = dealtIn(ctx.table, ctx.session.hero_seat);
+  let seat: number;
+  if (to === "next") {
+    seat = nextButton(buttonFor(ctx.session.button_seat, dealt), dealt);
+  } else {
+    seat = Number(to);
+    if (!Number.isInteger(seat) || seat < 1 || seat > ctx.session.seats) return { ok: false, error: `There is no seat ${to}.` };
+  }
+  const { error } = await db.from("live_sessions").update({ button_seat: seat }).eq("user_id", userId).eq("id", sessionId);
+  if (error) throw error;
+  return { ok: true, value: seat };
 }
 
 /** Someone changes seat: they leave one and sit in the other, at the same instant. */
@@ -568,6 +692,7 @@ export async function moveSeat(
   // One insert: all or nothing.
   const { error } = await db.from("live_seat_events").insert(rows);
   if (error) throw error;
+  await saveStacks(db, userId, sessionId, moveStack(ctx.session.stacks, from, to));
   return { ok: true };
 }
 
@@ -692,7 +817,7 @@ export async function getPlayer(db: SupabaseClient, userId: string, id: string):
   return (data as LivePlayer | null) ?? null;
 }
 
-function checkPlayer(input: { name?: string; description?: string | null }): Record<string, unknown> | string {
+function checkPlayer(input: { name?: string; description?: string | null; known?: boolean }): Record<string, unknown> | string {
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) {
     const name = cleanText(input.name);
@@ -707,15 +832,16 @@ function checkPlayer(input: { name?: string; description?: string | null }): Rec
     if (p) return p;
     patch.description = d;
   }
+  if (input.known !== undefined) patch.known = Boolean(input.known);
   return patch;
 }
 
 export async function createPlayer(
   db: SupabaseClient,
   userId: string,
-  input: { name: string; description?: string | null; tag_ids?: string[] },
+  input: { name: string; description?: string | null; tag_ids?: string[]; known?: boolean },
 ): Promise<Result<LivePlayer>> {
-  const fields = checkPlayer({ name: input.name, description: input.description ?? null });
+  const fields = checkPlayer({ name: input.name, description: input.description ?? null, known: input.known ?? true });
   if (typeof fields === "string") return { ok: false, error: fields };
   const { data, error } = await db
     .from("live_players")
@@ -732,7 +858,7 @@ export async function patchPlayer(
   db: SupabaseClient,
   userId: string,
   id: string,
-  input: { name?: string; description?: string | null },
+  input: { name?: string; description?: string | null; known?: boolean },
 ): Promise<Result> {
   const patch = checkPlayer(input);
   if (typeof patch === "string") return { ok: false, error: patch };
@@ -740,6 +866,45 @@ export async function patchPlayer(
   const { error, count } = await db.from("live_players").update(patch, { count: "exact" }).eq("user_id", userId).eq("id", id);
   if (error) throw error;
   if (!count) return { ok: false, error: "No such player." };
+  return { ok: true };
+}
+
+/**
+ * "That unknown is Marco": their seats, notes, tags, hands and description
+ * move to Marco and the unknown goes (migration 0022). Refused when the two
+ * sat at the same table at the same time — they are two people.
+ */
+export async function mergePlayers(db: SupabaseClient, userId: string, fromId: string, intoId: string): Promise<Result> {
+  if (fromId === intoId) return { ok: false, error: "That is the same player." };
+  const [from, into] = await Promise.all([getPlayer(db, userId, fromId), getPlayer(db, userId, intoId)]);
+  if (!from || !into) return { ok: false, error: "No such player." };
+
+  const { data: sits, error } = await db
+    .from("live_seat_events")
+    .select("session_id, player_id")
+    .eq("user_id", userId)
+    .eq("kind", "sit")
+    .in("player_id", [fromId, intoId]);
+  if (error) throw error;
+  const seen = new Map<string, Set<string>>();
+  for (const r of sits ?? []) {
+    const set = seen.get(r.session_id as string) ?? new Set<string>();
+    set.add(r.player_id as string);
+    seen.set(r.session_id as string, set);
+  }
+  for (const [sessionId, who] of seen) {
+    if (who.size < 2) continue;
+    const events = await loadSeatEvents(db, userId, sessionId);
+    if (seatedTogether(events, fromId, intoId)) {
+      return { ok: false, error: `${from.name} and ${into.name} sat at the same table at the same time: they are two people.` };
+    }
+  }
+
+  const { error: e2 } = await db.rpc("live_merge_players", { p_from: fromId, p_into: intoId });
+  if (e2) {
+    if (pgCode(e2) === "P0002") return { ok: false, error: "No such player." };
+    throw e2;
+  }
   return { ok: true };
 }
 
@@ -1012,6 +1177,7 @@ function handRow(input: HandInput) {
     small_blind: input.small_blind,
     big_blind: input.big_blind,
     straddle: input.straddle,
+    posts: input.posts ?? [],
     seats: input.seats,
     actions: input.actions,
     hero_cards: input.hero_cards,
@@ -1033,8 +1199,10 @@ export async function createHand(
   const session = await getSession(db, userId, sessionId);
   if (!session) return { ok: false, error: "No such session." };
   let input: HandInput;
+  let checked: ReturnType<typeof checkHand>;
   try {
-    input = checkHand(raw, session.seats).input;
+    checked = checkHand(raw, session.seats);
+    input = checked.input;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -1046,11 +1214,13 @@ export async function createHand(
     .select(HAND_COLUMNS)
     .single();
   if (error) throw error;
-  // The next hand's button starts from this one.
+  // The button moves on, to the next seat that was dealt into this hand, and
+  // the stacks move by what each seat won or lost.
   if (!session.ended_at) {
+    const next = nextButton(input.button_seat, input.seats.map((s) => s.seat));
     const { error: e2 } = await db
       .from("live_sessions")
-      .update({ button_seat: input.button_seat })
+      .update({ button_seat: next, stacks: stacksAfterHand(session.stacks, input.seats, checked.settlement) })
       .eq("user_id", userId)
       .eq("id", sessionId);
     if (e2) throw e2;
