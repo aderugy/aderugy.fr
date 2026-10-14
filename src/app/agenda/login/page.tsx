@@ -1,5 +1,6 @@
 import { LoginForm } from "@/components/agenda/LoginForm";
 import { safeNext } from "@/lib/supabase/session";
+import Link from "next/link";
 
 export const metadata = { title: "Sign in — Agenda" };
 
@@ -35,6 +36,18 @@ export default async function LoginPage({
           <code>.env.local</code> and fill in your project URL and anon key.
         </p>
       )}
+
+      <p className="mt-6 text-xs text-muted">
+        By continuing, you accept the{" "}
+        <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
+          terms of use
+        </Link>{" "}
+        and the{" "}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+          privacy policy
+        </Link>
+        .
+      </p>
     </main>
   );
 }
