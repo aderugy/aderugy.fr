@@ -17,5 +17,6 @@ export const config = {
     "/poker/trainers/:path*",
     "/maths/:path*",
     "/jobs/:path*",
+    "/flashcards/:path*",
   ],
 };

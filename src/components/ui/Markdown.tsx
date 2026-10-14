@@ -27,7 +27,8 @@ function styled<T extends { className?: string }>(base: string) {
   };
 }
 
-const components: Components = {
+/** Element styling, shared with renderers that add plugins (flash cards: math, code). */
+export const markdownComponents: Components = {
   h1: (p) => <h1 className="mb-2 mt-3 text-base font-semibold first:mt-0" {...omitNode(p)} />,
   h2: (p) => <h2 className="mb-1.5 mt-3 text-sm font-semibold first:mt-0" {...omitNode(p)} />,
   h3: (p) => <h3 className="mb-1 mt-2 text-sm font-medium first:mt-0" {...omitNode(p)} />,
@@ -70,7 +71,7 @@ export function Markdown({ source, className }: { source: string; className?: st
   return (
     // A caller's className replaces the default size rather than fighting it.
     <div className={["break-words", className ?? "text-sm"].join(" ")}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {source}
       </ReactMarkdown>
     </div>

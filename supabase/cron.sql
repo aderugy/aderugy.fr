@@ -105,5 +105,13 @@ select cron.schedule(
       where exists (select 1 from public.blocks_due_for_reminder(1)) $$
 );
 
+-- Flash cards: notes in the trash for 30 days, and images no note uses any
+-- more, deleted for good (migration 0023). Once a day, at 03:30 UTC.
+select cron.schedule(
+  'flashcards-purge-trash',
+  '30 3 * * *',
+  $$ select public.fc_purge_trash() $$
+);
+
 -- Inspect with:  select * from cron.job;
 --                select * from cron.job_run_details order by start_time desc limit 20;

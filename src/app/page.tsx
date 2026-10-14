@@ -18,6 +18,11 @@ const tools = [
     description: "Probability & statistics path: a DAG of concepts, courses, exercises, spaced repetition.",
   },
   {
+    href: "/flashcards",
+    name: "Flashcards",
+    description: "Spaced-repetition cards: decks, Markdown and maths, FSRS reviews, stats, Claude-written cards to approve.",
+  },
+  {
     href: "/jobs",
     name: "Jobs",
     description: "The internship search: applications, companies, interviews on the agenda, offers kept.",
