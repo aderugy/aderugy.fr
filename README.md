@@ -303,6 +303,20 @@ Restoring: download the file, look before touching anything —
 Restoring into the live project means stopping the cron jobs first
 (`supabase/cron.sql`) so the Google pusher does not act on half-restored rows.
 
+## Migration numbers
+
+Supabase reads a migration's version from the number before the first `_`.
+Two pull requests that each add a `0023_*.sql` both look fine; the second one
+merged fails to apply. `.github/workflows/migration-numbers.yml` sets a
+**Migration numbers** status on every pull request into `main`, failing when
+the migrations `main` would hold after the merge use a number twice. Because
+the clash usually appears when *another* pull request is merged, every push to
+`main` re-checks all open pull requests. Fix a failure by renaming the file to
+the next free number.
+
+Setup, once: in the branch protection rule for `main`, add **Migration
+numbers** to the required status checks, next to **Backup database**.
+
 ## Poker rake presets
 
 `/poker` prices every call net of rake, so the presets it offers — Betclic and

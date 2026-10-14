@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/**/*.test.ts src/lib/maths/*/*.test.ts supabase/functions/_shared/*.test.ts",
+    "test": "tsx --test src/lib/**/*.test.ts src/lib/maths/*/*.test.ts supabase/functions/_shared/*.test.ts scripts/ci/*.test.mjs",
     "maths:layout": "node scripts/maths/layout.mjs",
     "maths:check": "python3 scripts/maths/validate_graph.py"
   },
