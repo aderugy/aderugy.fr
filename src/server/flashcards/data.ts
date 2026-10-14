@@ -285,7 +285,12 @@ export async function decksWithCounts(
   db: SupabaseClient,
   userId: string,
   now = new Date(),
-): Promise<{ decks: DeckWithCounts[]; settings: Settings; doneToday: { reviews: number; fresh: number } }> {
+): Promise<{
+  decks: DeckWithCounts[];
+  total: DeckCounts;
+  settings: Settings;
+  doneToday: { reviews: number; fresh: number };
+}> {
   const settings = await loadSettings(db, userId);
   const today = reviewDay(now, settings);
   const [decks, counts, done] = await Promise.all([
@@ -342,7 +347,17 @@ export async function decksWithCounts(
       counts: { ...sum, newCards: Math.min(sum.newCards, freshRoom), reviewDue: Math.min(sum.reviewDue, reviewRoom) },
     };
   });
-  return { decks: out, settings, doneToday: { reviews: reviewsDone, fresh: freshDone } };
+  const total: DeckCounts = { cards: 0, newCards: 0, learningDue: 0, reviewDue: 0, suspended: 0 };
+  for (const c of own.values()) {
+    total.cards += c.cards;
+    total.newCards += c.newCards;
+    total.learningDue += c.learningDue;
+    total.reviewDue += c.reviewDue;
+    total.suspended += c.suspended;
+  }
+  total.newCards = Math.min(total.newCards, freshRoom);
+  total.reviewDue = Math.min(total.reviewDue, reviewRoom);
+  return { decks: out, total, settings, doneToday: { reviews: reviewsDone, fresh: freshDone } };
 }
 
 /* ------------------------------------------------------------------- notes */
@@ -1157,4 +1172,20 @@ export async function loadMedia(db: SupabaseClient, userId: string, id: string):
   const raw = String(data.bytes);
   const bytes = raw.startsWith("\\x") ? Buffer.from(raw.slice(2), "hex") : Buffer.from(raw, "base64");
   return { mime: String(data.mime), bytes };
+}
+
+/** Cards due on the next review day (overdue ones excluded), for the end of a session. */
+export async function dueTomorrow(db: SupabaseClient, userId: string, deckId: string | null, now = new Date()): Promise<number> {
+  const [settings, decks] = await Promise.all([loadSettings(db, userId), loadDecks(db, userId)]);
+  const today = reviewDay(now, settings);
+  const { data, error } = await db.rpc("fc_forecast", {
+    p_today: today,
+    p_days: 2,
+    p_tz: settings.timeZone,
+    p_day_start: settings.dayStartsHour,
+    p_deck_ids: deckId ? subtreeIds(decks, deckId) : null,
+  });
+  check(error);
+  const tomorrow = addDaysISO(today, 1);
+  return Number(((data ?? []) as { day: string; cards: number }[]).find((r) => String(r.day) === tomorrow)?.cards ?? 0);
 }

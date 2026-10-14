@@ -23,6 +23,7 @@ import {
   trashNotes as trashNotesRows,
   undoReview as undoReviewRow,
   findDuplicate,
+  dueTomorrow as dueTomorrowCount,
   type ImportReport,
   type ImportRow,
   type NoteRow,
@@ -197,6 +198,15 @@ export async function undoReview(reviewId: number): Promise<Value<QueueItem>> {
     return await undoReviewRow(supabase, user.id, reviewId);
   } catch (e) {
     return failed(e);
+  }
+}
+
+export async function dueTomorrow(deckId: string | null): Promise<number | null> {
+  try {
+    const { supabase, user } = await requireUser();
+    return await dueTomorrowCount(supabase, user.id, deckId);
+  } catch {
+    return null;
   }
 }
 
