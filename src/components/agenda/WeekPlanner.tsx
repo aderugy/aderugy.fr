@@ -173,7 +173,8 @@ export function WeekPlanner({
   const externalById = useMemo(() => {
     const sources = new Map(calendarSources.map((s) => [s.id, s]));
     const out = new Map<string, { event: ExternalEvent; source: CalendarSource }>();
-    for (const item of external.items) {
+    // All-day chips use the same id scheme, so they open the same detail.
+    for (const item of [...external.items, ...external.allDay]) {
       const [sourceId, eventId] = item.id.split(":");
       const source = sources.get(sourceId);
       const event = externalEvents.find(
@@ -182,7 +183,7 @@ export function WeekPlanner({
       if (source && event) out.set(item.id, { event, source });
     }
     return out;
-  }, [external.items, externalEvents, calendarSources]);
+  }, [external.items, external.allDay, externalEvents, calendarSources]);
 
   /**
    * A block has no category and no title of its own. A placed template keeps

@@ -1,8 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { countsAsCommitted } from "@/lib/external";
-import type { CalendarSource, ExternalEvent } from "@/lib/types";
+import { countsAsCommitted, withoutHidden } from "@/lib/external";
+import type { CalendarSource, ExternalEvent, HiddenEventRule } from "@/lib/types";
 import { weekSpan, type Span, type ViewBlock, type ViewEvent } from "@/lib/agenda/week-view";
+
+/** The columns of a hidden-event rule (migration 0024). */
+export const HIDDEN_COLUMNS = "id, calendar_source_id, external_event_id, title, label, starts_at, created_at";
 
 /**
  * Reading the week grid for the Claude connector: blocks with what is inside
@@ -133,9 +136,9 @@ export async function getBlock(db: SupabaseClient, userId: string, id: string): 
   return blocks.find((b) => b.id === id) ?? null;
 }
 
-/** Calendar events that count (enabled calendar, not cancelled, busy…) overlapping `span`. */
+/** Calendar events that count (enabled calendar, not cancelled, busy, not hidden…) overlapping `span`. */
 export async function loadEvents(db: SupabaseClient, userId: string, span: Span): Promise<ViewEvent[]> {
-  const [events, sources] = await Promise.all([
+  const [events, sources, hidden] = await Promise.all([
     db
       .from("external_events")
       .select("calendar_source_id, external_event_id, title, starts_at, ends_at, all_day, status, transparency, attendee_response, archived_at")
@@ -147,12 +150,14 @@ export async function loadEvents(db: SupabaseClient, userId: string, span: Span)
       .from("calendar_sources")
       .select("id, provider, external_id, display_name, color, category_id, enabled, include_all_day, include_free, include_declined, position")
       .eq("user_id", userId),
+    db.from("hidden_external_events").select(HIDDEN_COLUMNS).eq("user_id", userId),
   ]);
   // A broken calendar integration degrades the week; it does not fail it.
   if (events.error || sources.error) return [];
   const byId = new Map(((sources.data ?? []) as CalendarSource[]).map((s) => [s.id, s]));
   const out: ViewEvent[] = [];
-  for (const e of (events.data ?? []) as ExternalEvent[]) {
+  // Hidden events are left out; if the rules cannot be read, nothing is hidden.
+  for (const e of withoutHidden((events.data ?? []) as ExternalEvent[], (hidden.data ?? []) as HiddenEventRule[])) {
     const s = byId.get(e.calendar_source_id);
     if (!s || !countsAsCommitted(e, s)) continue;
     if (e.all_day && !s.include_all_day) continue;

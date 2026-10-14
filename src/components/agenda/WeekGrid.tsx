@@ -772,16 +772,18 @@ export function WeekGrid({
                     const tint = dimmed ? HIDDEN_COLOR : chip.color;
 
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={chip.id}
+                        onClick={() => onSelect(chip.id === selectedId ? null : chip.id)}
                         title={`${chip.label}${chip.title ? ` — ${chip.title}` : ""}${
                           chip.archived
                             ? "\nArchived — your calendar deleted this once it was over. Kept here."
                             : ""
                         }`}
-                        className={`mb-0.5 truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
+                        className={`mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] leading-tight ${
                           dimmed ? "text-muted opacity-60" : ""
-                        }`}
+                        } ${chip.id === selectedId ? "ring-1 ring-foreground/40" : ""}`}
                         style={{
                           backgroundColor: `${tint}22`,
                           borderLeft: `2px solid ${tint}`,
@@ -791,7 +793,7 @@ export function WeekGrid({
                         }}
                       >
                         {chip.title ?? chip.label}
-                      </div>
+                      </button>
                     );
                   })}
               </div>
