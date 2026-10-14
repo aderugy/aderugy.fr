@@ -79,6 +79,9 @@ seat under "Blinds bought back" to cycle BB → BB + SB dead → none.
 At a showdown — on the river, or an all-in before it that runs the board out —
 the editor asks for the rest of the board, then each opponent's cards (or "Not
 shown"), before the result. In the result, tapping a seat edits its shown cards.
+Anywhere in the editor, tapping a board card (or an empty place for the next
+street) changes that street, and tapping a seat's cards (or Arthur's empty
+slot) changes them; on a saved hand the same taps open the editor.
 
 The editor (setup → action → result) replays the action list on every change;
 the server replays it again before saving (`src/lib/live/validate.ts`) and
