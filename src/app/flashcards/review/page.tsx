@@ -36,6 +36,7 @@ export default async function ReviewPage({ searchParams }: PageProps<"/flashcard
       deckName={session.deckName}
       heldBack={session.heldBack}
       decks={deckList}
+      startedAt={new Date().toISOString()}
     />
   );
 }

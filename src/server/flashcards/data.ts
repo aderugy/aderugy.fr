@@ -458,6 +458,7 @@ export async function saveNote(
   db: SupabaseClient,
   userId: string,
   input: SaveNoteInput & { id?: string },
+  opts: { checkDuplicate?: boolean } = {},
 ): Promise<Result<{ id: string; duplicateOf: string | null; removedCards: number }>> {
   const clean = attempt(() => cleanNote(input));
   if (!clean.ok) return clean;
@@ -479,7 +480,7 @@ export async function saveNote(
   }
 
   const synced = inbox ? { removed: 0 } : await syncCards(db, userId, { id: id!, ...n });
-  const dup = await findDuplicate(db, userId, input.deckId, n.front, id);
+  const dup = opts.checkDuplicate === false ? null : await findDuplicate(db, userId, input.deckId, n.front, id);
   return ok({ id: id!, duplicateOf: dup?.id ?? null, removedCards: synced.removed });
 }
 
@@ -1118,7 +1119,12 @@ export async function importNotes(
       report.skipped++;
       continue;
     }
-    const saved = await saveNote(db, userId, { ...note.value, deckId, id: dup && opts.duplicates === "update" ? dup : undefined });
+    const saved = await saveNote(
+      db,
+      userId,
+      { ...note.value, deckId, id: dup && opts.duplicates === "update" ? dup : undefined },
+      { checkDuplicate: false },
+    );
     if (!saved.ok) {
       report.errors.push({ row: i + 1, error: saved.error });
       continue;

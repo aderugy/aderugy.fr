@@ -44,9 +44,10 @@ export function NoteCards({
   history: Review[];
   trashed: boolean;
   timeZone: string;
-  /** Server time, so the "due in" labels render the same on both sides. */
-  now: number;
+  /** Server time (ISO), so the "due in" labels render the same on both sides. */
+  now: string;
 }) {
+  const nowMs = Date.parse(now);
   const router = useRouter();
   const [open, setOpen] = useState<string | null>(null);
   const { pending, error, run } = useAction();
@@ -57,7 +58,7 @@ export function NoteCards({
       {cards.length === 0 && <p className="text-sm text-muted">No card yet.</p>}
       {cards.map((c) => {
         const mine = history.filter((h) => h.card_id === c.id);
-        const due = Date.parse(c.due) - now;
+        const due = Date.parse(c.due) - nowMs;
         return (
           <div key={c.id} className="rounded-lg border border-line bg-surface p-3 text-sm">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

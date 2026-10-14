@@ -54,7 +54,7 @@ export default async function NotePage({ params }: PageProps<"/flashcards/notes/
         }}
         cards={note.cards.map((c) => ({ ord: c.ord, reps: c.reps }))}
       />
-      <NoteCards noteId={note.id} kind={note.kind} cards={note.cards} history={history} trashed={Boolean(note.deleted_at)} timeZone={settings.timeZone} now={Date.now()} />
+      <NoteCards noteId={note.id} kind={note.kind} cards={note.cards} history={history} trashed={Boolean(note.deleted_at)} timeZone={settings.timeZone} now={new Date().toISOString()} />
     </main>
   );
 }

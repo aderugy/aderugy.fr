@@ -57,6 +57,7 @@ export function Reviewer({
   deckName,
   heldBack,
   decks,
+  startedAt,
 }: {
   initial: Lists;
   settings: Settings;
@@ -65,9 +66,15 @@ export function Reviewer({
   deckName: string | null;
   heldBack: { review: number; fresh: number };
   decks: { id: string; path: string; depth: number }[];
+  /** Server time when the queue was built: the first card is picked at it, on both sides. */
+  startedAt: string;
 }) {
-  const [lists, setLists] = useState<Lists>(initial);
-  const [current, setCurrent] = useState<{ item: QueueItem; from: From } | null>(() => null);
+  const [boot] = useState(() => {
+    const p = pick(initial, new Date(startedAt));
+    return { lists: p ? without(initial, p.item.card.id) : initial, current: p };
+  });
+  const [lists, setLists] = useState<Lists>(boot.lists);
+  const [current, setCurrent] = useState<{ item: QueueItem; from: From } | null>(boot.current);
   const [revealed, setRevealed] = useState(false);
   const [typed, setTyped] = useState("");
   const [history, setHistory] = useState<Done[]>([]);
@@ -75,7 +82,6 @@ export function Reviewer({
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [started, setStarted] = useState(false);
   const [tomorrow, setTomorrow] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
 
@@ -87,7 +93,6 @@ export function Reviewer({
     listsRef.current = lists;
   }, [lists]);
 
-  // Show the first card on mount (the queue's order depends on "now").
   const advance = useCallback((from: Lists) => {
     const p = pick(from, new Date());
     if (p) {
@@ -104,14 +109,11 @@ export function Reviewer({
   }, []);
 
   useEffect(() => {
-    if (!started) {
-      setStarted(true);
-      advance(initial);
-    }
-  }, [started, advance, initial]);
+    shownAt.current = Date.now();
+  }, []);
 
   // While waiting for a card still in its steps, tick so it appears when due.
-  const waitingFor = !current && started ? lists.learning.map((i) => Date.parse(i.card.due)).sort((a, b) => a - b)[0] : undefined;
+  const waitingFor = !current ? lists.learning.map((i) => Date.parse(i.card.due)).sort((a, b) => a - b)[0] : undefined;
   useEffect(() => {
     if (waitingFor === undefined) return;
     const id = window.setInterval(() => {
@@ -121,7 +123,7 @@ export function Reviewer({
     return () => window.clearInterval(id);
   }, [waitingFor, advance]);
 
-  const finished = started && !current && lists.learning.length === 0;
+  const finished = !current && lists.learning.length === 0;
   useEffect(() => {
     if (finished && tomorrow === null && !cram) {
       void dueTomorrow(deckId).then((n) => setTomorrow(n ?? -1));
@@ -320,8 +322,6 @@ export function Reviewer({
   const canUndo = history.length > 0;
 
   /* --------------------------------------------------------------- views */
-
-  if (!started) return null;
 
   if (finished) {
     const by = (r: Rating) => history.filter((d) => d.rating === r).length;
