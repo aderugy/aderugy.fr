@@ -2,7 +2,7 @@
 
 Personal website and utility tools. Next.js (App Router) · Tailwind · Supabase · Vercel.
 
-Five tools live here so far:
+Six tools live here so far:
 
 - **`/agenda`** — a weekly planner: typed tasks in a backlog, reusable blocks,
   and a week grid you assemble by hand. Claude can read the week and plan blocks of its own
@@ -21,6 +21,11 @@ Five tools live here so far:
 - **`/jobs`** — the internship search: applications with their companies,
   type-of-job tags, notes and a saved copy of each offer; interviews that go on
   the agenda; Claude tools to prepare them. See [docs/jobs/design.md](docs/jobs/design.md).
+- **`/flashcards`** — spaced-repetition flash cards: a deck tree, notes in
+  Markdown with KaTeX and code (basic, reversed, cloze, typed answer), FSRS
+  reviews with learning steps and an adjustable target retention, cram, stats,
+  CSV import/export; Claude writes notes into an inbox you approve. See
+  [docs/flashcards/design.md](docs/flashcards/design.md).
 
 ## Getting started
 

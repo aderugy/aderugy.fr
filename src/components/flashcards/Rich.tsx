@@ -27,7 +27,7 @@ export function Rich({ source, className }: { source: string; className?: string
     <div className={["fc-rich break-words", className ?? "text-base"].join(" ")}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }], [rehypeHighlight, { detect: false, ignoreMissing: true }]]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }], [rehypeHighlight, { detect: false }]]}
         components={components}
       >
         {source}

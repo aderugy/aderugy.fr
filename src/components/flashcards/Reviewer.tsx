@@ -274,7 +274,8 @@ export function Reviewer({
   const [holding, setHolding] = useState(false);
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("a, button, input, textarea, select")) return;
-    const timer = window.setTimeout(() => {
+    // A hold opens the menu on touch only: with a mouse it would fight text selection.
+    const timer = e.pointerType === "mouse" ? null : window.setTimeout(() => {
       if (touch.current && !touch.current.moved) {
         setHolding(false);
         setMenu(true);
@@ -478,6 +479,7 @@ export function Reviewer({
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder="Type the answer, then Enter"
+              autoFocus
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
