@@ -24,7 +24,8 @@ Six tools live here so far:
 - **`/flashcards`** — spaced-repetition flash cards: a deck tree, notes in
   Markdown with KaTeX and code (basic, reversed, cloze, typed answer), FSRS
   reviews with learning steps and an adjustable target retention, cram, stats,
-  CSV import/export; Claude writes notes into an inbox you approve. See
+  CSV import/export; Claude can manage decks, notes and cards through the
+  connector, writing new notes to an inbox by default. See
   [docs/flashcards/design.md](docs/flashcards/design.md).
 
 ## Getting started
