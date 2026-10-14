@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { GoogleConnection } from "@/components/agenda/GoogleConnection";
+import { HiddenEvents } from "@/components/agenda/HiddenEvents";
 import { ConnectedApps, type ConnectedApp } from "@/components/agenda/ConnectedApps";
 import {
   NotificationSettings,
@@ -12,6 +13,7 @@ import type {
   Category,
   GoogleAccount,
   GoogleSyncState,
+  HiddenEventRule,
   PushStatus,
 } from "@/lib/types";
 
@@ -28,7 +30,7 @@ export default async function SettingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(LOGIN_PATH);
 
-  const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes, grantsRes, devicesRes, prefsRes] =
+  const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes, grantsRes, devicesRes, prefsRes, hiddenRes] =
     await Promise.all([
     supabase
       .from("google_accounts")
@@ -75,6 +77,11 @@ export default async function SettingsPage({
       .select("block_reminders, lead_minutes")
       .eq("user_id", user.id)
       .maybeSingle(),
+    supabase
+      .from("hidden_external_events")
+      .select("id, calendar_source_id, external_event_id, title, label, starts_at, created_at")
+      .eq("user_id", user.id)
+      .order("created_at"),
   ]);
 
   const apps: ConnectedApp[] = (grantsRes.data ?? []).map((g) => ({
@@ -94,6 +101,11 @@ export default async function SettingsPage({
         categories={(categoriesRes.data ?? []) as Category[]}
         pushStatus={(pushRes.data ?? null) as PushStatus | null}
         notice={{ error: typeof params.error === "string" ? params.error : undefined }}
+      />
+
+      <HiddenEvents
+        rules={(hiddenRes.data ?? []) as HiddenEventRule[]}
+        sources={(sourcesRes.data ?? []) as CalendarSource[]}
       />
 
       <NotificationSettings

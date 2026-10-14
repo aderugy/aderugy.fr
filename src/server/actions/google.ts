@@ -181,3 +181,59 @@ export async function updateCalendarSource(input: {
     return fail(e);
   }
 }
+
+/**
+ * Hide an event mirrored from a calendar: this occurrence (`scope: "event"`),
+ * or every event with its title in that calendar (`scope: "title"`). It leaves
+ * the grid and the totals; the calendar itself is untouched, and the rule
+ * outlives any resync (migration 0023). Undone from the settings.
+ */
+export async function hideExternalEvent(input: {
+  calendarSourceId: string;
+  externalEventId: string;
+  scope: "event" | "title";
+}): Promise<ActionResult> {
+  try {
+    const { supabase, user } = await requireUser();
+    const { data: event, error: readError } = await supabase
+      .from("external_events")
+      .select("title, starts_at")
+      .eq("user_id", user.id)
+      .eq("calendar_source_id", input.calendarSourceId)
+      .eq("external_event_id", input.externalEventId)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!event) throw new Error("This event is no longer in your calendar.");
+    const title = (event.title as string | null)?.trim() ? (event.title as string) : null;
+    if (input.scope === "title" && !title) throw new Error("This event has no title: hide it on its own.");
+
+    const { error } = await supabase.from("hidden_external_events").insert({
+      user_id: user.id,
+      calendar_source_id: input.calendarSourceId,
+      external_event_id: input.scope === "event" ? input.externalEventId : null,
+      title: input.scope === "title" ? title : null,
+      label: title,
+      starts_at: input.scope === "event" ? event.starts_at : null,
+    });
+    // Already hidden: nothing to do.
+    if (error && error.code !== "23505") throw error;
+
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Show a hidden event again (or every event of a hidden title). */
+export async function unhideExternalEvent(ruleId: string): Promise<ActionResult> {
+  try {
+    const { supabase, user } = await requireUser();
+    const { error } = await supabase.from("hidden_external_events").delete().eq("user_id", user.id).eq("id", ruleId);
+    if (error) throw error;
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}

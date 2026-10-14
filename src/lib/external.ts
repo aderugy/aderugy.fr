@@ -1,4 +1,4 @@
-import type { AllDayItem, CalendarSource, ExternalEvent, GridItem } from "./types";
+import type { AllDayItem, CalendarSource, ExternalEvent, GridItem, HiddenEventRule } from "./types";
 import { DAY_END_MIN, DAY_START_MIN, clamp, dayIndexOf, minutesOfDay } from "./time";
 
 /**
@@ -21,6 +21,31 @@ export function countsAsCommitted(
   if (!source.include_free && event.transparency !== "opaque") return false;
   if (!source.include_declined && event.attendee_response === "declined") return false;
   return true;
+}
+
+/** The rule that hides this event, if any: its own, else its title's in that calendar. */
+export function hiddenBy(
+  event: Pick<ExternalEvent, "calendar_source_id" | "external_event_id" | "title">,
+  rules: HiddenEventRule[],
+): HiddenEventRule | null {
+  return (
+    rules.find((r) => r.calendar_source_id === event.calendar_source_id && r.external_event_id === event.external_event_id) ??
+    rules.find((r) => r.calendar_source_id === event.calendar_source_id && r.title !== null && r.title === event.title) ??
+    null
+  );
+}
+
+/**
+ * The events left once the hidden ones are taken out. Applied where events are
+ * loaded, so the grid, the totals and the connector all agree — the week
+ * totals view (migration 0023) applies the same rule in SQL.
+ */
+export function withoutHidden<E extends Pick<ExternalEvent, "calendar_source_id" | "external_event_id" | "title">>(
+  events: E[],
+  rules: HiddenEventRule[],
+): E[] {
+  if (!rules.length) return events;
+  return events.filter((e) => !hiddenBy(e, rules));
 }
 
 /**

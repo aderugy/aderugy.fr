@@ -153,6 +153,22 @@ export type CalendarSource = {
   position: number;
 };
 
+/**
+ * An event Arthur hid from a mirrored calendar: one occurrence
+ * (`external_event_id`), or every event with that title in the calendar
+ * (`title`). Hidden events leave the grid, the totals and the free-time search.
+ */
+export type HiddenEventRule = {
+  id: string;
+  calendar_source_id: string;
+  external_event_id: string | null;
+  title: string | null;
+  /** What it looked like when hidden, for the settings list. */
+  label: string | null;
+  starts_at: string | null;
+  created_at: string;
+};
+
 export type ExternalEvent = {
   calendar_source_id: string;
   external_event_id: string;
