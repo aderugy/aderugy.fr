@@ -43,7 +43,7 @@ does not accept connector tokens, so there is no immediate nudge).
 
 Arthur can hide an event mirrored from a calendar, from its detail on the week:
 that occurrence, or every event with its title in that calendar (a class he
-skips). The rules live in `hidden_external_events` (migration 0023), apart from
+skips). The rules live in `hidden_external_events` (migration 0024), apart from
 the mirror, so a resync that rebuilds `external_events` never brings one back.
 Hidden events are dropped where events are loaded (`withoutHidden` in
 `src/lib/external.ts`, used by the week page and `loadEvents`), and the

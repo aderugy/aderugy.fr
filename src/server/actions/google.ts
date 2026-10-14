@@ -186,7 +186,7 @@ export async function updateCalendarSource(input: {
  * Hide an event mirrored from a calendar: this occurrence (`scope: "event"`),
  * or every event with its title in that calendar (`scope: "title"`). It leaves
  * the grid and the totals; the calendar itself is untouched, and the rule
- * outlives any resync (migration 0023). Undone from the settings.
+ * outlives any resync (migration 0024). Undone from the settings.
  */
 export async function hideExternalEvent(input: {
   calendarSourceId: string;

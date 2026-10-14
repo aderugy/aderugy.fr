@@ -1,12 +1,12 @@
--- Migration 0023: hiding events mirrored from calendars — the rules, who may
+-- Migration 0024: hiding events mirrored from calendars — the rules, who may
 -- write them, and the week totals leaving hidden events out.
 --
 -- Run after stub.sql and every migration (see oauth_scope_test.sql for the
 -- commands), from the repository root:
 --   psql -d t -f supabase/tests/hidden_events_test.sql   # ends with ALL CHECKS PASSED
--- It re-applies 0023 first: the migration must be re-runnable.
+-- It re-applies 0024 first: the migration must be re-runnable.
 \set ON_ERROR_STOP 1
-\i supabase/migrations/0023_hidden_external_events.sql
+\i supabase/migrations/0024_hidden_external_events.sql
 
 insert into auth.users values
   ('aaaaaaaa-0000-4000-8000-0000000000d1', 'h@x'),

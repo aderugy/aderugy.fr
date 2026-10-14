@@ -38,7 +38,7 @@ export function hiddenBy(
 /**
  * The events left once the hidden ones are taken out. Applied where events are
  * loaded, so the grid, the totals and the connector all agree — the week
- * totals view (migration 0023) applies the same rule in SQL.
+ * totals view (migration 0024) applies the same rule in SQL.
  */
 export function withoutHidden<E extends Pick<ExternalEvent, "calendar_source_id" | "external_event_id" | "title">>(
   events: E[],

@@ -4,7 +4,7 @@ import { countsAsCommitted, withoutHidden } from "@/lib/external";
 import type { CalendarSource, ExternalEvent, HiddenEventRule } from "@/lib/types";
 import { weekSpan, type Span, type ViewBlock, type ViewEvent } from "@/lib/agenda/week-view";
 
-/** The columns of a hidden-event rule (migration 0023). */
+/** The columns of a hidden-event rule (migration 0024). */
 export const HIDDEN_COLUMNS = "id, calendar_source_id, external_event_id, title, label, starts_at, created_at";
 
 /**
