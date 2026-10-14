@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalFooter } from "@/components/legal/LegalPage";
 
 const tools = [
   {
@@ -44,6 +45,8 @@ export default function Home() {
           </li>
         ))}
       </ul>
+
+      <LegalFooter className="mt-16" />
     </main>
   );
 }
