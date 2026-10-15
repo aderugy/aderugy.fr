@@ -158,8 +158,8 @@ function Row({ app, silent }: { app: ApplicationSummary; silent: boolean }) {
               {KIND_LABELS[app.next_interview.kind]} · {fmtDateTime(app.next_interview.starts_at)}
             </span>
           )}
-          {app.deadline && app.status === "to_apply" && <span>apply by {fmtDate(app.deadline)}</span>}
-          {app.applied_on && app.status !== "to_apply" && <span>applied {fmtDate(app.applied_on)}</span>}
+          {app.deadline && (app.status === "to_apply" || app.status === "to_review") && <span>apply by {fmtDate(app.deadline)}</span>}
+          {app.applied_on && app.status !== "to_apply" && app.status !== "to_review" && <span>applied {fmtDate(app.applied_on)}</span>}
           {silent && <span className="text-amber-600">no news for 3 weeks — follow up?</span>}
           {!app.has_offer_text && app.offer_url && <span title={app.offer_fetch_error ?? ""}>offer not saved</span>}
         </div>

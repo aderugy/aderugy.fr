@@ -95,14 +95,14 @@ function NewTask({
   const [description, setDescription] = useState(
     next
       ? `Prepare ${app.company.name} ${KIND_LABELS[next.kind].toLowerCase()} interview`
-      : app.status === "to_apply"
+      : app.status === "to_apply" || app.status === "to_review"
         ? `Apply to ${app.company.name}`
         : `Follow up with ${app.company.name}`,
   );
   const [minutes, setMinutes] = useState(60);
   const [priority, setPriority] = useState(2);
   const [deadline, setDeadline] = useState(
-    next ? toLocalInput(next.starts_at).slice(0, 10) : (app.status === "to_apply" ? app.deadline : null) ?? "",
+    next ? toLocalInput(next.starts_at).slice(0, 10) : (app.status === "to_apply" || app.status === "to_review" ? app.deadline : null) ?? "",
   );
 
   const field = "rounded border border-line bg-background px-2 py-1 text-xs outline-none focus:border-accent";

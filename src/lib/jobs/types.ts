@@ -4,6 +4,7 @@
  */
 
 export const APPLICATION_STATUSES = [
+  "to_review",
   "to_apply",
   "applied",
   "interviewing",
@@ -15,6 +16,7 @@ export const APPLICATION_STATUSES = [
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  to_review: "To review",
   to_apply: "To apply",
   applied: "Applied",
   interviewing: "Interviewing",
@@ -25,7 +27,7 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
 };
 
 /** Still in play. The rest are outcomes. */
-export const OPEN_STATUSES: ApplicationStatus[] = ["to_apply", "applied", "interviewing", "offer"];
+export const OPEN_STATUSES: ApplicationStatus[] = ["to_review", "to_apply", "applied", "interviewing", "offer"];
 
 export function isApplicationStatus(s: string): s is ApplicationStatus {
   return (APPLICATION_STATUSES as readonly string[]).includes(s);
