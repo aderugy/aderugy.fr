@@ -1,11 +1,11 @@
--- Migration 0026: blocks become task sessions — the backfill, the triggers
+-- Migration 0027: blocks become task sessions — the backfill, the triggers
 -- that keep tasks and Google in step, the week's totals, the push queue,
 -- reminders, and who may change what (Arthur, Claude, someone else).
 --
 -- Run after stub.sql and every migration (see oauth_scope_test.sql for the
 -- commands), from the repository root:
 --   psql -d t -f supabase/tests/task_sessions_test.sql   # ends with ALL CHECKS PASSED
--- The blocks are seeded first and 0026 is re-applied, which is also what
+-- The blocks are seeded first and 0027 is re-applied, which is also what
 -- checks that it is re-runnable: its backfill picks them up.
 \set ON_ERROR_STOP 1
 
@@ -122,7 +122,7 @@ select pg_temp.check(
 \i supabase/migrations/0026_task_sessions.sql
 select pg_temp.check(
   (select count(*) from public.task_sessions where user_id = 'aaaaaaaa-0000-4000-8000-0000000000d1') = 10,
-  're-running 0026 adds nothing');
+  're-running 0027 adds nothing');
 
 -- ============================================================== triggers
 

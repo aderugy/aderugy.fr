@@ -1,7 +1,7 @@
 /**
  * Sessions, as pure functions: what the grid, the week's totals and the
  * backlog all agree on. A session is one task at one span of time; see
- * migration 0026 for the model.
+ * migration 0027 for the model.
  */
 
 import type { SessionStatus } from "@/lib/types";

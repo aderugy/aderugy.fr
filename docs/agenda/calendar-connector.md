@@ -1,7 +1,7 @@
 # The week grid in the Claude connector
 
 The connector (`/api/mcp`) reads the whole week grid and can plan tasks on it
-(since migration `0019`; on slots rather than blocks since `0026`). Tools in
+(since migration `0019`; on slots rather than blocks since `0027`). Tools in
 `src/server/mcp/calendar-tools.ts`:
 
 | Tool | What it does |
@@ -24,7 +24,7 @@ which is UTC on Vercel.
 ## Who may change what
 
 `task_sessions.created_by` (`app` | `claude`) is forced to `claude` for a
-connector token on insert and never changes after. Enforced by RLS (0026),
+connector token on insert and never changes after. Enforced by RLS (0027),
 checked first by the tools so the answer is a sentence:
 
 | | Connected app (Claude) |
@@ -37,7 +37,7 @@ checked first by the tools so the answer is a sentence:
 For everyone, a slot must sit in one of the caller's weeks and point at the
 caller's task.
 
-Claude's slots are pushed to Google like Arthur's: the triggers of 0026 mark
+Claude's slots are pushed to Google like Arthur's: the triggers of 0027 mark
 them pending and the cron sweep pushes them within a minute (the push function
 does not accept connector tokens, so there is no immediate nudge).
 
