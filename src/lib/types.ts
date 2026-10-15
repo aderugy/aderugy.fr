@@ -1,4 +1,4 @@
-import type { InterviewOnBlock } from "@/lib/jobs/types";
+import type { InterviewOnSession } from "@/lib/jobs/types";
 
 export type Category = {
   id: string;
@@ -26,7 +26,7 @@ export type Task = {
   /** Required: the category is the label. */
   category_id: string;
   description: string | null;
-  /** Extended description, Markdown. Shown in full in the backlog and the block panel. */
+  /** Extended description, Markdown. Shown in full in the backlog and the session panel. */
   notes: string | null;
   estimated_minutes: number;
   priority: number;
@@ -34,67 +34,51 @@ export type Task = {
   status: TaskStatus;
   splittable: boolean;
   /**
-   * Created inside a block and owned by it. It never reaches the backlog, and
-   * it is deleted with the block rather than surviving it.
+   * Legacy (dropped in 0026): set on tasks drawn inside a block before
+   * sessions, and still on an interview's own task, which the backlog leaves
+   * out because the interview stands for it.
    */
   ad_hoc: boolean;
   completed_at: string | null;
   created_at: string;
 };
 
-export type BlockItem = {
-  id: string;
-  block_id: string;
-  position: number;
-  label: string;
-  estimated_minutes: number;
-  category_id: string | null;
-};
+export type SessionStatus = "planned" | "done" | "skipped";
 
-export type Block = {
-  id: string;
-  /** Templates keep a name of their own — it spans categories. */
-  name: string;
-  color: string | null;
-  default_minutes: number;
-  default_category_id: string;
-  preferred_daypart: "morning" | "afternoon" | "evening" | null;
-  archived: boolean;
-  block_items: BlockItem[];
-};
-
-export type ScheduledStatus = "planned" | "done" | "skipped";
-
-export type ScheduledBlockTask = {
-  task_id: string;
-  planned_minutes: number;
-  /** Order inside the block: children are stacked top to bottom by this. */
-  position: number;
-  tasks: Pick<
-    Task,
-    "id" | "description" | "notes" | "category_id" | "estimated_minutes" | "ad_hoc"
-  > | null;
-};
+/** What the grid needs of a session's task. */
+export type SessionTask = Pick<
+  Task,
+  | "id"
+  | "category_id"
+  | "description"
+  | "notes"
+  | "estimated_minutes"
+  | "priority"
+  | "deadline"
+  | "status"
+  | "created_at"
+>;
 
 /**
- * A span of time on the grid, and nothing more.
+ * A task placed on the grid: one task, one span of time.
  *
- * A block has no category of its own: what its hours count as is decided by the
- * tasks inside it, each with its own category and its own planned minutes. A
- * block with no tasks is time you have reserved but not yet attributed.
+ * A session has no contents and no title of its own — it is drawn as its
+ * task. Skipping it keeps the row, so the attempt stays in the task's history;
+ * a planned session whose time has passed is "missed", which is computed when
+ * read (`isMissed`) and never stored.
  */
-export type ScheduledBlock = {
+export type TaskSession = {
   id: string;
+  task_id: string;
   week_id: string;
   starts_at: string;
   ends_at: string;
-  description: string | null;
-  source_block_id: string | null;
-  status: ScheduledStatus;
-  actual_minutes: number | null;
-  scheduled_block_tasks: ScheduledBlockTask[];
-  /** Set when the block holds a /jobs interview (added by the week page, not stored here). */
-  interview?: InterviewOnBlock | null;
+  status: SessionStatus;
+  /** Who placed it. Claude may change only its own sessions. */
+  created_by: "app" | "claude";
+  tasks: SessionTask | null;
+  /** Set when the session holds a /jobs interview (added by the week page, not stored here). */
+  interview?: InterviewOnSession | null;
 };
 
 export type Week = {
@@ -114,25 +98,16 @@ export type Objective = {
   position: number;
 };
 
-/** What a rail item carries through a drag onto the grid. */
-export type DragPayload =
-  | {
-      kind: "task";
-      id: string;
-      /** What the rail showed — the category leaf, or the template's name. */
-      label: string;
-      minutes: number;
-      categoryId: string;
-      description: string | null;
-    }
-  | {
-      kind: "block";
-      id: string;
-      label: string;
-      minutes: number;
-      /** Only a fallback colour for the drop preview; the block itself has none. */
-      categoryId: string;
-    };
+/** What a rail task carries through a drag onto the grid. */
+export type DragPayload = {
+  kind: "task";
+  id: string;
+  /** What the rail showed: the category leaf. */
+  label: string;
+  minutes: number;
+  categoryId: string;
+  description: string | null;
+};
 
 // ------------------------------------------------------- Calendar sources
 
@@ -172,7 +147,7 @@ export type HiddenEventRule = {
 export type ExternalEvent = {
   calendar_source_id: string;
   external_event_id: string;
-  /** The event's own title, which becomes the block's description. */
+  /** The event's own title, shown under the calendar's name. */
   title: string | null;
   starts_at: string;
   ends_at: string;
@@ -199,19 +174,19 @@ export type GoogleAccount = {
   last_error_at: string | null;
   /** What Google granted. Pushing needs `calendar.app.created` among them. */
   scopes?: string[];
-  /** Blocks are written to the app's own "Agenda" calendar. */
+  /** Sessions are written to the app's own "Agenda" calendar. */
   push_enabled?: boolean;
   push_calendar_id?: string | null;
   last_pushed_at?: string | null;
   push_error?: string | null;
 };
 
-/** Where the push to Google stands, in counts. See the `push_status` view. */
+/** Where the push to Google stands, in counts. See the `session_push_status` view. */
 export type PushStatus = {
   pending: number;
   failed: number;
   synced: number;
-  last_block_error: string | null;
+  last_error: string | null;
 };
 
 export type GoogleSyncState = {
@@ -222,54 +197,39 @@ export type GoogleSyncState = {
   last_error_at: string | null;
 };
 
-/** One task drawn inside its block, already resolved and placed. */
-export type GridChild = {
-  /** The task id. Unique within the block, which is all the grid needs. */
-  id: string;
-  /** The task's category leaf — what this slice of the block counts as. */
-  label: string;
-  /** That leaf's id, so the grid can tell whether it is currently hidden. */
-  categoryId: string | null;
-  description: string | null;
-  /** The task's Markdown notes, shown in the block panel. */
-  notes: string | null;
-  color: string;
-  minutes: number;
-  /** Minutes from the top of the block: children stack in order. */
-  offsetMinutes: number;
-};
-
 /**
- * What the grid actually draws. Own blocks and external events are stored
- * separately — the mirror is read-only and has no category of its own — but
- * they lay out together, so the grid takes one normalised list.
+ * What the grid actually draws. Sessions and external events are stored
+ * separately — the mirror is read-only — but they lay out together, so the
+ * grid takes one normalised list.
  */
 export type GridItem = {
   id: string;
-  kind: "block" | "external";
+  kind: "session" | "external";
   /**
-   * What this item's hours count as, when the item knows: a calendar's
-   * category. Always null for your own blocks — a block has no category, only
-   * the tasks inside it do.
+   * What this item's hours count as: the session's task category, or the
+   * calendar's. Null for a calendar with no category.
    */
   categoryId: string | null;
   startsAt: string;
   endsAt: string;
-  /** Template name, own description, or calendar name. May be empty. */
+  /** The category leaf, or the calendar's name. May be empty. */
   label: string;
+  /** The task's description, or the event's title. */
   description: string | null;
   color: string;
+  /** A session's status; null for an external event. */
+  status: SessionStatus | null;
+  /** A planned session whose time is over, not marked done or skipped. */
+  missed: boolean;
   done: boolean;
-  /** External events are never movable: the next sync would revert it. */
+  /** External events and skipped sessions never move. */
   movable: boolean;
-  /** The tasks inside a block. Always empty for an external event. */
-  children: GridChild[];
-  /** The children ask for more time than the block holds. */
-  overfilled: boolean;
+  /** Placed by Claude through the connector. */
+  byClaude: boolean;
   /**
    * An external event the calendar has deleted and the planner kept. Drawn
    * differently, counted the same, and removable only from the detail panel.
-   * Always false for your own blocks.
+   * Always false for sessions.
    */
   archived: boolean;
 };

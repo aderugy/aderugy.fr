@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNow } from "./useNow";
 import {
   DAY_END_MIN,
   DAY_LABELS,
@@ -20,7 +21,6 @@ import {
 } from "@/lib/time";
 import type { AllDayItem, DragPayload, GridItem } from "@/lib/types";
 import { mergeSpans } from "@/lib/external";
-import { resizedChildMinutes } from "@/lib/blocks";
 
 /** Soft cap per day. Planned and committed time are measured against it together. */
 export const DAILY_CAPACITY_MIN = 10 * 60;
@@ -36,9 +36,9 @@ const HIDDEN_COLOR = "#9ca3af";
 
 /**
  * Touch has three gestures on the grid, told apart by time and distance:
- * - a short tap: select (opens the block to edit it), or clear the selection;
+ * - a short tap: select (opens the task to edit it), or clear the selection;
  * - a touch that starts moving straight away: the browser's own scroll, always;
- * - a hold of LONG_PRESS_MS, then a drag: move or resize a block, or draw a new
+ * - a hold of LONG_PRESS_MS, then a drag: move or resize a slot, or draw a new
  *   range on an empty part of the day (released without moving: one hour).
  * A finger drifting more than TOUCH_SLOP before the hold completes is a scroll.
  */
@@ -56,18 +56,8 @@ type TouchPress = {
   raf: number | null;
 };
 
-/**
- * A block has no category, so it only reads as hidden once everything inside it
- * is — an outline around nothing but hidden tasks is itself nothing to look at.
- * An empty block has no category to hide and always stays.
- */
 function isItemHidden(item: GridItem, hidden: ReadonlySet<string>) {
-  if (hidden.size === 0) return false;
-  if (item.categoryId !== null) return hidden.has(item.categoryId);
-  return (
-    item.children.length > 0 &&
-    item.children.every((c) => c.categoryId !== null && hidden.has(c.categoryId))
-  );
+  return item.categoryId !== null && hidden.has(item.categoryId);
 }
 
 type Span = { id: string; start: number; end: number };
@@ -121,69 +111,24 @@ function layoutLanes(spans: Span[]) {
   return out;
 }
 
-/**
- * A block with tasks in it gives its own text to the tooltip: the children take
- * the space inside, and what the block itself is called would otherwise have
- * nowhere to show.
- */
+/** The tooltip: what it is, when, and what state it is in. */
 function itemTitle(item: GridItem, startMin: number, endMin: number) {
   const when = `${fmtTime(startMin)}–${fmtTime(endMin)}`;
   const parts = [item.label, item.description].filter(
     (p): p is string => Boolean(p) && p !== "",
   );
   const head = [...new Set(parts)].join(" — ");
-  const kept = item.archived
+  const state = item.archived
     ? "\nArchived — your calendar deleted this once it was over. Kept here."
-    : "";
-
-  if (item.children.length === 0) {
-    return `${head ? `${head} · ${when}` : when}${kept}`;
-  }
-
-  const inside = item.children
-    .map((c) => `${c.label} ${fmtDuration(c.minutes)}`)
-    .join(", ");
-  return `${head ? `${head} · ` : ""}${when}\n${inside}${kept}`;
-}
-
-const MINUTE_MS = 60_000;
-
-/**
- * The clock is an external store, so it is subscribed to rather than polled
- * into state. Ticks are lined up with the minute boundary: a plain interval
- * started on mount would drift the caret up to a minute behind the clock it
- * mirrors.
- */
-function subscribeToMinute(onTick: () => void) {
-  let interval: ReturnType<typeof setInterval> | undefined;
-  const timeout = setTimeout(
-    () => {
-      onTick();
-      interval = setInterval(onTick, MINUTE_MS);
-    },
-    MINUTE_MS - (Date.now() % MINUTE_MS),
-  );
-
-  return () => {
-    clearTimeout(timeout);
-    if (interval) clearInterval(interval);
-  };
-}
-
-/** Minute resolution, so the snapshot only changes when the caret would move. */
-const minuteNow = () => Math.floor(Date.now() / MINUTE_MS);
-
-/** The server has no "now" worth rendering, and hydration must not disagree. */
-const noServerNow = () => null;
-
-/** The current minute, or `null` until the client has taken over. */
-function useNow(): Date | null {
-  const minute = useSyncExternalStore<number | null>(
-    subscribeToMinute,
-    minuteNow,
-    noServerNow,
-  );
-  return minute === null ? null : new Date(minute * MINUTE_MS);
+    : item.status === "skipped"
+      ? "\nSkipped — kept as history; the task went back to the backlog."
+      : item.missed
+        ? "\nMissed — its time is over. Mark it done, skip it, or drag it to reschedule."
+        : item.status === "done"
+          ? "\nDone."
+          : "";
+  const who = item.byClaude ? "\nPlanned by Claude." : "";
+  return `${head ? `${head} · ${when}` : when}${state}${who}`;
 }
 
 export type DrawnRange = {
@@ -206,13 +151,13 @@ type DragState = {
 
 type Props = {
   weekStartDate: Date;
-  /** Own blocks and external events, already normalised and merged. */
+  /** Sessions and external events, already normalised and merged. */
   items: GridItem[];
   allDay: AllDayItem[];
   /**
    * Which days the body draws, in order, as indices into the week.
    *
-   * A narrow screen cannot give seven columns enough width to drop a block into
+   * A narrow screen cannot give seven columns enough width to drop a task into
    * one on purpose, so it shows a single day and the header turns into the
    * picker for it. Everything else — lane widths, the pointer maths, the drop
    * preview — reads its column count from here rather than assuming seven.
@@ -226,6 +171,8 @@ type Props = {
   onCreateFromDrag: (payload: DragPayload, startsAt: Date) => void;
   onDraw: (range: DrawnRange) => void;
   onMove: (id: string, startsAt: Date, endsAt: Date) => void;
+  /** Slots whose start has passed: moving one reschedules it, which the drag says. */
+  reschedulingIds: ReadonlySet<string>;
   /** Only meaningful while the body is showing fewer than seven days. */
   onFocusDay: (dayIndex: number) => void;
 };
@@ -242,6 +189,7 @@ export function WeekGrid({
   onCreateFromDrag,
   onDraw,
   onMove,
+  reschedulingIds,
   onFocusDay,
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
@@ -311,13 +259,15 @@ export function WeekGrid({
   // capacity: an hour of lecture is an hour you cannot also plan into.
   //
   // Every figure here is a union of spans rather than a sum of durations. Two
-  // blocks laid over the same hour are one hour of the day, not two — the day
-  // has no more room for being booked twice over.
+  // slots laid over the same hour are one hour of the day, not two — the day
+  // has no more room for being booked twice over. A skipped slot is history,
+  // not time spent, so it counts towards nothing.
   const dayTotals = byDay.map((list) => {
     const plannedSpans: { startMin: number; endMin: number }[] = [];
     const committedSpans: { startMin: number; endMin: number }[] = [];
 
     for (const item of list) {
+      if (item.status === "skipped") continue;
       const { startMin, endMin } = positionOf(item);
       if (item.kind === "external") committedSpans.push({ startMin, endMin });
       else plannedSpans.push({ startMin, endMin });
@@ -544,7 +494,7 @@ export function WeekGrid({
     const mode: "move" | "resize" = target.dataset.resize === "true" ? "resize" : "move";
 
     // By touch nothing is decided yet: a tap selects on release, a quick move
-    // is the page scrolling, and only a hold picks the block up.
+    // is the page scrolling, and only a hold picks the slot up.
     if (e.pointerType === "touch") {
       const grabAt = e.clientY;
       startPress(e, () => {
@@ -648,7 +598,7 @@ export function WeekGrid({
   /**
    * A touch that the browser decides to treat as a scroll takes the pointer
    * away mid-gesture. Without this the grid keeps the half-finished drag in
-   * state and paints the block where the finger last was, for good.
+   * state and paints the slot where the finger last was, for good.
    */
   function onItemPointerCancel() {
     endPress();
@@ -880,9 +830,9 @@ export function WeekGrid({
                 <div
                   key={dayIndex}
                   /**
-                   * The browser keeps its scroll everywhere on the grid, blocks
+                   * The browser keeps its scroll everywhere on the grid, slots
                    * included: a finger that moves straight away is always
-                   * navigation. Drawing a range or moving a block by touch
+                   * navigation. Drawing a range or moving a slot by touch
                    * starts with a hold instead (see LONG_PRESS_MS).
                    */
                   className="relative touch-manipulation border-l border-line"
@@ -923,34 +873,11 @@ export function WeekGrid({
                     const isSelected = selectedId === item.id;
                     const height = ((endMin - startMin) / SLOT_MIN) * PX_PER_SLOT;
                     const external = item.kind === "external";
-                    // A block is a container: once it holds tasks, they carry the
-                    // labels and the colour, and the block is only the dashed
-                    // outline drawn around them.
-                    const filled = item.children.length > 0;
-
-                    // Mid-resize, a single task stretches with its block, as it
-                    // will once the move lands (resizedChildMinutes).
-                    const storedMinutes = Math.round(
-                      (new Date(item.endsAt).getTime() -
-                        new Date(item.startsAt).getTime()) /
-                        60_000,
-                    );
-                    const childSpans =
-                      drag?.id === item.id && drag.mode === "resize"
-                        ? resizedChildMinutes(
-                            item.children.map((c) => c.minutes),
-                            storedMinutes,
-                            endMin - startMin,
-                          )
-                        : item.children.map((c) => c.minutes);
-
-                    const hasMultipleChildren = item.children.length > 1;
-
-                    // A filled block only greys its outline. Its children fade
-                    // on their own, and stacking both would leave the block
-                    // barely there — hidden time still has to be findable.
+                    const skipped = item.status === "skipped";
                     const dimmed = isItemHidden(item, hiddenCategories);
                     const tint = dimmed ? HIDDEN_COLOR : item.color;
+                    const rescheduling =
+                      isDragging && drag?.mode === "move" && drag.moved && reschedulingIds.has(item.id);
 
                     return (
                       <div
@@ -967,19 +894,23 @@ export function WeekGrid({
                                 // that happened, held by nothing but this row.
                                 item.archived ? "border-dotted" : "border-dashed"
                               }`
-                            : filled
-                              ? hasMultipleChildren
-                                ? "cursor-grab border border-dashed p-[2px]"
-                                : "cursor-grab py-0.5"
-                              : "cursor-grab border border-dashed px-1.5 py-0.5"
-                        } ${isDragging ? "z-20 cursor-grabbing opacity-90 shadow-lg" : "z-10"} ${
+                            : `border-l-[3px] px-1.5 py-0.5 shadow-sm ${
+                                item.movable ? "cursor-grab" : "cursor-pointer"
+                              } ${
+                                // Amber, all round: a planned slot whose time
+                                // is over, waiting for done, skip or a new time.
+                                item.missed && !dimmed ? "border-y border-r border-amber-500" : ""
+                              }`
+                        } ${isDragging ? "z-20 cursor-grabbing opacity-90 shadow-lg" : skipped ? "z-0" : "z-10"} ${
                           isSelected ? "ring-2 ring-accent" : ""
                         } ${
-                          dimmed && !filled
+                          dimmed
                             ? "text-muted opacity-55"
-                            : item.done
-                              ? "opacity-60"
-                              : ""
+                            : skipped
+                              ? "text-muted opacity-60"
+                              : item.done
+                                ? "opacity-60"
+                                : ""
                         }`}
                         style={{
                           top: slotToY(startMin),
@@ -1001,98 +932,55 @@ export function WeekGrid({
                                   : undefined,
                               }
                             : {
-                                // Amber says the tasks ask for more time than the
-                                // block holds, so the last of them is clipped.
-                                // A hidden block is not worth warning about.
-                                borderColor:
-                                  item.overfilled && !dimmed
-                                    ? "#e8590c"
-                                    : `${tint}66`,
-                                backgroundColor: filled
-                                  ? "transparent"
-                                  : `${tint}12`,
+                                borderLeftColor: tint,
+                                backgroundColor: skipped ? "transparent" : `${tint}26`,
+                                // A skipped slot is hatched: the time stays on
+                                // the grid as history, but nothing filled it.
+                                backgroundImage: skipped
+                                  ? `repeating-linear-gradient(45deg, ${tint}1a 0 4px, transparent 4px 9px)`
+                                  : undefined,
                               }),
                         }}
                       >
-                        {filled ? (
-                          <div className="relative h-full">
-                            {item.children.map((child, i) => {
-                              const childTop =
-                                (child.offsetMinutes / SLOT_MIN) * PX_PER_SLOT;
-                              const childHeight =
-                                (childSpans[i] / SLOT_MIN) * PX_PER_SLOT;
-                              const childDimmed =
-                                child.categoryId !== null &&
-                                hiddenCategories.has(child.categoryId);
-                              const childTint = childDimmed
-                                ? HIDDEN_COLOR
-                                : child.color;
-
-                              return (
-                                <div
-                                  key={child.id}
-                                  title={`${child.label}${
-                                    child.description ? ` — ${child.description}` : ""
-                                  } · ${fmtDuration(childSpans[i])}${
-                                    childDimmed ? "\nHidden from the week's totals." : ""
-                                  }`}
-                                  className={`absolute inset-x-0 overflow-hidden rounded-sm border-l-[3px] px-1 shadow-sm ${
-                                    childDimmed ? "text-muted opacity-55" : ""
-                                  }`}
-                                  style={{
-                                    top: childTop,
-                                    height: Math.max(childHeight - 1, 8),
-                                    borderLeftColor: childTint,
-                                    backgroundColor: `${childTint}26`,
-                                  }}
-                                >
-                                  <span className="block truncate font-medium">
-                                    {child.label}
-                                  </span>
-                                  {child.description &&
-                                    childHeight >= PX_PER_SLOT * 3 && (
-                                      <span className="block truncate text-muted">
-                                        {child.description}
-                                      </span>
-                                    )}
-                                </div>
-                              );
-                            })}
-                          </div>
+                        <div className="flex items-baseline gap-1">
+                          {external && (
+                            <span
+                              className="shrink-0 opacity-60"
+                              title={item.archived ? "Archived from a calendar" : "From a calendar"}
+                            >
+                              {item.archived ? "⧗" : "⧉"}
+                            </span>
+                          )}
+                          {item.done && <span className="shrink-0" aria-label="Done">✓</span>}
+                          {item.missed && !dimmed && (
+                            <span className="shrink-0 text-amber-600 dark:text-amber-500" aria-label="Missed">
+                              !
+                            </span>
+                          )}
+                          <span className={`truncate font-medium ${skipped ? "line-through" : ""}`}>
+                            {item.label || <span className="text-muted">Untitled</span>}
+                          </span>
+                          {item.byClaude && (
+                            <span className="ml-auto shrink-0 text-[9px] text-muted" title="Planned by Claude">
+                              ✦
+                            </span>
+                          )}
+                        </div>
+                        {rescheduling ? (
+                          <div className="truncate text-[10px] text-accent">↻ reschedule here</div>
                         ) : (
-                          <>
-                            <div className="flex items-baseline gap-1">
-                              {external && (
-                                <span
-                                  className="shrink-0 opacity-60"
-                                  title={
-                                    item.archived
-                                      ? "Archived from a calendar"
-                                      : "From a calendar"
-                                  }
-                                >
-                                  {item.archived ? "⧗" : "⧉"}
-                                </span>
-                              )}
-                              <span className="truncate font-medium">
-                                {item.label || (
-                                  <span className="text-muted">Empty block</span>
-                                )}
-                              </span>
+                          item.description &&
+                          item.description !== item.label &&
+                          height >= PX_PER_SLOT * 3 && (
+                            <div className={`truncate text-muted ${skipped ? "line-through" : ""}`}>
+                              {item.description}
                             </div>
-                            {item.description &&
-                              item.description !== item.label &&
-                              height >= PX_PER_SLOT * 3 && (
-                                <div className="truncate text-muted">
-                                  {item.description}
-                                </div>
-                              )}
-                            {height >= PX_PER_SLOT * 5 && (
-                              <div className="truncate text-muted">
-                                {fmtTime(startMin)}–{fmtTime(endMin)}
-                              </div>
-                            )}
-                          </>
+                          )
+                        )}
+                        {height >= PX_PER_SLOT * 5 && (
+                          <div className="truncate text-muted">
+                            {fmtTime(startMin)}–{fmtTime(endMin)}
+                          </div>
                         )}
                         {item.movable && (
                           <div

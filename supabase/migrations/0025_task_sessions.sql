@@ -1,4 +1,4 @@
--- Blocks go away; a task carries its own time on the grid (phase 1 of 3).
+-- Blocks go away; a task carries its own time on the grid (phases 1 and 2).
 --
 -- The model:
 --   * a session is one task at one time span — the slot it was planned in.
@@ -12,11 +12,11 @@
 --     while one is planned, 'backlog' otherwise, 'done' when one is done.
 --     'done' and 'dropped' set on the task itself are left alone.
 --
--- This migration only ADDS. Blocks, their tasks, templates, their triggers and
--- the functions the current app calls are untouched, except two that become
--- supersets and keep working for both: `users_due_for_push` (the cron calls it
--- by name) and `category_usage`. Phase 2 deploys the code that reads sessions;
--- phase 3 (0026) drops the blocks.
+-- It ships in one deploy with the code that reads sessions, and deletes
+-- nothing: blocks, their tasks, templates and their triggers stay, unused,
+-- until phase 3 (0026) drops them. What the live system reads is switched
+-- over at the end ("switch-over"): the week's totals, the Google push queue
+-- and the reminders job now look at sessions.
 --
 -- Google: the event id is derived from the row id (see push-events.ts), so a
 -- session that takes over a block reuses the block's id and its Google event
@@ -211,14 +211,17 @@ create trigger task_sessions_touch_updated_at
   before update on public.task_sessions
   for each row execute function public.touch_updated_at();
 
--- Who placed it, from the token. Same rule as blocks (0019).
+-- Who placed it, from the token: the connector can only ever insert Claude's
+-- slots. Otherwise the given value stands (default 'app'), so a re-run of the
+-- backfill keeps a block Claude planned as Claude's.
 create or replace function public.task_sessions_created_by()
 returns trigger
 language plpgsql
 as $$
 begin
   if tg_op = 'INSERT' then
-    new.created_by := case when public.is_oauth_client() then 'claude' else 'app' end;
+    new.created_by := case when public.is_oauth_client() then 'claude'
+                           else coalesce(new.created_by, 'app') end;
   else
     new.created_by := old.created_by;
   end if;
@@ -631,6 +634,128 @@ drop policy if exists "oauth clients delete their own sessions" on public.task_s
 create policy "oauth clients delete their own sessions" on public.task_sessions
   as restrictive for delete to authenticated
   using (not (select public.is_oauth_client()) or created_by = 'claude');
+
+-- ------------------------------------------------------------ switch-over
+-- This migration ships with the code that reads sessions (phase 2), so from
+-- here on the database stops looking at blocks for anything live. Blocks and
+-- their tables stay, untouched, until 0026 drops them.
+
+-- The week's totals, from sessions: a session counts for its own length
+-- against its task's category, unless it was skipped. As in 0024, events
+-- Arthur hid are left out of the calendars' share.
+create or replace view public.week_category_minutes
+with (security_invoker = true)
+as
+with own as (
+  select
+    s.user_id,
+    s.week_id,
+    t.category_id,
+    sum(extract(epoch from (s.ends_at - s.starts_at)) / 60)::int as planned_minutes,
+    sum(
+      case when s.status = 'done'
+           then extract(epoch from (s.ends_at - s.starts_at)) / 60 else 0 end
+    )::int as done_minutes,
+    0 as external_minutes
+  from public.task_sessions s
+  join public.tasks t on t.id = s.task_id
+  where s.status <> 'skipped'
+  group by 1, 2, 3
+),
+ext as (
+  select
+    w.user_id,
+    w.id as week_id,
+    cs.category_id,
+    0 as planned_minutes,
+    0 as done_minutes,
+    sum(
+      extract(epoch from (
+        least(e.ends_at, (w.week_start + 7)::timestamptz)
+        - greatest(e.starts_at, w.week_start::timestamptz)
+      )) / 60
+    )::int as external_minutes
+  from public.weeks w
+  join public.external_events e on e.user_id = w.user_id
+  join public.calendar_sources cs on cs.id = e.calendar_source_id
+  where cs.enabled
+    and cs.category_id is not null
+    and not e.all_day
+    and e.status <> 'cancelled'
+    and (cs.include_free or e.transparency = 'opaque')
+    and (cs.include_declined or e.attendee_response is distinct from 'declined')
+    and not exists (
+      select 1 from public.hidden_external_events h
+       where h.user_id = e.user_id
+         and h.calendar_source_id = e.calendar_source_id
+         and (h.external_event_id = e.external_event_id
+              or h.title = e.title)
+    )
+    and e.starts_at < (w.week_start + 7)::timestamptz
+    and e.ends_at   > w.week_start::timestamptz
+  group by 1, 2, 3
+)
+select
+  user_id,
+  week_id,
+  category_id,
+  sum(planned_minutes)::int  as planned_minutes,
+  sum(done_minutes)::int     as done_minutes,
+  sum(external_minutes)::int as external_minutes
+from (select * from own union all select * from ext) combined
+group by 1, 2, 3;
+
+-- The pusher only writes sessions now. Leaving blocks in this list would wake
+-- it every minute for a block a task rename marked pending, which nothing
+-- will ever push again. Replaces the superset defined above.
+create or replace function public.users_due_for_push(p_max_attempts int default 8)
+returns table (user_id uuid)
+language sql
+security definer
+set search_path = public
+as $$
+  select a.user_id
+    from public.google_accounts a
+   where a.push_enabled
+     and a.disconnected_at is null
+     and (a.push_locked_until is null or a.push_locked_until < now())
+     and (
+       exists (select 1 from public.task_sessions s
+                where s.user_id = a.user_id
+                  and (s.sync_state = 'pending'
+                       or (s.sync_state = 'failed' and s.push_attempts < p_max_attempts)))
+       or exists (select 1 from public.google_push_tombstones t
+                   where t.user_id = a.user_id)
+     );
+$$;
+revoke execute on function public.users_due_for_push(int) from public, authenticated, anon;
+
+-- Reminders: the once-a-minute job asked blocks whether anything was due, so
+-- it would never wake the new web-push again. Re-pointed at sessions here
+-- rather than left to a manual run of cron.sql, which is easy to forget and
+-- would silence every reminder until done. Only where the job exists — a
+-- local database without pg_cron has nothing to re-point.
+do $$
+declare
+  v_found boolean := false;
+begin
+  -- Dynamic SQL throughout: a plain reference to cron.job would fail to plan
+  -- on a database without the extension, even behind the check.
+  if to_regclass('cron.job') is not null then
+    execute $q$select exists (select 1 from cron.job where jobname = 'block-reminders-due')$q$
+      into v_found;
+  end if;
+  if v_found then
+    execute $cmd$
+      select cron.schedule(
+        'block-reminders-due',
+        '* * * * *',
+        $job$ select public.invoke_edge('web-push', '{"due": true}'::jsonb)
+               where exists (select 1 from public.sessions_due_for_reminder(1)) $job$
+      )
+    $cmd$;
+  end if;
+end $$;
 
 -- --------------------------------------------------------------- checks
 -- Read-only, to run after applying. Expected on 2026-10-08: 144 blocks with

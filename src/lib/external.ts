@@ -135,11 +135,11 @@ export function externalItems(
             label: source.display_name,
             description: event.title,
             color: source.color,
+            status: null,
+            missed: false,
             done: false,
             movable: false,
-            // A mirrored event is opaque to us: no tasks, nothing to overfill.
-            children: [],
-            overfilled: false,
+            byClaude: false,
             archived,
           });
         }

@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Result } from "@/server/agenda/tasks";
-import { ensureWeek, syncTaskStatus } from "@/server/weeks";
+import { ensureWeek } from "@/server/weeks";
 import { isoWeekStartInTimeZone } from "@/lib/time";
 import { TASK_LIMITS } from "@/lib/agenda/backlog";
 import { interviewTitle, type Interview, type InterviewKind } from "@/lib/jobs/types";
@@ -10,22 +10,21 @@ import { INTERVIEW_COLUMNS, getInterview } from "./data";
 /**
  * Interviews on the agenda.
  *
- * An interview's time is held by a scheduled block, created here with one
- * ad-hoc task inside it — under the interview category Arthur picks — so it
- * counts in the week's distribution and is pushed to Google like any block.
- * The block's title is the interview's ("Interview · Betclic (technical)").
+ * An interview's time is held by a session of its own task — under the
+ * interview category Arthur picks — so it counts in the week's distribution
+ * and is pushed to Google like any slot. The task is flagged ad_hoc and
+ * linked to the application: the interview stands for it, so the backlog
+ * leaves it out. Its description is the interview's title
+ * ("Interview · Betclic (technical)").
  *
- * The block is the source of truth for the time once it exists: moving the
- * interview here moves the block, and a trigger (migration 0017) copies any
- * move of the block back onto the interview, so a drag on the grid is enough.
+ * The session is the source of truth for the time once it exists: moving the
+ * interview here moves the session, and a trigger (migration 0025) copies any
+ * move of the session back onto the interview, so a drag on the grid is enough.
  *
- * Browser only. Connected apps cannot write scheduled blocks (0015), and
- * scheduling from Claude is deliberately not offered.
+ * Browser only: scheduling from Claude is deliberately not offered.
  */
 
 const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "Europe/Paris";
-
-type TaskFlags = { ad_hoc: boolean; application_id: string | null };
 
 function minutesBetween(startsAt: Date, endsAt: Date): number {
   return Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
@@ -68,8 +67,8 @@ async function companyOf(db: SupabaseClient, userId: string, applicationId: stri
   return { status: data.status as string, company: name };
 }
 
-/** A block holding one ad-hoc task for the interview. Returns the block id. */
-async function createInterviewBlock(
+/** The interview's own task, and its session on the grid. Returns the session id. */
+async function createInterviewSession(
   db: SupabaseClient,
   userId: string,
   input: { title: string; startsAt: Date; endsAt: Date; categoryId: string; applicationId: string },
@@ -77,73 +76,62 @@ async function createInterviewBlock(
   const week = await ensureWeek(db, userId, isoWeekStartInTimeZone(input.startsAt, APP_TIMEZONE));
   const minutes = minutesBetween(input.startsAt, input.endsAt);
 
-  const { data: block, error } = await db
-    .from("scheduled_blocks")
+  const { data: task, error: taskError } = await db
+    .from("tasks")
     .insert({
       user_id: userId,
-      week_id: week.id,
-      starts_at: input.startsAt.toISOString(),
-      ends_at: input.endsAt.toISOString(),
+      category_id: input.categoryId,
       description: input.title,
+      estimated_minutes: Math.min(Math.max(minutes, TASK_LIMITS.minMinutes), TASK_LIMITS.maxMinutes),
+      priority: 2,
+      ad_hoc: true,
+      application_id: input.applicationId,
     })
     .select("id")
     .single();
-  if (error) throw error;
+  if (taskError) throw taskError;
 
-  try {
-    const { data: task, error: taskError } = await db
-      .from("tasks")
-      .insert({
-        user_id: userId,
-        category_id: input.categoryId,
-        description: input.title,
-        estimated_minutes: Math.min(Math.max(minutes, TASK_LIMITS.minMinutes), TASK_LIMITS.maxMinutes),
-        priority: 2,
-        status: "scheduled",
-        ad_hoc: true,
-        application_id: input.applicationId,
-      })
-      .select("id")
-      .single();
-    if (taskError) throw taskError;
-
-    const { error: linkError } = await db.from("scheduled_block_tasks").insert({
+  const { data: session, error } = await db
+    .from("task_sessions")
+    .insert({
       user_id: userId,
-      scheduled_block_id: block.id,
       task_id: task.id,
-      planned_minutes: minutes,
-      position: 0,
-    });
-    if (linkError) throw linkError;
-  } catch (e) {
-    // No half-made block left on the grid.
-    await db.from("scheduled_blocks").delete().eq("user_id", userId).eq("id", block.id);
-    throw e;
+      week_id: week.id,
+      starts_at: input.startsAt.toISOString(),
+      ends_at: input.endsAt.toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error) {
+    // No task left behind without its slot.
+    await db.from("tasks").delete().eq("user_id", userId).eq("id", task.id);
+    throw error;
   }
-  return block.id as string;
+  return session.id as string;
 }
 
-/** Delete a block and the ad-hoc tasks that only existed inside it. */
-async function deleteBlock(db: SupabaseClient, userId: string, blockId: string): Promise<void> {
-  const { data: links, error: readError } = await db
-    .from("scheduled_block_tasks")
-    .select("task_id, tasks(ad_hoc)")
+/**
+ * Take an interview off the agenda: its own task goes, and its session with
+ * it (cascade). A session holding some other task only loses the slot.
+ */
+async function deleteInterviewSession(db: SupabaseClient, userId: string, sessionId: string): Promise<void> {
+  const { data, error: readError } = await db
+    .from("task_sessions")
+    .select("task_id, tasks(ad_hoc, application_id)")
     .eq("user_id", userId)
-    .eq("scheduled_block_id", blockId);
+    .eq("id", sessionId)
+    .maybeSingle();
   if (readError) throw readError;
-
-  const { error } = await db.from("scheduled_blocks").delete().eq("user_id", userId).eq("id", blockId);
-  if (error) throw error;
-
-  const rows = (links ?? []) as unknown as { task_id: string; tasks: { ad_hoc: boolean } | { ad_hoc: boolean }[] | null }[];
-  const adHoc = rows.filter((l) => (Array.isArray(l.tasks) ? l.tasks[0]?.ad_hoc : l.tasks?.ad_hoc)).map((l) => l.task_id);
-  const others = rows.map((l) => l.task_id).filter((id) => !adHoc.includes(id));
-  if (adHoc.length) {
-    const { error: e } = await db.from("tasks").delete().eq("user_id", userId).in("id", adHoc);
-    if (e) throw e;
+  if (!data) return;
+  const t = data.tasks as { ad_hoc: boolean; application_id: string | null } | { ad_hoc: boolean; application_id: string | null }[] | null;
+  const task = Array.isArray(t) ? t[0] : t;
+  if (task?.ad_hoc && task.application_id) {
+    const { error } = await db.from("tasks").delete().eq("user_id", userId).eq("id", data.task_id);
+    if (error) throw error;
+  } else {
+    const { error } = await db.from("task_sessions").delete().eq("user_id", userId).eq("id", sessionId);
+    if (error) throw error;
   }
-  // A prep task you had dropped into the interview's block goes back to the backlog.
-  await syncTaskStatus(db, userId, others);
 }
 
 export type NewInterview = {
@@ -153,7 +141,7 @@ export type NewInterview = {
   endsAt: string;
   withWhom?: string | null;
   location?: string | null;
-  /** Category of the block's task. Null keeps the interview off the agenda. */
+  /** Category of the interview's task. Null keeps the interview off the agenda. */
   categoryId: string | null;
 };
 
@@ -170,8 +158,8 @@ export async function scheduleInterview(
   const app = await companyOf(db, userId, input.applicationId);
   if (!app) return { ok: false, error: "No such application." };
 
-  const blockId = input.categoryId
-    ? await createInterviewBlock(db, userId, {
+  const sessionId = input.categoryId
+    ? await createInterviewSession(db, userId, {
         title: interviewTitle(app.company, input.kind),
         startsAt,
         endsAt,
@@ -185,7 +173,7 @@ export async function scheduleInterview(
     .insert({
       user_id: userId,
       application_id: input.applicationId,
-      scheduled_block_id: blockId,
+      session_id: sessionId,
       kind: input.kind,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
@@ -195,7 +183,7 @@ export async function scheduleInterview(
     .select(INTERVIEW_COLUMNS)
     .single();
   if (error) {
-    if (blockId) await deleteBlock(db, userId, blockId);
+    if (sessionId) await deleteInterviewSession(db, userId, sessionId);
     throw error;
   }
 
@@ -212,7 +200,7 @@ export async function scheduleInterview(
   return { ok: true, value: data as Interview };
 }
 
-/** New time for an interview: its block moves, and the trigger carries the interview along. */
+/** New time for an interview: its session moves, and the trigger carries the interview along. */
 export async function moveInterview(
   db: SupabaseClient,
   userId: string,
@@ -228,33 +216,27 @@ export async function moveInterview(
   const interview = await getInterview(db, userId, id);
   if (!interview) return { ok: false, error: "No such interview." };
 
-  if (interview.scheduled_block_id) {
-    const blockId = interview.scheduled_block_id;
-    const { error } = await db
-      .from("scheduled_blocks")
-      .update({ starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() })
+  if (interview.session_id) {
+    // An appointment that moved is a new time for the same slot, not a
+    // reschedule: no skipped trace is left behind, even for a past one.
+    const week = await ensureWeek(db, userId, isoWeekStartInTimeZone(startsAt, APP_TIMEZONE));
+    const { data: session, error } = await db
+      .from("task_sessions")
+      .update({ starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), week_id: week.id })
       .eq("user_id", userId)
-      .eq("id", blockId);
+      .eq("id", interview.session_id)
+      .select("task_id")
+      .maybeSingle();
     if (error) throw error;
-    // The interview's own task fills the block; resize it with the block.
-    const { data: links, error: readError } = await db
-      .from("scheduled_block_tasks")
-      .select("task_id, tasks(ad_hoc, application_id)")
-      .eq("user_id", userId)
-      .eq("scheduled_block_id", blockId);
-    if (readError) throw readError;
-    type Link = { task_id: string; tasks: TaskFlags | TaskFlags[] | null };
-    const own = ((links ?? []) as unknown as Link[]).find((l) => {
-      const t = Array.isArray(l.tasks) ? l.tasks[0] : l.tasks;
-      return t?.ad_hoc && t.application_id === interview.application_id;
-    });
-    if (own) {
+    if (session) {
+      const minutes = minutesBetween(startsAt, endsAt);
       const { error: e } = await db
-        .from("scheduled_block_tasks")
-        .update({ planned_minutes: minutesBetween(startsAt, endsAt) })
+        .from("tasks")
+        .update({ estimated_minutes: Math.min(Math.max(minutes, TASK_LIMITS.minMinutes), TASK_LIMITS.maxMinutes) })
         .eq("user_id", userId)
-        .eq("scheduled_block_id", blockId)
-        .eq("task_id", own.task_id);
+        .eq("id", session.task_id)
+        .eq("ad_hoc", true)
+        .eq("application_id", interview.application_id);
       if (e) throw e;
     }
   }
@@ -270,40 +252,33 @@ export async function moveInterview(
   return { ok: true };
 }
 
-/** Keep the block's title in step with the interview (kind or company changed). */
-export async function retitleInterviewBlock(db: SupabaseClient, userId: string, id: string): Promise<void> {
+/** Keep the interview's task title in step with the interview (kind or company changed). */
+export async function retitleInterviewSession(db: SupabaseClient, userId: string, id: string): Promise<void> {
   const interview = await getInterview(db, userId, id);
-  if (!interview?.scheduled_block_id) return;
+  if (!interview?.session_id) return;
   const app = await companyOf(db, userId, interview.application_id);
   if (!app) return;
   const title = interviewTitle(app.company, interview.kind);
 
-  const { error } = await db
-    .from("scheduled_blocks")
-    .update({ description: title })
-    .eq("user_id", userId)
-    .eq("id", interview.scheduled_block_id);
-  if (error) throw error;
-
-  const { data: links, error: readError } = await db
-    .from("scheduled_block_tasks")
+  const { data: session, error: readError } = await db
+    .from("task_sessions")
     .select("task_id")
     .eq("user_id", userId)
-    .eq("scheduled_block_id", interview.scheduled_block_id);
+    .eq("id", interview.session_id)
+    .maybeSingle();
   if (readError) throw readError;
-  const ids = (links ?? []).map((l) => l.task_id as string);
-  if (ids.length === 0) return;
-  const { error: e } = await db
+  if (!session) return;
+  const { error } = await db
     .from("tasks")
     .update({ description: title })
     .eq("user_id", userId)
+    .eq("id", session.task_id)
     .eq("ad_hoc", true)
-    .eq("application_id", interview.application_id)
-    .in("id", ids);
-  if (e) throw e;
+    .eq("application_id", interview.application_id);
+  if (error) throw error;
 }
 
-/** Put an interview whose block was deleted back on the agenda. */
+/** Put an interview whose slot was deleted back on the agenda. */
 export async function putInterviewOnAgenda(
   db: SupabaseClient,
   userId: string,
@@ -313,11 +288,11 @@ export async function putInterviewOnAgenda(
   if (!categoryId) return { ok: false, error: "Pick a category for the agenda." };
   const interview = await getInterview(db, userId, id);
   if (!interview) return { ok: false, error: "No such interview." };
-  if (interview.scheduled_block_id) return { ok: true };
+  if (interview.session_id) return { ok: true };
   const app = await companyOf(db, userId, interview.application_id);
   if (!app) return { ok: false, error: "No such application." };
 
-  const blockId = await createInterviewBlock(db, userId, {
+  const sessionId = await createInterviewSession(db, userId, {
     title: interviewTitle(app.company, interview.kind),
     startsAt: new Date(interview.starts_at),
     endsAt: new Date(interview.ends_at),
@@ -326,36 +301,36 @@ export async function putInterviewOnAgenda(
   });
   const { error } = await db
     .from("interviews")
-    .update({ scheduled_block_id: blockId })
+    .update({ session_id: sessionId })
     .eq("user_id", userId)
     .eq("id", id);
   if (error) {
-    await deleteBlock(db, userId, blockId);
+    await deleteInterviewSession(db, userId, sessionId);
     throw error;
   }
   return { ok: true };
 }
 
-/** Delete an interview, and its block with it. */
+/** Delete an interview, and its slot with it. */
 export async function removeInterview(db: SupabaseClient, userId: string, id: string): Promise<Result> {
   const interview = await getInterview(db, userId, id);
   if (!interview) return { ok: false, error: "No such interview." };
-  if (interview.scheduled_block_id) await deleteBlock(db, userId, interview.scheduled_block_id);
+  if (interview.session_id) await deleteInterviewSession(db, userId, interview.session_id);
   const { error } = await db.from("interviews").delete().eq("user_id", userId).eq("id", id);
   if (error) throw error;
   return { ok: true };
 }
 
-/** Delete an application; its interviews' blocks leave the agenda with it. */
+/** Delete an application; its interviews' slots leave the agenda with it. */
 export async function removeApplication(db: SupabaseClient, userId: string, id: string): Promise<Result> {
   const { data, error } = await db
     .from("interviews")
-    .select("scheduled_block_id")
+    .select("session_id")
     .eq("user_id", userId)
     .eq("application_id", id)
-    .not("scheduled_block_id", "is", null);
+    .not("session_id", "is", null);
   if (error) throw error;
-  for (const row of data ?? []) await deleteBlock(db, userId, row.scheduled_block_id as string);
+  for (const row of data ?? []) await deleteInterviewSession(db, userId, row.session_id as string);
 
   const { error: e, count } = await db
     .from("applications")

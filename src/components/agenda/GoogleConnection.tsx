@@ -165,7 +165,7 @@ export function GoogleConnection({
 }
 
 /**
- * Pushing blocks out to Google.
+ * Pushing planned tasks out to Google.
  *
  * Kept visibly separate from the calendars above: those are read, this one is
  * written, and it is the only calendar the app can write to at all.
@@ -193,11 +193,11 @@ function PushSection({
     <div className="mt-4 border-t border-line pt-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1 max-sm:basis-full">
-          <h3 className="font-medium">Push blocks to Google</h3>
+          <h3 className="font-medium">Push your plan to Google</h3>
           <p className="mt-0.5 text-xs text-muted">
-            Every block you plan appears in an <strong>Agenda</strong> calendar the app
+            Every task you place on the grid appears in an <strong>Agenda</strong> calendar the app
             creates in your Google account — on your phone, and to anyone you share it
-            with. One-way: edit blocks here; changes made in Google are overwritten.
+            with. One-way: edit them here; changes made in Google are overwritten.
           </p>
         </div>
 
@@ -215,7 +215,7 @@ function PushSection({
             onClick={() => {
               if (
                 confirm(
-                  "Stop pushing blocks?\n\nThe Agenda calendar is deleted from Google. Your blocks here are untouched.",
+                  "Stop pushing?\n\nThe Agenda calendar is deleted from Google. Your plan here is untouched.",
                 )
               ) {
                 onRun(disableGooglePush);
@@ -249,13 +249,13 @@ function PushSection({
           {account.push_error ? (
             <span className="text-red-500">{account.push_error}</span>
           ) : failing > 0 ? (
-            <span className="text-red-500" title={status?.last_block_error ?? undefined}>
-              {failing} block{failing === 1 ? "" : "s"} could not be pushed
-              {status?.last_block_error ? ` — ${status.last_block_error}` : ""}
+            <span className="text-red-500" title={status?.last_error ?? undefined}>
+              {failing} slot{failing === 1 ? "" : "s"} could not be pushed
+              {status?.last_error ? ` — ${status.last_error}` : ""}
             </span>
           ) : waiting > 0 ? (
             <span className="text-muted">
-              {waiting} block{waiting === 1 ? "" : "s"} on the way…
+              {waiting} slot{waiting === 1 ? "" : "s"} on the way…
             </span>
           ) : (
             <span className="text-muted">

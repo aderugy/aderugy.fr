@@ -8,7 +8,9 @@ import {
   type CategoryPathRow,
 } from "@/lib/agenda/backlog";
 import type { TaskStatus } from "@/lib/types";
-import { livePlacements } from "@/server/weeks";
+import { sessionSummaries } from "@/server/weeks";
+import { closeLiveSession } from "@/server/agenda/schedule";
+import { NO_SESSIONS, type SessionSummary } from "@/lib/agenda/sessions";
 
 /**
  * Backlog persistence shared by the UI's server actions and the Claude
@@ -48,8 +50,16 @@ export type TaskPatch = {
   status?: TaskStatus;
 };
 
+/**
+ * PostgREST filter for "a task the backlog lists": everything but an
+ * interview's own task (made by /jobs, flagged ad_hoc), which the interview
+ * stands for. Tasks drawn on the grid before sessions also carry ad_hoc, but
+ * have no application, and are ordinary tasks now.
+ */
+export const LISTED_TASKS = "ad_hoc.eq.false,application_id.is.null";
+
 export const TASK_COLUMNS =
-  "id, category_id, description, notes, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at";
+  "id, category_id, description, notes, estimated_minutes, priority, deadline, status, splittable, ad_hoc, application_id, completed_at, created_at";
 
 export type TaskRow = {
   id: string;
@@ -62,9 +72,16 @@ export type TaskRow = {
   status: TaskStatus;
   splittable: boolean;
   ad_hoc: boolean;
+  /** The /jobs application, for prep tasks and an interview's own task. */
+  application_id: string | null;
   completed_at: string | null;
   created_at: string;
 };
+
+/** An interview's own task: the interview stands for it, and /jobs manages it. */
+export function isInterviewTask(t: Pick<TaskRow, "ad_hoc" | "application_id">): boolean {
+  return t.ad_hoc && t.application_id !== null;
+}
 
 function checkMinutes(n: number): string | null {
   if (!Number.isInteger(n) || n < TASK_LIMITS.minMinutes || n > TASK_LIMITS.maxMinutes) {
@@ -192,6 +209,10 @@ export async function patchTask(
     .maybeSingle();
   if (error) throw error;
   if (!data) return { ok: false, error: "No such task." };
+  // A task finished or dropped from outside the grid closes its slot there too.
+  if (input.status === "done" || input.status === "dropped") {
+    await closeLiveSession(db, userId, id, input.status);
+  }
   return { ok: true, value: data as TaskRow };
 }
 
@@ -226,11 +247,10 @@ export async function loadCategoryPaths(
   return withInheritedArchive((data ?? []) as CategoryPathRow[]);
 }
 
-/** A task as listed: the row, its category path, and how much of it is on the grid. */
+/** A task as listed: the row, its category path, and its slots on the grid. */
 export type ListedTask = TaskRow & {
   category_path: string;
-  /** Minutes planned in blocks that are not skipped, across all weeks. */
-  placed_minutes: number;
+  session: SessionSummary;
 };
 
 export type TaskFilters = {
@@ -266,9 +286,7 @@ export async function listTasks(
     .from("tasks")
     .select(TASK_COLUMNS)
     .eq("user_id", userId)
-    // Tasks drawn inside a block belong to it, not to the backlog — the
-    // backlog page hides them for the same reason.
-    .eq("ad_hoc", false)
+    .or(LISTED_TASKS)
     .in("status", statuses);
 
   if (filters.categoryId) {
@@ -289,7 +307,7 @@ export async function listTasks(
 
   const paths = new Map(categories.map((c) => [c.id, c.path]));
   const found = (data ?? []) as TaskRow[];
-  const placements = await livePlacements(
+  const sessions = await sessionSummaries(
     db,
     found.map((t) => t.id),
   );
@@ -297,22 +315,19 @@ export async function listTasks(
     (task): ListedTask => ({
       ...task,
       category_path: paths.get(task.category_id) ?? "(unknown category)",
-      placed_minutes: placements.get(task.id)?.minutes ?? 0,
+      session: sessions.get(task.id) ?? NO_SESSIONS,
     }),
   );
   rows.sort(compareTasks);
   return { tasks: rows.slice(0, limit), truncated: rows.length > limit };
 }
 
-/**
- * One task with its placement, or null when it does not exist for this user.
- * `placements` counts live placements only — blocks that are not skipped.
- */
+/** One task with its slots on the grid, or null when it does not exist for this user. */
 export async function getTask(
   db: SupabaseClient,
   userId: string,
   id: string,
-): Promise<(TaskRow & { placed_minutes: number; placements: number }) | null> {
+): Promise<(TaskRow & { session: SessionSummary }) | null> {
   const { data, error } = await db
     .from("tasks")
     .select(TASK_COLUMNS)
@@ -322,15 +337,11 @@ export async function getTask(
   if (error) throw error;
   if (!data) return null;
   const task = data as TaskRow;
-  const placement = (await livePlacements(db, [task.id])).get(task.id);
-  return {
-    ...task,
-    placements: placement?.count ?? 0,
-    placed_minutes: placement?.minutes ?? 0,
-  };
+  const session = (await sessionSummaries(db, [task.id])).get(task.id) ?? NO_SESSIONS;
+  return { ...task, session };
 }
 
-/** Open (backlog or scheduled, not ad-hoc) task count per category id. */
+/** Open (backlog or scheduled) task count per category id, as the backlog lists them. */
 export async function openTaskCounts(
   db: SupabaseClient,
   userId: string,
@@ -339,7 +350,7 @@ export async function openTaskCounts(
     .from("tasks")
     .select("category_id")
     .eq("user_id", userId)
-    .eq("ad_hoc", false)
+    .or(LISTED_TASKS)
     .in("status", ["backlog", "scheduled"]);
   if (error) throw error;
   const counts = new Map<string, number>();

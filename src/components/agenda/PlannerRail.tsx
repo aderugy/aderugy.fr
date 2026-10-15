@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { buildTree, flattenTree, subtreeIds, DEFAULT_COLOR } from "@/lib/categories";
 import { fmtDuration } from "@/lib/time";
-import { PRIORITY_LABELS, type Block, type Category, type DragPayload, type Task } from "@/lib/types";
+import { PRIORITY_LABELS, type Category, type DragPayload, type Task } from "@/lib/types";
 
 const PRIORITY_COLOR: Record<number, string> = {
   1: "#e03131",
@@ -15,7 +15,6 @@ const PRIORITY_COLOR: Record<number, string> = {
 type Props = {
   categories: Category[];
   tasks: Task[];
-  blocks: Block[];
   onDragStart: (payload: DragPayload) => void;
   onDragEnd: () => void;
   /**
@@ -29,13 +28,11 @@ type Props = {
 export function PlannerRail({
   categories,
   tasks,
-  blocks,
   onDragStart,
   onDragEnd,
   className,
   onClose,
 }: Props) {
-  const [tab, setTab] = useState<"tasks" | "blocks">("tasks");
   const [filter, setFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
 
@@ -74,21 +71,9 @@ export function PlannerRail({
   return (
     <aside className={className}>
       <div className="flex items-center gap-1 border-b border-line p-2 text-xs">
-        {(["tasks", "blocks"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded px-2 py-1 capitalize ${
-              tab === t ? "bg-accent text-white" : "text-muted hover:text-foreground"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        <span className="px-1 font-medium">Backlog</span>
         <span className="ml-auto tabular-nums text-muted">
-          {tab === "tasks"
-            ? `${visibleTasks.length} · ${fmtDuration(unscheduledMinutes)}`
-            : `${blocks.length}`}
+          {`${visibleTasks.length} · ${fmtDuration(unscheduledMinutes)}`}
         </span>
         <button
           type="button"
@@ -103,12 +88,11 @@ export function PlannerRail({
       {/* Dragging onto the grid needs the grid on screen, which it is not while
           this is covering it. Tapping a task is the way in on a phone. */}
       <p className="border-b border-line px-2 py-1.5 text-[10px] leading-snug text-muted xl:hidden">
-        Drag onto the week to place. On a touch screen, double-tap the grid to
-        draw a slot instead.
+        Drag onto the week to place. On a touch screen, hold a spot on the grid
+        to draw a slot, then pick the task from the backlog.
       </p>
 
-      {tab === "tasks" ? (
-        <>
+      <>
           <div className="space-y-2 border-b border-line p-2">
             <input
               value={query}
@@ -204,60 +188,7 @@ export function PlannerRail({
               );
             })}
           </ul>
-        </>
-      ) : (
-        <ul className="flex-1 overflow-y-auto p-2">
-          {blocks.length === 0 && (
-            <li className="px-1 py-6 text-center text-xs text-muted">
-              No reusable blocks yet. Create them on the Blocks page.
-            </li>
-          )}
-          {blocks.map((block) => {
-            const itemMinutes = block.block_items.reduce(
-              (sum, i) => sum + i.estimated_minutes,
-              0,
-            );
-            const minutes = itemMinutes > 0 ? itemMinutes : block.default_minutes;
-            const category = block.default_category_id
-              ? categoryById.get(block.default_category_id)
-              : undefined;
-            const color = block.color ?? category?.effectiveColor ?? DEFAULT_COLOR;
-
-            return (
-              <li
-                key={block.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = "copy";
-                  e.dataTransfer.setData("text/plain", block.name);
-                  onDragStart({
-                    kind: "block",
-                    id: block.id,
-                    label: block.name,
-                    minutes,
-                    categoryId: block.default_category_id,
-                  });
-                }}
-                onDragEnd={onDragEnd}
-                className="mb-1 cursor-grab rounded border border-line bg-surface px-2 py-1.5 text-xs active:cursor-grabbing"
-                style={{ borderLeft: `3px solid ${color}` }}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 leading-snug">{block.name}</span>
-                  <span className="shrink-0 tabular-nums text-muted">
-                    {fmtDuration(minutes)}
-                  </span>
-                </div>
-                {block.block_items.length > 0 && (
-                  <div className="mt-0.5 text-[10px] text-muted">
-                    {block.block_items.length} steps
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      </>
     </aside>
   );
 }

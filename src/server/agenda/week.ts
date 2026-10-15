@@ -2,129 +2,80 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { countsAsCommitted, withoutHidden } from "@/lib/external";
 import type { CalendarSource, ExternalEvent, HiddenEventRule } from "@/lib/types";
-import { weekSpan, type Span, type ViewBlock, type ViewEvent } from "@/lib/agenda/week-view";
+import { weekSpan, type Span, type ViewEvent, type ViewSession } from "@/lib/agenda/week-view";
 
 /** The columns of a hidden-event rule (migration 0024). */
 export const HIDDEN_COLUMNS = "id, calendar_source_id, external_event_id, title, label, starts_at, created_at";
 
 /**
- * Reading the week grid for the Claude connector: blocks with what is inside
- * them, the calendars' events that count, the week's intent and objectives.
+ * Reading the week grid for the Claude connector: sessions with their tasks,
+ * the calendars' events that count, the week's intent and objectives.
  * Read-only — a week that does not exist yet is not created by looking at it.
  */
 
-const BLOCK_COLUMNS =
-  "id, starts_at, ends_at, description, source_block_id, status, created_by, scheduled_block_tasks(task_id, planned_minutes, position, tasks(id, description, category_id, ad_hoc))";
+const SESSION_COLUMNS =
+  "id, task_id, starts_at, ends_at, status, created_by, tasks(category_id, description, status)";
 
-type BlockRow = {
+type SessionRow = {
   id: string;
+  task_id: string;
   starts_at: string;
   ends_at: string;
-  description: string | null;
-  source_block_id: string | null;
-  status: ViewBlock["status"];
-  created_by: ViewBlock["created_by"] | null;
-  scheduled_block_tasks: {
-    task_id: string;
-    planned_minutes: number;
-    position: number;
-    tasks: { id: string; description: string | null; category_id: string; ad_hoc: boolean } | null;
-  }[];
+  status: ViewSession["status"];
+  created_by: ViewSession["created_by"] | null;
+  tasks: { category_id: string; description: string | null; status: string } | null;
 };
 
-export type Template = {
-  id: string;
-  name: string;
-  default_minutes: number;
-  default_category_id: string;
-  preferred_daypart: "morning" | "afternoon" | "evening" | null;
-  items: { label: string; estimated_minutes: number; category_id: string | null }[];
-};
-
-export async function loadTemplates(db: SupabaseClient, userId: string): Promise<Template[]> {
+/** Sessions whose start lies in `span`, in order. */
+export async function loadSessions(db: SupabaseClient, userId: string, span: Span): Promise<ViewSession[]> {
   const { data, error } = await db
-    .from("blocks")
-    .select("id, name, default_minutes, default_category_id, preferred_daypart, block_items(position, label, estimated_minutes, category_id)")
+    .from("task_sessions")
+    .select(SESSION_COLUMNS)
     .eq("user_id", userId)
-    .eq("archived", false)
-    .order("name");
+    .gte("starts_at", new Date(span.start).toISOString())
+    .lt("starts_at", new Date(span.end).toISOString())
+    .order("starts_at");
   if (error) throw error;
-  return (data ?? []).map((b) => {
-    const row = b as Omit<Template, "items"> & {
-      block_items: { position: number; label: string; estimated_minutes: number; category_id: string | null }[];
-    };
-    const { block_items, ...rest } = row;
-    return {
-      ...rest,
-      items: [...(block_items ?? [])]
-        .sort((x, y) => x.position - y.position)
-        .map((i) => ({ label: i.label, estimated_minutes: i.estimated_minutes, category_id: i.category_id })),
-    };
-  });
-}
-
-/** Blocks whose start lies in `span`, with their tasks in order. */
-export async function loadBlocks(db: SupabaseClient, userId: string, span: Span): Promise<ViewBlock[]> {
-  const [{ data, error }, templates] = await Promise.all([
-    db
-      .from("scheduled_blocks")
-      .select(BLOCK_COLUMNS)
-      .eq("user_id", userId)
-      .gte("starts_at", new Date(span.start).toISOString())
-      .lt("starts_at", new Date(span.end).toISOString())
-      .order("starts_at"),
-    db.from("blocks").select("id, name").eq("user_id", userId),
-  ]);
-  if (error) throw error;
-  const names = new Map(((templates.data ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]));
-  const rows = (data ?? []) as unknown as BlockRow[];
+  const rows = ((data ?? []) as unknown as SessionRow[]).filter((r) => r.tasks);
 
   // Interviews from /jobs, best effort: the week reads fine without them.
   const interviews = new Map<string, string>();
   if (rows.length) {
     const { data: iv } = await db
       .from("interviews")
-      .select("scheduled_block_id, kind, applications(companies(name))")
+      .select("session_id, kind, applications(companies(name))")
       .in(
-        "scheduled_block_id",
+        "session_id",
         rows.map((r) => r.id),
       );
     for (const r of (iv ?? []) as unknown as {
-      scheduled_block_id: string;
+      session_id: string;
       kind: string;
       applications: { companies: { name: string } | { name: string }[] | null } | null;
     }[]) {
       const c = r.applications?.companies;
       const company = (Array.isArray(c) ? c[0]?.name : c?.name) ?? "?";
-      interviews.set(r.scheduled_block_id, `Interview (${r.kind}) · ${company}`);
+      interviews.set(r.session_id, `Interview (${r.kind}) · ${company}`);
     }
   }
 
   return rows.map((r) => ({
     id: r.id,
+    task_id: r.task_id,
     starts_at: r.starts_at,
     ends_at: r.ends_at,
-    description: r.description,
     status: r.status,
     created_by: r.created_by ?? "app",
-    template: r.source_block_id ? (names.get(r.source_block_id) ?? null) : null,
+    category_id: r.tasks!.category_id,
+    description: r.tasks!.description,
+    task_status: r.tasks!.status,
     interview: interviews.get(r.id) ?? null,
-    tasks: [...(r.scheduled_block_tasks ?? [])]
-      .sort((a, b) => a.position - b.position || a.task_id.localeCompare(b.task_id))
-      .filter((l) => l.tasks)
-      .map((l) => ({
-        task_id: l.task_id,
-        category_id: l.tasks!.category_id,
-        description: l.tasks!.description,
-        minutes: l.planned_minutes,
-        ad_hoc: l.tasks!.ad_hoc,
-      })),
   }));
 }
 
-export async function getBlock(db: SupabaseClient, userId: string, id: string): Promise<ViewBlock | null> {
+export async function getSession(db: SupabaseClient, userId: string, id: string): Promise<ViewSession | null> {
   const { data, error } = await db
-    .from("scheduled_blocks")
+    .from("task_sessions")
     .select("starts_at")
     .eq("user_id", userId)
     .eq("id", id)
@@ -132,8 +83,8 @@ export async function getBlock(db: SupabaseClient, userId: string, id: string): 
   if (error) throw error;
   if (!data) return null;
   const t = Date.parse(data.starts_at as string);
-  const blocks = await loadBlocks(db, userId, { start: t, end: t + 1 });
-  return blocks.find((b) => b.id === id) ?? null;
+  const sessions = await loadSessions(db, userId, { start: t, end: t + 1 });
+  return sessions.find((s) => s.id === id) ?? null;
 }
 
 /** Calendar events that count (enabled calendar, not cancelled, busy, not hidden…) overlapping `span`. */
@@ -204,10 +155,10 @@ export async function loadIntent(db: SupabaseClient, userId: string, monday: str
 
 export async function loadWeek(db: SupabaseClient, userId: string, monday: string, timeZone: string) {
   const span = weekSpan(monday, timeZone);
-  const [blocks, events, intent] = await Promise.all([
-    loadBlocks(db, userId, span),
+  const [sessions, events, intent] = await Promise.all([
+    loadSessions(db, userId, span),
     loadEvents(db, userId, span),
     loadIntent(db, userId, monday),
   ]);
-  return { span, blocks, events, intent };
+  return { span, sessions, events, intent };
 }

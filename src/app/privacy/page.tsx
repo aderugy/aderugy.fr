@@ -42,7 +42,7 @@ export default function PrivacyPage() {
         </p>
         <p>
           <strong>What you enter in the tools.</strong> Everything you create is stored in your
-          account: agenda tasks, categories, blocks, weeks and objectives; maths progress, exercise
+          account: agenda tasks, categories, the slots you plan them in, weeks and objectives; maths progress, exercise
           results and review history; job applications, companies, notes, saved copies of job
           offers and interviews; live poker sessions, hands, players and notes; poker spots and
           trainers.
@@ -61,7 +61,7 @@ export default function PrivacyPage() {
           <li>
             <strong>Calendars created by the app</strong> (<code>calendar.app.created</code>): if you
             turn on pushing, the site creates an &ldquo;Agenda&rdquo; calendar in your Google account
-            and writes your planned blocks to it. It can write to that calendar only.
+            and writes the tasks you plan to it. It can write to that calendar only.
           </li>
         </ul>
         <p>
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
           policy.
         </p>
         <p>
-          <strong>Notifications (optional).</strong> If you turn on block reminders on a device, the
+          <strong>Notifications (optional).</strong> If you turn on reminders on a device, the
           site stores that device&apos;s push subscription (an endpoint address and encryption keys)
           and a record of which reminders were sent.
         </p>
@@ -121,7 +121,7 @@ export default function PrivacyPage() {
             Google API Services User Data Policy
           </a>
           , including the Limited Use requirements. Google data is used only to show your calendars
-          on your own agenda and to write your blocks to the calendar the app created. It is not
+          on your own agenda and to write your planned tasks to the calendar the app created. It is not
           transferred to anyone except as needed to provide that feature, not used for advertising,
           not read by a human unless you ask for help with your account or the law requires it, and
           not used to train AI models.

@@ -14,7 +14,6 @@ import {
 } from "@/lib/time";
 import type {
   AllDayItem,
-  Block,
   CalendarSource,
   Category,
   DragPayload,
@@ -22,34 +21,29 @@ import type {
   GoogleAccount,
   GridItem,
   Objective,
-  ScheduledBlock,
   Task,
+  TaskSession,
   Week,
 } from "@/lib/types";
 import { externalItems, externalMinutesByCategory } from "@/lib/external";
-import { blockChildren, blockMinutes, childMinutes, resizedChildMinutes } from "@/lib/blocks";
+import { counts, isMissed, moveReschedules, sessionMinutes } from "@/lib/agenda/sessions";
 import { CalendarLiveness } from "./CalendarLiveness";
 import { ExternalDetail } from "./ExternalDetail";
-import {
-  createScheduledBlock,
-  moveScheduled,
-  placeBlock,
-  placeTask,
-} from "@/server/actions/schedule";
-import { BlockPopup, type DraftBlock } from "./BlockPopup";
+import { createTaskOnGrid, moveScheduled, placeTask } from "@/server/actions/schedule";
+import { SessionPopup, type DraftSlot, type DraftChoice } from "./SessionPopup";
 import { relativeTime } from "./GoogleConnection";
-import { BlockDetail } from "./BlockDetail";
+import { SessionDetail } from "./SessionDetail";
 import { PlannerRail } from "./PlannerRail";
 import { WeekGrid, type DrawnRange } from "./WeekGrid";
 import { WeekIntent } from "./WeekIntent";
+import { useNow } from "./useNow";
 
 type Props = {
   weekStart: string;
   week: Week;
   categories: Category[];
   tasks: Task[];
-  blocks: Block[];
-  scheduled: ScheduledBlock[];
+  sessions: TaskSession[];
   objectives: Objective[];
   externalEvents: ExternalEvent[];
   calendarSources: CalendarSource[];
@@ -62,8 +56,7 @@ export function WeekPlanner({
   week,
   categories,
   tasks,
-  blocks,
-  scheduled,
+  sessions,
   objectives,
   externalEvents,
   calendarSources,
@@ -73,12 +66,12 @@ export function WeekPlanner({
   const weekStartDate = useMemo(() => fromISODate(weekStart), [weekStart]);
 
   /**
-   * The grid owns the placed blocks between server renders.
+   * The grid owns the placed sessions between server renders.
    *
-   * This used to be `useOptimistic` over the `scheduled` prop, which meant
+   * This used to be `useOptimistic` over the server prop, which meant
    * every drag had to be followed by a route re-render: as soon as the action
    * settled React dropped the optimistic value and fell back to the prop, so
-   * without a refresh the block snapped back to where it started. Holding the
+   * without a refresh the slot snapped back to where it started. Holding the
    * list in real state lets a move persist on the strength of the write alone.
    *
    * The prop is still the source of truth whenever the server sends a new one —
@@ -86,16 +79,16 @@ export function WeekPlanner({
    * new prop identity. Adjusting state during render is the documented way to
    * do that; an effect would paint the stale list first.
    */
-  const [items, setItems] = useState<ScheduledBlock[]>(scheduled);
-  const [seededFrom, setSeededFrom] = useState(scheduled);
-  if (seededFrom !== scheduled) {
-    setSeededFrom(scheduled);
-    setItems(scheduled);
+  const [items, setItems] = useState<TaskSession[]>(sessions);
+  const [seededFrom, setSeededFrom] = useState(sessions);
+  if (seededFrom !== sessions) {
+    setSeededFrom(sessions);
+    setItems(sessions);
   }
 
   const [pendingDrag, setPendingDrag] = useState<DragPayload | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<DraftBlock | null>(null);
+  const [draft, setDraft] = useState<DraftSlot | null>(null);
   const [gridError, setGridError] = useState<string | null>(null);
   /**
    * Categories the week is currently being read without. Nothing but a lens:
@@ -103,7 +96,7 @@ export function WeekPlanner({
    * asks "what does the week look like without this", it does not change it.
    *
    * Held here rather than in the panel that toggles it, because the panel is
-   * unmounted whenever a block is selected and the grid must keep reading it.
+   * unmounted whenever a slot is selected and the grid must keep reading it.
    */
   const [hiddenCategories, setHiddenCategories] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -125,7 +118,7 @@ export function WeekPlanner({
    * during the server render, which has no business deciding what today is.
    *
    * Navigating to another week forgets the tap, the same way the grid re-seeds
-   * itself from a new `scheduled` prop.
+   * itself from a new `sessions` prop.
    */
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const [pickedFor, setPickedFor] = useState(weekStart);
@@ -159,7 +152,11 @@ export function WeekPlanner({
   const googleConnected = Boolean(googleAccount && !googleAccount.disconnected_at);
 
   const categories_ = useMemo(() => categoryIndex(categories), [categories]);
-  const blockById = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks]);
+
+  // A planned slot becomes missed through the clock alone; the server render
+  // has no "now" to decide that with, so it waits for the client.
+  const now = useNow();
+  const nowMs = now?.getTime() ?? null;
 
   const external = useMemo(
     () =>
@@ -186,67 +183,37 @@ export function WeekPlanner({
   }, [external.items, external.allDay, externalEvents, calendarSources]);
 
   /**
-   * A block has no category and no title of its own. A placed template keeps
-   * the name you gave it; otherwise the only thing the block says about itself
-   * is its description. Either can be empty — the tasks inside carry the
-   * labels, and the grid draws the block as the outline around them.
-   */
-  const labelFor = (block: ScheduledBlock) => {
-    if (block.source_block_id) {
-      const source = blockById.get(block.source_block_id);
-      if (source) return source.name;
-    }
-    return block.description ?? "";
-  };
-
-  /**
-   * The outline's colour. With no category to borrow from, a block takes the
-   * template's colour if it came from one, and otherwise stays neutral so the
-   * children are the only thing carrying category colour.
-   */
-  const colorFor = (block: ScheduledBlock) => {
-    if (block.source_block_id) {
-      const source = blockById.get(block.source_block_id);
-      if (source?.color) return source.color;
-    }
-    return DEFAULT_COLOR;
-  };
-
-  /**
-   * One list for the grid. Own blocks and external events are stored apart —
-   * the mirror is read-only and carries no category of its own — but they lay
-   * out together, so they are normalised here.
+   * One list for the grid. Sessions and external events are stored apart —
+   * the mirror is read-only — but they lay out together, so they are
+   * normalised here. A session is drawn as its task: the category leaf, in
+   * the category's colour, with the task's description under it.
    */
   const gridItems: GridItem[] = useMemo(
     () => [
-      ...items.map((block) => {
-        const children = blockChildren(block, categories_);
+      ...items.map((s): GridItem => {
+        const category = s.tasks ? categories_.get(s.tasks.category_id) : undefined;
         return {
-          id: block.id,
-          kind: "block" as const,
-          // A block has no category of its own; its children carry them.
-          categoryId: null,
-          startsAt: block.starts_at,
-          endsAt: block.ends_at,
-          label: labelFor(block),
-          description: block.description,
-          color: colorFor(block),
-          done: block.status === "done",
-          // A block the server has not acknowledged has no real id yet, so a
-          // move would address a row that does not exist.
-          movable: !block.id.startsWith("temp-"),
-          children,
-          overfilled: childMinutes(block) > blockMinutes(block),
-          // Only a mirrored event can be an archive. A block you drew is yours
-          // already, and nothing outside the app can delete it.
+          id: s.id,
+          kind: "session",
+          categoryId: s.tasks?.category_id ?? null,
+          startsAt: s.starts_at,
+          endsAt: s.ends_at,
+          label: category?.name ?? "Uncategorised",
+          description: s.tasks?.description ?? null,
+          color: category?.effectiveColor ?? DEFAULT_COLOR,
+          status: s.status,
+          missed: nowMs !== null && isMissed(s, nowMs),
+          done: s.status === "done",
+          // A slot the server has not acknowledged has no real id yet, and a
+          // skipped one is history: neither moves.
+          movable: !s.id.startsWith("temp-") && s.status !== "skipped",
+          byClaude: s.created_by === "claude",
           archived: false,
         };
       }),
       ...external.items,
     ],
-    // labelFor/colorFor read the same memoised maps these depend on.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, external.items, categories_, blockById],
+    [items, external.items, categories_, nowMs],
   );
 
   const externalMinutes = useMemo(
@@ -258,94 +225,69 @@ export function WeekPlanner({
   );
 
   /**
-   * The blocks that belong to the week on screen. The page fetches a day either
-   * side as timezone padding, so `items` also holds the Sunday before and the
-   * Monday after — fine for the grid, which only lays out days 0–6, but every
-   * total must stick to the displayed week or the neighbours leak into it.
-   * A block belongs to the day it starts on, the same rule the grid uses.
+   * The sessions that belong to the week on screen. The page fetches a day
+   * either side as timezone padding, so `items` also holds the Sunday before
+   * and the Monday after — fine for the grid, which only lays out days 0–6, but
+   * every total must stick to the displayed week or the neighbours leak into
+   * it. A session belongs to the day it starts on, the same rule the grid uses.
    */
   const weekItems = useMemo(
     () =>
-      items.filter((b) => {
-        const day = dayIndexOf(weekStartDate, new Date(b.starts_at));
+      items.filter((s) => {
+        const day = dayIndexOf(weekStartDate, new Date(s.starts_at));
         return day >= 0 && day <= 6;
       }),
     [items, weekStartDate],
   );
 
-  const totalMinutes = weekItems.reduce(
-    (sum, b) =>
-      sum +
-      Math.round(
-        (new Date(b.ends_at).getTime() - new Date(b.starts_at).getTime()) / 60_000,
-      ),
-    0,
-  );
+  // Skipped slots stay on the grid as history but are not time planned.
+  const totalMinutes = weekItems.filter(counts).reduce((sum, s) => sum + sessionMinutes(s), 0);
 
-  const selected = items.find((b) => b.id === selectedId) ?? null;
+  const selected = items.find((s) => s.id === selectedId) ?? null;
   const selectedExternal = selectedId ? externalById.get(selectedId) : undefined;
 
   function onCreateFromDrag(payload: DragPayload, startsAt: Date) {
     const endsAt = new Date(startsAt.getTime() + payload.minutes * 60_000);
+    const task = tasks.find((t) => t.id === payload.id);
 
-    // Optimistic placeholder; replaced when the server round-trip lands.
-    //
-    // A dragged task can be drawn in full straight away — the rail already knows
-    // its category and minutes. A template cannot: its steps live on the server,
-    // so the block appears empty for one round trip and fills in on the refresh.
-    const temp: ScheduledBlock = {
+    // Optimistic placeholder, drawn in full straight away — the rail already
+    // knows the task. Replaced when the server round-trip lands.
+    const temp: TaskSession = {
       id: `temp-${crypto.randomUUID()}`,
+      task_id: payload.id,
       week_id: week.id,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
-      description: null,
-      source_block_id: payload.kind === "block" ? payload.id : null,
       status: "planned",
-      actual_minutes: null,
-      scheduled_block_tasks:
-        payload.kind === "task"
-          ? [
-              {
-                task_id: payload.id,
-                planned_minutes: payload.minutes,
-                position: 0,
-                tasks: {
-                  id: payload.id,
-                  description: payload.description,
-                  // Filled in by the refresh; the grid never shows notes.
-                  notes: null,
-                  category_id: payload.categoryId,
-                  estimated_minutes: payload.minutes,
-                  ad_hoc: false,
-                },
-              },
-            ]
-          : [],
+      created_by: "app",
+      tasks: {
+        id: payload.id,
+        category_id: payload.categoryId,
+        description: payload.description,
+        notes: task?.notes ?? null,
+        estimated_minutes: payload.minutes,
+        priority: task?.priority ?? 3,
+        deadline: task?.deadline ?? null,
+        status: "scheduled",
+        created_at: task?.created_at ?? new Date().toISOString(),
+      },
     };
     setPendingDrag(null);
     setGridError(null);
     setItems((prev) => [...prev, temp]);
 
     startTransition(async () => {
-      const result =
-        payload.kind === "task"
-          ? await placeTask({
-              weekStart,
-              taskId: payload.id,
-              startsAt: startsAt.toISOString(),
-              minutes: payload.minutes,
-            })
-          : await placeBlock({
-              weekStart,
-              blockId: payload.id,
-              startsAt: startsAt.toISOString(),
-            });
+      const result = await placeTask({
+        taskId: payload.id,
+        startsAt: startsAt.toISOString(),
+        minutes: payload.minutes,
+      });
 
       // On success the action refreshes the route and the real row arrives as
       // a new prop, replacing this placeholder. On failure nothing will, so
-      // take it back out rather than leaving a block that does not exist.
+      // take it back out rather than leaving a slot that does not exist.
       if (!result.ok) {
-        setItems((prev) => prev.filter((b) => b.id !== temp.id));
+        setItems((prev) => prev.filter((s) => s.id !== temp.id));
         setGridError(result.error);
       }
     });
@@ -385,19 +327,20 @@ export function WeekPlanner({
    * Returns an error message instead of throwing it away, so a rejected insert
    * shows up in the popup rather than silently leaving the grid unchanged.
    */
-  async function onDraftSubmit(input: {
-    categoryId: string;
-    description: string | null;
-    startsAt: Date;
-    endsAt: Date;
-  }): Promise<string | null> {
-    const result = await createScheduledBlock({
-      weekStart,
-      categoryId: input.categoryId,
-      description: input.description,
-      startsAt: input.startsAt.toISOString(),
-      endsAt: input.endsAt.toISOString(),
-    });
+  async function onDraftSubmit(choice: DraftChoice): Promise<string | null> {
+    const result =
+      choice.kind === "new"
+        ? await createTaskOnGrid({
+            categoryId: choice.categoryId,
+            description: choice.description,
+            startsAt: choice.startsAt.toISOString(),
+            endsAt: choice.endsAt.toISOString(),
+          })
+        : await placeTask({
+            taskId: choice.taskId,
+            startsAt: choice.startsAt.toISOString(),
+            endsAt: choice.endsAt.toISOString(),
+          });
 
     if (!result.ok) return result.error;
 
@@ -409,35 +352,22 @@ export function WeekPlanner({
 
   /**
    * Move and resize both land here, and neither waits on the server to paint.
-   * The write is fire-and-forget in the happy path; a rejection puts the block
+   * The write is fire-and-forget in the happy path; a rejection puts the slot
    * back where it was and says why.
+   *
+   * Moving a slot whose start has passed is a reschedule (see
+   * `moveReschedules`): the server keeps the old slot as skipped and plans a
+   * new one. The grid paints the move now and the refresh brings back the
+   * skipped trace.
    */
   function onMove(id: string, startsAt: Date, endsAt: Date) {
-    const previous = items.find((b) => b.id === id);
+    const previous = items.find((s) => s.id === id);
     if (!previous) return;
 
     setGridError(null);
-    // A resize carries a single task along with it (see resizedChildMinutes);
-    // the server applies the same rule, so the refresh agrees with this paint.
-    const toMinutes = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
-    const resized = resizedChildMinutes(
-      previous.scheduled_block_tasks.map((l) => l.planned_minutes),
-      blockMinutes(previous),
-      toMinutes,
-    );
     setItems((prev) =>
-      prev.map((b) =>
-        b.id === id
-          ? {
-              ...b,
-              starts_at: startsAt.toISOString(),
-              ends_at: endsAt.toISOString(),
-              scheduled_block_tasks: b.scheduled_block_tasks.map((l, i) => ({
-                ...l,
-                planned_minutes: resized[i] ?? l.planned_minutes,
-              })),
-            }
-          : b,
+      prev.map((s) =>
+        s.id === id ? { ...s, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() } : s,
       ),
     );
 
@@ -449,11 +379,23 @@ export function WeekPlanner({
       });
 
       if (!result.ok) {
-        setItems((prev) => prev.map((b) => (b.id === id ? previous : b)));
+        setItems((prev) => prev.map((s) => (s.id === id ? previous : s)));
         setGridError(result.error);
+      } else if (result.rescheduled && selectedId === id) {
+        // The slot that was selected is now the skipped trace; follow the task.
+        setSelectedId(result.id);
       }
     });
   }
+
+  /** Shown on the grid while dragging a slot already started: it will be rescheduled. */
+  const reschedulingIds = useMemo(
+    () =>
+      new Set(
+        nowMs === null ? [] : items.filter((s) => moveReschedules(s, nowMs)).map((s) => s.id),
+      ),
+    [items, nowMs],
+  );
 
   const prevWeek = toISODate(addDays(weekStartDate, -7));
   const nextWeek = toISODate(addDays(weekStartDate, 7));
@@ -569,7 +511,6 @@ export function WeekPlanner({
           onClose={() => setDrawer("none")}
           categories={categories}
           tasks={tasks}
-          blocks={blocks}
           onDragStart={setPendingDrag}
           onDragEnd={() => setPendingDrag(null)}
         />
@@ -587,6 +528,7 @@ export function WeekPlanner({
             onCreateFromDrag={onCreateFromDrag}
             onDraw={onDraw}
             onMove={onMove}
+            reschedulingIds={reschedulingIds}
             onFocusDay={setPickedDay}
           />
         </div>
@@ -601,10 +543,11 @@ export function WeekPlanner({
               onClose={() => onSelect(null)}
             />
           ) : selected ? (
-            <BlockDetail
+            <SessionDetail
               key={selected.id}
-              block={selected}
+              session={selected}
               categories={categories}
+              now={nowMs}
               onClose={() => onSelect(null)}
             />
           ) : (
@@ -614,7 +557,7 @@ export function WeekPlanner({
               week={week}
               categories={categories}
               objectives={objectives}
-              scheduled={weekItems}
+              sessions={weekItems}
               externalMinutes={externalMinutes}
               hiddenCategories={hiddenCategories}
               onToggleCategory={onToggleCategory}
@@ -626,10 +569,10 @@ export function WeekPlanner({
       </div>
 
       {draft && (
-        <BlockPopup
+        <SessionPopup
           draft={draft}
           categories={categories}
-          defaultCategoryId={null}
+          tasks={tasks}
           onCancel={() => setDraft(null)}
           onSubmit={onDraftSubmit}
         />

@@ -9,9 +9,13 @@ import {
   type CategoryPathRow,
 } from "@/lib/agenda/backlog";
 import { PRIORITY_LABELS, type TaskStatus } from "@/lib/types";
+import type { SessionSummary } from "@/lib/agenda/sessions";
+import { fmtWhen } from "@/lib/agenda/zoned";
+import { APP_TIMEZONE } from "@/lib/jobs/format";
 import {
   getTask,
   insertTasks,
+  isInterviewTask,
   listTasks,
   loadCategoryPaths,
   openTaskCounts,
@@ -39,8 +43,9 @@ How the data works:
 - Call list_categories before creating or recategorising tasks. Categories cannot be created or renamed from here — if none fits, say so and suggest one for Arthur to add.
 - A task can also carry notes: an extended description in Markdown (context, links, checklists). Keep the description short and put detail in notes.
 - Priority: 1 urgent, 2 high, 3 normal (default), 4 someday. Estimates are in minutes (5–1440). Deadlines are dates (YYYY-MM-DD).
-- Status: backlog (waiting), scheduled (placed on the week grid — set automatically when the task is put in a block, by Arthur or with create_block / add_to_block), done, dropped. A task whose block was skipped is back in the backlog.
-- A task placed on the grid cannot be deleted from here; mark it dropped instead.`;
+- Status: backlog (waiting), scheduled (it has a planned slot on the week grid — set automatically when it is placed, by Arthur or with schedule_task), done, dropped. A task whose slot was skipped is back in the backlog; the skipped slot stays as its history.
+- Marking a task done or dropped closes its planned slot too: a slot already started becomes done (or skipped), one still to come is taken off the grid.
+- A task that has been on the grid cannot be deleted from here; mark it dropped instead.`;
 
 /* ------------------------------------------------------------- shapes */
 
@@ -86,7 +91,8 @@ const taskOut = z.object({
   deadline: z.string().nullable(),
   status: z.enum(["backlog", "scheduled", "done", "dropped"]),
   splittable: z.boolean(),
-  placed_minutes: z.number(),
+  planned_at: z.string().nullable().describe("When its planned slot starts, local time, if it has one."),
+  skipped_count: z.number().describe("How many of its slots were skipped."),
   created_at: z.string(),
 });
 type TaskOut = z.infer<typeof taskOut>;
@@ -94,7 +100,7 @@ type TaskOut = z.infer<typeof taskOut>;
 /* ------------------------------------------------------------ helpers */
 
 function toOut(
-  task: TaskRow & { placed_minutes?: number },
+  task: TaskRow & { session?: SessionSummary },
   paths: Map<string, string>,
   categoryPath?: string,
 ): TaskOut {
@@ -109,7 +115,8 @@ function toOut(
     deadline: deadlineDate(task.deadline),
     status: task.status,
     splittable: task.splittable,
-    placed_minutes: task.placed_minutes ?? 0,
+    planned_at: task.session?.plannedStarts ? fmtWhen(task.session.plannedStarts, APP_TIMEZONE) : null,
+    skipped_count: task.session?.skippedCount ?? 0,
     created_at: task.created_at,
   };
 }
@@ -122,7 +129,8 @@ function line(t: TaskOut): string {
   ];
   if (t.deadline) bits.push(`due ${t.deadline}`);
   if (t.status !== "backlog") bits.push(t.status);
-  if (t.placed_minutes > 0) bits.push(`${t.placed_minutes} min on the grid`);
+  if (t.planned_at) bits.push(`on the grid ${t.planned_at}`);
+  if (t.skipped_count > 0) bits.push(`skipped ${t.skipped_count}× before`);
   const head = `- ${bits.join(" · ")} (id ${t.id})`;
   if (!t.notes) return head;
   // Notes travel with the task, indented under it and capped so a long one
@@ -210,7 +218,7 @@ export function registerBacklogTools(server: McpServer) {
     {
       title: "List backlog tasks",
       description:
-        "Tasks in the backlog, most urgent first (priority, then deadline, then oldest). By default lists open tasks (backlog and scheduled). Tasks drawn directly inside a block on the grid are not part of the backlog and are not listed.",
+        "Tasks in the backlog, most urgent first (priority, then deadline, then oldest). By default lists open tasks (backlog and scheduled). An interview's own task is not listed: the interview stands for it (see /jobs tools).",
       inputSchema: z.object({
         category: categoryRef.optional().describe("Only this category and its subcategories."),
         status: z
@@ -380,8 +388,8 @@ export function registerBacklogTools(server: McpServer) {
         getTask(db, userId, input.id),
       ]);
       if (!task) return failure(`No task with id ${input.id}.`);
-      if (task.ad_hoc) {
-        return failure("This task was drawn inside a block on the grid; edit it from the week view.");
+      if (isInterviewTask(task)) {
+        return failure("This task is an interview's slot on the agenda; Arthur changes it from /jobs.");
       }
 
       let categoryId: string | undefined;
@@ -407,7 +415,7 @@ export function registerBacklogTools(server: McpServer) {
       });
       if (!result.ok) return failure(result.error);
 
-      const out = toOut({ ...result.value, placed_minutes: task.placed_minutes }, pathMap(categories));
+      const out = toOut({ ...result.value, session: task.session }, pathMap(categories));
       return {
         content: [{ type: "text", text: `Updated:\n${line(out)}` }],
         structuredContent: { task: out },
@@ -420,7 +428,7 @@ export function registerBacklogTools(server: McpServer) {
     {
       title: "Complete, drop or reopen a task",
       description:
-        'Mark a task done or dropped, or reopen it. Reopening puts it back in the backlog — or back to "scheduled" if it is still placed on the grid.',
+        'Mark a task done or dropped, or reopen it. Done or dropped also closes its planned slot when you planned it (a slot already started becomes done or skipped; one still to come leaves the grid); a slot Arthur planned stays for him to settle. Reopening puts it back in the backlog, or back to "scheduled" if it still has a planned slot.',
       inputSchema: z.object({
         id: taskId,
         status: z.enum(["done", "dropped", "open"]),
@@ -435,16 +443,17 @@ export function registerBacklogTools(server: McpServer) {
         getTask(db, userId, id),
       ]);
       if (!task) return failure(`No task with id ${id}.`);
-      if (task.ad_hoc) {
-        return failure("This task was drawn inside a block on the grid; mark it from the week view.");
+      if (isInterviewTask(task)) {
+        return failure("This task is an interview's slot on the agenda; Arthur marks it from the week view.");
       }
 
       const next: TaskStatus =
-        status === "open" ? (task.placements > 0 ? "scheduled" : "backlog") : status;
+        status === "open" ? (task.session.plannedId ? "scheduled" : "backlog") : status;
       const result = await patchTask(db, userId, id, { status: next });
       if (!result.ok) return failure(result.error);
 
-      const out = toOut({ ...result.value, placed_minutes: task.placed_minutes }, pathMap(categories));
+      const after = await getTask(db, userId, id);
+      const out = toOut({ ...result.value, session: after?.session ?? task.session }, pathMap(categories));
       return {
         content: [{ type: "text", text: `Now ${next}:\n${line(out)}` }],
         structuredContent: { task: out },
@@ -457,7 +466,7 @@ export function registerBacklogTools(server: McpServer) {
     {
       title: "Delete a task",
       description:
-        "Permanently delete a backlog task. Refused for a task placed on the week grid — mark it dropped with set_task_status instead, which keeps the week's history intact.",
+        "Permanently delete a backlog task. Refused for a task that has been on the week grid — mark it dropped with set_task_status instead, which keeps the week's history intact.",
       inputSchema: z.object({ id: taskId }),
       outputSchema: z.object({ deleted: z.string() }),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -466,9 +475,10 @@ export function registerBacklogTools(server: McpServer) {
       const { db, userId } = callerOf(ctx.http?.authInfo);
       const task = await getTask(db, userId, id);
       if (!task) return failure(`No task with id ${id}.`);
-      if (task.ad_hoc || task.placements > 0) {
+      const s = task.session;
+      if (isInterviewTask(task) || s.plannedId || s.doneCount > 0 || s.skippedCount > 0) {
         return failure(
-          `This task is placed on the week grid (${task.placed_minutes} min), so deleting it would remove planned time. Use set_task_status with "dropped" instead.`,
+          `This task has been on the week grid${s.plannedId ? ` (planned ${fmtWhen(s.plannedStarts!, APP_TIMEZONE)})` : ""}, so deleting it would erase its slots and their history. Use set_task_status with "dropped" instead.`,
         );
       }
 

@@ -4,15 +4,15 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Markdown } from "@/components/ui/Markdown";
 import { NotesEditor } from "@/components/ui/NotesEditor";
-import { KIND_LABELS, type InterviewOnBlock } from "@/lib/jobs/types";
+import { KIND_LABELS, type InterviewOnSession } from "@/lib/jobs/types";
 import { updateInterview } from "@/server/actions/jobs";
 
 /**
- * The interview behind a block, in the week view's block panel: what it is,
+ * The interview behind a session, in the week view's detail panel: what it is,
  * the prep to reread, and the debrief to write right after — without leaving
  * the agenda.
  */
-export function BlockInterview({ interview: i }: { interview: InterviewOnBlock }) {
+export function SessionInterview({ interview: i }: { interview: InterviewOnSession }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 

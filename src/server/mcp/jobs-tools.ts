@@ -89,7 +89,7 @@ function interviewBlock(i: Interview, now: number): string {
   const lines = [head];
   if (i.with_whom) lines.push(`With: ${i.with_whom}`);
   if (i.location) lines.push(`Where: ${i.location}`);
-  lines.push(`On the agenda: ${i.scheduled_block_id ? "yes" : "no"}`);
+  lines.push(`On the agenda: ${i.session_id ? "yes" : "no"}`);
   lines.push("", "#### Prep", i.prep_notes ?? "_(empty)_", "", "#### Debrief", i.debrief_notes ?? "_(empty)_");
   return lines.join("\n");
 }
@@ -324,7 +324,7 @@ export function registerJobsTools(server: McpServer) {
       if (!result.ok) return failure(result.error);
       const a = result.value;
       return ok(
-        `Updated: ${a.role_title} — ${STATUS_LABELS[a.status]} (id ${a.id}).${input.company ? " Agenda blocks of its interviews keep the old company name until Arthur edits them in the app." : ""}`,
+        `Updated: ${a.role_title} — ${STATUS_LABELS[a.status]} (id ${a.id}).${input.company ? " Agenda slots of its interviews keep the old company name until Arthur edits them in the app." : ""}`,
       );
     },
   );
@@ -450,7 +450,7 @@ export function registerJobsTools(server: McpServer) {
       if (!interview) return failure(`No interview with id ${interview_id}.`);
       const r = await patchInterview(db, userId, interview_id, { prepNotes: md });
       if (!r.ok) return failure(r.error);
-      return ok(`Prep saved on the ${KIND_LABELS[interview.kind].toLowerCase()} interview of ${fmtDateTime(interview.starts_at)}. Arthur sees it on the application page and in the agenda block.`);
+      return ok(`Prep saved on the ${KIND_LABELS[interview.kind].toLowerCase()} interview of ${fmtDateTime(interview.starts_at)}. Arthur sees it on the application page and in the agenda slot.`);
     },
   );
 }

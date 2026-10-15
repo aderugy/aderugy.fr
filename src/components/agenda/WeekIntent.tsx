@@ -4,9 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import { buildTree, flattenTree, subtreeIds } from "@/lib/categories";
 import type { CategoryNode } from "@/lib/categories";
-import { plannedMinutesByCategory } from "@/lib/blocks";
+import { minutesByCategory as sessionMinutesByCategory } from "@/lib/agenda/sessions";
 import { fmtDuration } from "@/lib/time";
-import type { Category, Objective, ScheduledBlock, Week } from "@/lib/types";
+import type { Category, Objective, TaskSession, Week } from "@/lib/types";
 import {
   createObjective,
   deleteObjective,
@@ -19,7 +19,8 @@ type Props = {
   week: Week;
   categories: Category[];
   objectives: Objective[];
-  scheduled: ScheduledBlock[];
+  /** The week's sessions. Skipped ones count towards nothing. */
+  sessions: TaskSession[];
   /** Minutes per category already committed by a connected calendar. */
   externalMinutes: Map<string, number>;
   /** Categories being read past: still listed, still greyed, never counted. */
@@ -35,7 +36,7 @@ export function WeekIntent({
   week,
   categories,
   objectives,
-  scheduled,
+  sessions,
   externalMinutes,
   hiddenCategories,
   onToggleCategory,
@@ -53,18 +54,17 @@ export function WeekIntent({
    * Minutes scheduled this week per category: `direct` is what was booked on
    * the category itself, `rolled` adds everything below it in the tree.
    *
-   * A block contributes nothing by itself — it has no category. What counts is
-   * the tasks inside it, each for its own planned minutes against its own
-   * category. Time in a block that no task claims is planned but not yet
-   * attributed, and stays out rather than being spread over the categories
-   * that happen to be present.
+   * A session counts for its own length against its task's category; a
+   * skipped one is history and counts for nothing (lib/agenda/sessions).
    */
   const {
     direct: directMinutes,
     rolled: minutesByCategory,
     counted: countedByCategory,
   } = useMemo(() => {
-    const direct = plannedMinutesByCategory(scheduled);
+    const direct = sessionMinutesByCategory(
+      sessions.map((s) => ({ ...s, category_id: s.tasks?.category_id ?? null })),
+    ).planned;
     // Hours a calendar already committed count the same as hours you planned:
     // the objective asks where your time goes, not how much of it you typed in.
     for (const [categoryId, minutes] of externalMinutes) {
@@ -85,7 +85,7 @@ export function WeekIntent({
       counted.set(c.id, shown);
     }
     return { direct, rolled, counted };
-  }, [scheduled, externalMinutes, categories, flat, hiddenCategories]);
+  }, [sessions, externalMinutes, categories, flat, hiddenCategories]);
 
   const totalMinutes = useMemo(
     () => tree.reduce((sum, root) => sum + (countedByCategory.get(root.id) ?? 0), 0),

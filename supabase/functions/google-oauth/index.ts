@@ -85,8 +85,8 @@ Deno.serve(async (request) => {
     const token = await exchangeCode(body.code, body.redirectUri);
     const secretId = await storeRefreshToken(admin, user.id, token.refresh_token!);
 
-    // The calendar the app writes blocks into shows up in Google's list like
-    // any other. It is never a source: mirroring it would draw every block twice.
+    // The calendar the app writes sessions into shows up in Google's list like
+    // any other. It is never a source: mirroring it would draw every slot twice.
     const { data: existing } = await admin
       .from("google_accounts")
       .select("push_calendar_id")

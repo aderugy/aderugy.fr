@@ -58,7 +58,7 @@ test("days and weeks", () => {
 
 /* -------------------------------------------------------- the week view */
 
-import { busySpans, gaps, mergeSpans, minutesByCategory, allDayDates, weekSpan, type ViewBlock, type ViewEvent } from "./week-view";
+import { busySpans, gaps, mergeSpans, minutesByCategory, allDayDates, sessionLabel, weekSpan, type ViewEvent, type ViewSession } from "./week-view";
 
 const at = (s: string) => parseLocal(s, TZ)!.getTime();
 
@@ -75,36 +75,45 @@ test("gaps between busy spans, inside a window", () => {
   assert.deepEqual(free, ["08:00-09:00", "12:00-21:30"], "the 10-minute gap is too short");
 });
 
-const block = (over: Partial<ViewBlock>): ViewBlock => ({
-  id: "b",
+const session = (over: Partial<ViewSession>): ViewSession => ({
+  id: "s",
+  task_id: "t",
   starts_at: "2026-10-09T16:00:00Z",
   ends_at: "2026-10-09T17:00:00Z",
-  description: null,
   status: "planned",
   created_by: "app",
-  template: null,
+  category_id: "poker",
+  description: null,
+  task_status: "scheduled",
   interview: null,
-  tasks: [],
   ...over,
 });
 
-test("minutes by category: skipped blocks and all-day events do not count; events are clipped to the week", () => {
+test("minutes by category: skipped sessions and all-day events do not count; events are clipped to the week", () => {
   const week = weekSpan("2026-10-05", TZ);
-  const blocks = [
-    block({ tasks: [{ task_id: "t1", category_id: "poker", description: null, minutes: 60, ad_hoc: true }], status: "done" }),
-    block({ id: "b2", status: "skipped", tasks: [{ task_id: "t2", category_id: "poker", description: null, minutes: 90, ad_hoc: false }] }),
+  const sessions = [
+    session({ status: "done" }),
+    session({ id: "s2", status: "skipped", ends_at: "2026-10-09T17:30:00Z" }),
   ];
   const events: ViewEvent[] = [
     { calendar: "EPITA", category_id: "school", title: "ML", starts_at: "2026-10-12T06:00:00Z", ends_at: "2026-10-12T10:00:00Z", all_day: false, archived: false },
     { calendar: "EPITA", category_id: "school", title: "Sunday night", starts_at: "2026-10-11T21:00:00Z", ends_at: "2026-10-11T23:00:00Z", all_day: false, archived: false },
     { calendar: "Perso", category_id: "life", title: "Trip", starts_at: "2026-10-10T00:00:00Z", ends_at: "2026-10-12T00:00:00Z", all_day: true, archived: false },
   ];
-  const m = minutesByCategory(blocks, events, week);
+  const m = minutesByCategory(sessions, events, week);
   assert.equal(m.planned.get("poker"), 60);
   assert.equal(m.done.get("poker"), 60);
   // Sunday 23:00–Monday 01:00 Paris: one hour inside the week. The Monday lecture is next week.
   assert.equal(m.external.get("school"), 60);
   assert.equal(m.external.get("life"), undefined);
   assert.deepEqual(allDayDates(events[2]), ["2026-10-10", "2026-10-11"]);
-  assert.equal(busySpans(blocks, events).length, 3, "skipped block and all-day event are not busy");
+  assert.equal(busySpans(sessions, events).length, 3, "skipped session and all-day event are not busy");
+});
+
+test("a session is named by its interview, else its category and description", () => {
+  const paths = new Map([["poker", "poker > grind"]]);
+  assert.equal(sessionLabel(session({ description: "review" }), paths), "poker > grind — review");
+  assert.equal(sessionLabel(session({}), paths), "poker > grind");
+  assert.equal(sessionLabel(session({ interview: "Interview (technical) · Betclic" }), paths), "Interview (technical) · Betclic");
+  assert.equal(sessionLabel(session({ description: "review" }), null), "review");
 });

@@ -211,7 +211,7 @@ export function NotificationSettings({
     <section className="rounded-lg border border-line bg-surface p-4 text-sm">
       <h2 className="font-medium">Notifications</h2>
       <p className="mt-0.5 text-xs text-muted">
-        A reminder on your devices before each planned block starts. Each device opts in on its
+        A reminder on your devices before each planned task starts. Each device opts in on its
         own: turn it on here from your phone and from your computer.
       </p>
 
@@ -272,7 +272,7 @@ export function NotificationSettings({
             disabled={pending}
             onChange={(e) => savePrefs({ ...prefs, blockReminders: e.target.checked })}
           />
-          Remind me before blocks
+          Remind me before planned tasks
         </label>
         <label className="flex items-center gap-2 text-xs text-muted">
           <select

@@ -7,7 +7,7 @@ import { accessTokenOf, callEdge } from "@/server/edge";
 /**
  * Read every calendar; write only to calendars this app created itself.
  *
- * `calendar.app.created` is what makes pushing blocks safe to offer: it grants
+ * `calendar.app.created` is what makes pushing the plan safe to offer: it grants
  * nothing over your existing calendars, so the one the app creates ("Agenda")
  * is the only thing it can ever modify.
  */
@@ -75,7 +75,7 @@ export async function syncGoogleNow(): Promise<ActionResult> {
 }
 
 /**
- * Start writing your blocks to an "Agenda" calendar in Google.
+ * Start writing your planned tasks to an "Agenda" calendar in Google.
  *
  * The Edge Function creates the calendar and pushes the first batch before
  * answering, so the settings page can report real numbers straight away.

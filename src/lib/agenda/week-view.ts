@@ -9,24 +9,19 @@ import { addDaysISO, startOfLocalDay } from "./zoned";
 
 export type Span = { start: number; end: number };
 
-export type ViewTask = {
-  task_id: string;
-  category_id: string;
-  description: string | null;
-  minutes: number;
-  ad_hoc: boolean;
-};
-
-export type ViewBlock = {
+/** A session as the connector reads it: the slot and what its task says. */
+export type ViewSession = {
   id: string;
+  task_id: string;
   starts_at: string;
   ends_at: string;
-  description: string | null;
   status: "planned" | "done" | "skipped";
   created_by: "app" | "claude";
-  template: string | null;
-  tasks: ViewTask[];
-  /** "Technical interview · Betclic", when the block holds one. */
+  category_id: string;
+  description: string | null;
+  /** The task's own status (done, dropped…), which may differ from the slot's. */
+  task_status: string;
+  /** "Technical interview · Betclic", when the session holds one. */
   interview: string | null;
 };
 
@@ -71,12 +66,12 @@ export function overlapping<T extends Span>(span: Span, others: T[]): T[] {
   return others.filter((o) => o.start < span.end && o.end > span.start);
 }
 
-/** What occupies time: blocks not skipped, and timed calendar events. */
-export function busySpans(blocks: ViewBlock[], events: ViewEvent[], exceptBlockId?: string): (Span & { label: string })[] {
+/** What occupies time: sessions not skipped, and timed calendar events. */
+export function busySpans(sessions: ViewSession[], events: ViewEvent[], exceptSessionId?: string): (Span & { label: string })[] {
   const out: (Span & { label: string })[] = [];
-  for (const b of blocks) {
-    if (b.status === "skipped" || b.id === exceptBlockId) continue;
-    out.push({ start: Date.parse(b.starts_at), end: Date.parse(b.ends_at), label: blockLabel(b, null) });
+  for (const s of sessions) {
+    if (s.status === "skipped" || s.id === exceptSessionId) continue;
+    out.push({ start: Date.parse(s.starts_at), end: Date.parse(s.ends_at), label: sessionLabel(s, null) });
   }
   for (const e of events) {
     if (e.all_day) continue;
@@ -85,27 +80,22 @@ export function busySpans(blocks: ViewBlock[], events: ViewEvent[], exceptBlockI
   return out;
 }
 
-/** A block's name: its template, its description, or what is inside. */
-export function blockLabel(b: ViewBlock, paths: Map<string, string> | null): string {
-  if (b.interview) return b.interview;
-  if (b.template) return b.template;
-  if (b.description) return b.description;
-  if (b.tasks.length && paths) {
-    const t = b.tasks[0];
-    const leaf = paths.get(t.category_id) ?? "?";
-    return t.description ? `${leaf} — ${t.description}` : leaf;
-  }
-  return "block";
+/** A session's name: its interview, or its task's category and description. */
+export function sessionLabel(s: ViewSession, paths: Map<string, string> | null): string {
+  if (s.interview) return s.interview;
+  const leaf = paths?.get(s.category_id) ?? null;
+  if (leaf && s.description) return `${leaf} — ${s.description}`;
+  return leaf ?? s.description ?? "task";
 }
 
 /**
- * Minutes per category over a week, before rolling up the tree: tasks inside
- * blocks that are not skipped (each for its own planned minutes) and the
- * calendars' timed events, clipped to the week. `done` counts blocks marked
- * done.
+ * Minutes per category over a week, before rolling up the tree: sessions that
+ * are not skipped (each for its own length, against its task's category) and
+ * the calendars' timed events, clipped to the week. `done` counts sessions
+ * marked done.
  */
 export function minutesByCategory(
-  blocks: ViewBlock[],
+  sessions: ViewSession[],
   events: ViewEvent[],
   week: Span,
 ): { planned: Map<string, number>; done: Map<string, number>; external: Map<string, number> } {
@@ -113,13 +103,12 @@ export function minutesByCategory(
   const done = new Map<string, number>();
   const external = new Map<string, number>();
   const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v);
-  for (const b of blocks) {
-    if (b.status === "skipped") continue;
-    for (const t of b.tasks) {
-      if (t.minutes <= 0) continue;
-      add(planned, t.category_id, t.minutes);
-      if (b.status === "done") add(done, t.category_id, t.minutes);
-    }
+  for (const s of sessions) {
+    if (s.status === "skipped") continue;
+    const minutes = Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000);
+    if (minutes <= 0) continue;
+    add(planned, s.category_id, minutes);
+    if (s.status === "done") add(done, s.category_id, minutes);
   }
   for (const e of events) {
     if (e.all_day || !e.category_id) continue;
