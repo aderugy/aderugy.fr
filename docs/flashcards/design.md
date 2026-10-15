@@ -85,25 +85,30 @@ Fields render as Markdown + KaTeX + highlighted code
 
 ## Claude connector
 
-Same MCP server (`/api/mcp`), five tools (`src/server/mcp/flashcards-tools.ts`):
-`list_decks`, `search_notes`, `create_notes`, `get_flashcard_stats`,
-`list_hard_cards`.
+Same MCP server (`/api/mcp`), full CRUD since migration `0025_flashcards_connector_crud.sql`
+(`src/server/mcp/flashcards-tools.ts`, 19 tools):
+
+| Area | Tools |
+|---|---|
+| Decks | `list_decks`, `create_deck` (by path, parents included), `update_deck` (rename, move, position), `delete_deck` |
+| Notes | `search_notes` (also the inbox and the trash), `get_note` (fields, cards, rating history), `create_notes` (inbox by default, `to_inbox: false` straight into decks), `update_note` (any field; dropping reviewed cards needs `allow_card_loss`), `delete_notes` (trash, or `permanent`), `restore_notes`, `move_notes`, `tag_notes`, `review_inbox` (accept / reject) |
+| Cards | `update_cards`: suspend, flag, bury, reset to new, set the due day — by card or by note |
+| Tags | `list_tags`, `rename_tag` (children too; merge) |
+| Stats, settings | `get_flashcard_stats` (with the settings), `update_flashcard_settings` (partial), `list_hard_cards` |
 
 | | Connected app (Claude) |
 |---|---|
-| `fc_notes` | read; insert, forced into the inbox and signed `claude` (trigger); update only while in the inbox, never out of it; no delete, no trash |
-| `fc_decks`, `fc_cards`, `fc_reviews`, `fc_settings` | read only |
-| `fc_media` | nothing |
-| write RPCs | refused |
-
-Cards of a Claude note are created when Arthur accepts it, in the browser:
-Claude never writes a card or a rating.
+| `fc_decks`, `fc_notes`, `fc_cards`, `fc_settings` | full access to own rows; a note Claude inserts is signed `created_by = 'claude'`, and nobody can change that afterwards |
+| `fc_delete_deck`, `fc_rename_tag` | allowed |
+| `fc_reviews` | read only: the review journal is Arthur's |
+| `fc_save_review`, `fc_undo_review` | refused: Claude does not rate or undo |
+| `fc_media` | nothing: images are pasted in the app |
 
 ## Tests
 
 - `supabase/tests/flashcards_test.sql`: ownership, the rating and undo RPCs
   (stale refusal, leech, cram), aggregates, tag renaming, deck deletion,
-  another user, every connector rule above, the purge.
+  another user, every connector rule above (re-applies 0023 then 0025), the purge.
 - `src/lib/flashcards/scheduler.test.ts`: transitions, button order, target
   retention, leeches, review days across the October clock change.
 - `src/lib/flashcards/notes.test.ts`: cloze parsing with LaTeX braces, cards
@@ -113,6 +118,7 @@ Claude never writes a card or a rating.
 ## Decisions
 
 - Route `/flashcards`, UI in English like /jobs.
-- Free deck tree; Claude cannot create decks.
+- Free deck tree.
+- The connector has full CRUD on decks, notes, cards, tags and settings (Oct 2026); reviewing stays in the app.
 - V1 has no Anki import, notifications, offline mode, poker rendering or
   /agenda, /maths, /poker and /jobs links: those are V2 in the spec.
