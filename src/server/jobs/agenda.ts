@@ -189,7 +189,7 @@ export async function scheduleInterview(
 
   // An interview means the application is in the interview stage — unless it
   // is already further along (an offer) or closed.
-  if (app.status === "to_apply" || app.status === "applied") {
+  if (app.status === "to_review" || app.status === "to_apply" || app.status === "applied") {
     const { error: e } = await db
       .from("applications")
       .update({ status: "interviewing" })

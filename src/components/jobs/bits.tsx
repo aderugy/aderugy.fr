@@ -4,6 +4,7 @@ import { DEFAULT_COLOR } from "@/lib/categories";
 import { STATUS_LABELS, type ApplicationStatus, type JobTag } from "@/lib/jobs/types";
 
 const STATUS_STYLE: Record<ApplicationStatus, string> = {
+  to_review: "border-dashed border-line text-muted",
   to_apply: "border-line text-muted",
   applied: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
   interviewing: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",

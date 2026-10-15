@@ -47,7 +47,7 @@ export const JOBS_INSTRUCTIONS = `Arthur's internship search (aderugy.fr/jobs): 
 How the data works:
 - An application is one job offer at one company: role title, link, status, Markdown notes, and several tags for the type of job (e.g. quant, research, DS/ML, CIFRE). Tags are Arthur's; list_job_tags shows them, and they cannot be created from here.
 - Companies are shared by every application to them and carry their own Markdown notes (contacts, research). Prefer company notes for anything true of the company, application notes for this offer.
-- Status: to_apply, applied, interviewing, offer, accepted, rejected, withdrawn. Moving to "applied" fills the applied date. Every change is kept in the application's timeline.
+- Status: to_review (saved, not yet read through), to_apply, applied, interviewing, offer, accepted, rejected, withdrawn. Moving to "applied" fills the applied date. Every change is kept in the application's timeline.
 - The offer is saved as Markdown when the link is added, because postings disappear. get_application returns it. If it is missing or the site refused the server (LinkedIn often does), read the page another way and store it with set_offer_text.
 - Interviews are scheduled by Arthur in the app (they go on his agenda). Each has two notes: prep and debrief. You may write the prep only (write_interview_prep); the debrief is his.
 
@@ -75,7 +75,7 @@ function summaryLine(a: ApplicationSummary): string {
   ];
   if (a.tags.length) bits.push(a.tags.map((t) => t.name).join(", "));
   if (a.applied_on) bits.push(`applied ${a.applied_on}`);
-  if (a.deadline && a.status === "to_apply") bits.push(`apply by ${a.deadline}`);
+  if (a.deadline && (a.status === "to_apply" || a.status === "to_review")) bits.push(`apply by ${a.deadline}`);
   if (a.next_interview) {
     bits.push(`next: ${KIND_LABELS[a.next_interview.kind]} ${fmtDateTime(a.next_interview.starts_at)} (interview ${a.next_interview.id})`);
   }
