@@ -5,56 +5,55 @@ import { ensureWeek } from "@/server/weeks";
 import { addDays, fromISODate, isoWeekStartInTimeZone, toISODate } from "@/lib/time";
 import { WeekPlanner } from "@/components/agenda/WeekPlanner";
 import { withoutHidden } from "@/lib/external";
-import type { InterviewOnBlock } from "@/lib/jobs/types";
+import type { InterviewOnSession } from "@/lib/jobs/types";
+import { LISTED_TASKS } from "@/server/agenda/tasks";
 import type {
-  Block,
   CalendarSource,
   Category,
   ExternalEvent,
   GoogleAccount,
   HiddenEventRule,
   Objective,
-  ScheduledBlock,
   Task,
+  TaskSession,
 } from "@/lib/types";
 
 export const metadata = { title: "Week — Agenda" };
 
-type InterviewRow = Omit<InterviewOnBlock, "company" | "role_title"> & {
-  scheduled_block_id: string;
+type InterviewRow = Omit<InterviewOnSession, "company" | "role_title"> & {
+  session_id: string;
   applications: { role_title: string; companies: { name: string } | { name: string }[] | null } | null;
 };
 
 /**
- * Mark the blocks that hold a /jobs interview. A separate query rather than an
- * embed, and its failure ignored: the week must still render on a database
- * where the jobs migration has not run yet.
+ * Mark the sessions that hold a /jobs interview. A separate query rather than
+ * an embed, and its failure ignored: the week must still render without it.
  */
 async function withInterviews(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  blocks: ScheduledBlock[],
-): Promise<ScheduledBlock[]> {
-  if (blocks.length === 0) return blocks;
+  sessions: TaskSession[],
+): Promise<TaskSession[]> {
+  if (sessions.length === 0) return sessions;
   const { data, error } = await supabase
     .from("interviews")
-    .select("id, application_id, scheduled_block_id, kind, prep_notes, debrief_notes, applications(role_title, companies(name))")
+    .select("id, application_id, session_id, kind, prep_notes, debrief_notes, applications(role_title, companies(name))")
     .in(
-      "scheduled_block_id",
-      blocks.map((b) => b.id),
+      "session_id",
+      sessions.map((s) => s.id),
     );
-  if (error || !data?.length) return blocks;
+  if (error || !data?.length) return sessions;
 
-  const byBlock = new Map<string, InterviewOnBlock>();
+  const bySession = new Map<string, InterviewOnSession>();
   for (const row of data as unknown as InterviewRow[]) {
-    const { applications, scheduled_block_id, ...rest } = row;
+    const { applications, session_id, ...rest } = row;
     const c = applications?.companies;
-    byBlock.set(scheduled_block_id, {
+    bySession.set(session_id, {
       ...rest,
       role_title: applications?.role_title ?? "",
       company: (Array.isArray(c) ? c[0]?.name : c?.name) ?? "",
     });
   }
-  return blocks.map((b) => (byBlock.has(b.id) ? { ...b, interview: byBlock.get(b.id)! } : b));
+  return sessions.map((s) => (bySession.has(s.id) ? { ...s, interview: bySession.get(s.id)! } : s));
 }
 
 const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "Europe/Paris";
@@ -82,7 +81,6 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   const [
     categoriesRes,
     tasksRes,
-    blocksRes,
     scheduledRes,
     objectivesRes,
     externalRes,
@@ -104,25 +102,16 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
         )
         .eq("user_id", user.id)
         .in("status", ["backlog", "scheduled"])
-        // The rail is for work waiting on a slot. A task that exists only
-        // inside a block is already placed, and reaches the grid through the
-        // block's own join rather than through here.
-        .eq("ad_hoc", false)
+        // The rail is for work waiting on a slot; an interview's own task is
+        // the interview, and reaches the grid through its session.
+        .or(LISTED_TASKS)
         .order("created_at"),
+      // Filtered by time range rather than week_id so a session shows where
+      // it actually sits, whatever week it was planned from.
       supabase
-        .from("blocks")
+        .from("task_sessions")
         .select(
-          "id, name, color, default_minutes, default_category_id, preferred_daypart, archived, block_items(id, block_id, position, label, estimated_minutes, category_id)",
-        )
-        .eq("user_id", user.id)
-        .eq("archived", false)
-        .order("name"),
-      // Filtered by time range rather than week_id so blocks that were dragged
-      // across a week boundary still show up where they actually sit.
-      supabase
-        .from("scheduled_blocks")
-        .select(
-          "id, week_id, starts_at, ends_at, description, source_block_id, status, actual_minutes, scheduled_block_tasks(task_id, planned_minutes, position, tasks(id, description, notes, category_id, estimated_minutes, ad_hoc))",
+          "id, task_id, week_id, starts_at, ends_at, status, created_by, tasks(id, category_id, description, notes, estimated_minutes, priority, deadline, status, created_at)",
         )
         .eq("user_id", user.id)
         .gte("starts_at", rangeStart)
@@ -176,7 +165,6 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   const error =
     categoriesRes.error ??
     tasksRes.error ??
-    blocksRes.error ??
     scheduledRes.error ??
     objectivesRes.error;
 
@@ -193,7 +181,10 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
     );
   }
 
-  const scheduled = await withInterviews(supabase, (scheduledRes.data ?? []) as unknown as ScheduledBlock[]);
+  const sessions = await withInterviews(
+    supabase,
+    ((scheduledRes.data ?? []) as unknown as TaskSession[]).filter((s) => s.tasks),
+  );
 
   // The weakest link decides how fresh the picture is, so report the oldest.
   const syncTimes = ((syncRes.data ?? []) as { last_synced_at: string | null }[]).map(
@@ -209,8 +200,7 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       week={week}
       categories={(categoriesRes.data ?? []) as Category[]}
       tasks={(tasksRes.data ?? []) as Task[]}
-      blocks={(blocksRes.data ?? []) as unknown as Block[]}
-      scheduled={scheduled}
+      sessions={sessions}
       objectives={(objectivesRes.data ?? []) as Objective[]}
       externalEvents={withoutHidden((externalRes.data ?? []) as ExternalEvent[], (hiddenRes.data ?? []) as HiddenEventRule[])}
       calendarSources={(sourcesRes.data ?? []) as CalendarSource[]}

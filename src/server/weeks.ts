@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Week } from "@/lib/types";
+import { summaryFromRow, type SessionSummary } from "@/lib/agenda/sessions";
 
 /**
  * Weeks are created lazily: the first time you open or touch a week, its row
@@ -33,70 +34,25 @@ export async function ensureWeek(
   return data as Week;
 }
 
-/** Live placements per task: links to blocks that are not skipped. */
-export async function livePlacements(
+/**
+ * Per task: its live session and its history, from `task_session_summary`
+ * (migration 0026). A task with no session has no entry.
+ *
+ * There is no status to recompute after a write any more: a trigger keeps a
+ * task's status in step with its sessions.
+ */
+export async function sessionSummaries(
   supabase: SupabaseClient,
   taskIds: string[],
-): Promise<Map<string, { count: number; minutes: number; total: number }>> {
+): Promise<Map<string, SessionSummary>> {
   const ids = [...new Set(taskIds)].filter(Boolean);
-  const out = new Map<string, { count: number; minutes: number; total: number }>();
+  const out = new Map<string, SessionSummary>();
   if (ids.length === 0) return out;
 
-  const { data, error } = await supabase.rpc("task_placements", { p_task_ids: ids });
+  const { data, error } = await supabase.rpc("task_session_summary", { p_task_ids: ids });
   if (error) throw error;
-  for (const row of (data ?? []) as {
-    task_id: string;
-    live_count: number;
-    live_minutes: number;
-    total_count: number;
-  }[]) {
-    out.set(row.task_id, {
-      count: row.live_count,
-      minutes: row.live_minutes,
-      total: row.total_count,
-    });
+  for (const row of (data ?? []) as (Parameters<typeof summaryFromRow>[0] & { task_id: string })[]) {
+    out.set(row.task_id, summaryFromRow(row));
   }
   return out;
-}
-
-/**
- * A task counts as scheduled when it sits in at least one block that is not
- * skipped. Skipping a block means the work did not happen, so its tasks go
- * back to the backlog — the link stays, so the skipped block still shows what
- * was planned. Deriving it after every placement or status change keeps the
- * backlog rail honest without a trigger. `done` and `dropped` are user intent
- * and stay untouched; ad-hoc tasks belong to their block and are left alone.
- */
-export async function syncTaskStatus(
-  supabase: SupabaseClient,
-  userId: string,
-  taskIds: string[],
-) {
-  const ids = [...new Set(taskIds)].filter(Boolean);
-  if (ids.length === 0) return;
-
-  const placements = await livePlacements(supabase, ids);
-  const nowScheduled = ids.filter((id) => (placements.get(id)?.count ?? 0) > 0);
-  const nowFree = ids.filter((id) => (placements.get(id)?.count ?? 0) === 0);
-
-  if (nowScheduled.length) {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ status: "scheduled" })
-      .eq("user_id", userId)
-      .eq("status", "backlog")
-      .eq("ad_hoc", false)
-      .in("id", nowScheduled);
-    if (error) throw error;
-  }
-  if (nowFree.length) {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ status: "backlog" })
-      .eq("user_id", userId)
-      .eq("status", "scheduled")
-      .eq("ad_hoc", false)
-      .in("id", nowFree);
-    if (error) throw error;
-  }
 }

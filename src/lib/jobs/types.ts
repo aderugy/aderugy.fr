@@ -90,7 +90,8 @@ export type Application = {
 export type Interview = {
   id: string;
   application_id: string;
-  scheduled_block_id: string | null;
+  /** The session holding the interview on the agenda, if it is on it. */
+  session_id: string | null;
   kind: InterviewKind;
   starts_at: string;
   ends_at: string;
@@ -139,8 +140,8 @@ export type ApplicationDetail = Application & {
   tasks: LinkedTask[];
 };
 
-/** What an interview block carries on the agenda grid. */
-export type InterviewOnBlock = {
+/** What an interview session carries on the agenda grid. */
+export type InterviewOnSession = {
   id: string;
   application_id: string;
   kind: InterviewKind;

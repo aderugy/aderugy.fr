@@ -1,472 +1,357 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ensureWeek, syncTaskStatus } from "@/server/weeks";
-import { resizedChildMinutes } from "@/lib/blocks";
+import { ensureWeek } from "@/server/weeks";
+import { TASK_LIMITS } from "@/lib/agenda/backlog";
+import { canUnschedule, moveReschedules } from "@/lib/agenda/sessions";
+import { isoWeekStartInTimeZone } from "@/lib/time";
+import type { SessionStatus } from "@/lib/types";
 import type { Result } from "@/server/agenda/tasks";
 
 /**
  * The week grid's writes, shared by the planner's server actions and the
  * Claude connector — on the model of server/agenda/tasks.ts. Every function
  * takes the client to act through (cookie-bound for the UI, bearer-token for
- * Claude); both run as the user under RLS, so the rules of migration 0019
- * (a connected app changes only the blocks it created) apply to the connector
+ * Claude); both run as the user under RLS, so the rules of migration 0026 (a
+ * connected app changes only the sessions it created) apply to the connector
  * without anything here having to know.
+ *
+ * The grid holds sessions: one task, one span of time. A task's status
+ * follows its sessions through a trigger, so nothing here recomputes it.
  *
  * Throws on database errors; returns `{ ok: false }` for anything the caller
  * should show as a sentence. Nothing here refreshes a page or nudges the
  * Google push: the caller decides.
  */
 
-export type NewChild = {
-  categoryId: string;
-  description: string | null;
-  minutes: number;
+const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "Europe/Paris";
+
+const SESSION_READ = "id, task_id, week_id, starts_at, ends_at, status";
+
+type SessionRow = {
+  id: string;
+  task_id: string;
+  week_id: string;
+  starts_at: string;
+  ends_at: string;
+  status: SessionStatus;
 };
 
-/**
- * Create tasks that exist only inside a block and link them to it.
- *
- * These are instances, not backlog items: they are born scheduled, marked
- * `ad_hoc`, and deleted with the block. Without that flag, removing a block
- * drawn on the grid would push its task into the backlog as work still to do.
- */
-export async function insertAdHocTasks(
-  db: SupabaseClient,
-  userId: string,
-  scheduledBlockId: string,
-  children: NewChild[],
-  positionOffset = 0,
-): Promise<string[]> {
-  const wanted = children.filter((c) => c.categoryId && c.minutes > 0);
-  if (wanted.length === 0) return [];
+/** The unique index allowing one planned session per task (0026). */
+const ONE_PLANNED = "task_sessions_one_planned_idx";
 
-  const { data: created, error: taskError } = await db
-    .from("tasks")
-    .insert(
-      wanted.map((c) => ({
-        user_id: userId,
-        category_id: c.categoryId,
-        description: c.description?.trim() || null,
-        estimated_minutes: c.minutes,
-        priority: 3,
-        status: "scheduled",
-        ad_hoc: true,
-      })),
-    )
-    .select("id");
-  if (taskError) throw taskError;
-
-  const ids = (created ?? []).map((t) => t.id as string);
-
-  const { error: linkError } = await db.from("scheduled_block_tasks").insert(
-    ids.map((id, i) => ({
-      user_id: userId,
-      scheduled_block_id: scheduledBlockId,
-      task_id: id,
-      planned_minutes: wanted[i].minutes,
-      position: positionOffset + i,
-    })),
-  );
-  if (linkError) throw linkError;
-
-  return ids;
+function isOnePlannedViolation(e: unknown): boolean {
+  const err = e as { code?: string; message?: string } | null;
+  return err?.code === "23505" && (err.message ?? "").includes(ONE_PLANNED);
 }
 
-/**
- * Delete the ad-hoc tasks among a set, leaving real backlog tasks alone.
- *
- * Called wherever a link disappears: a task that only ever existed to fill a
- * block has nothing left to be once it is out of one. Returns the others,
- * whose status the caller must recompute.
- */
-export async function dropAdHocTasks(
-  db: SupabaseClient,
-  userId: string,
-  taskIds: string[],
-): Promise<string[]> {
-  const ids = [...new Set(taskIds)].filter(Boolean);
-  if (ids.length === 0) return [];
+const ALREADY_PLANNED =
+  "This task already has a slot on the grid. Move that one, or skip it first.";
 
-  const { data: adHoc } = await db
-    .from("tasks")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("ad_hoc", true)
-    .in("id", ids);
-
-  const doomed = (adHoc ?? []).map((t) => t.id as string);
-  if (doomed.length > 0) {
-    await db.from("tasks").delete().eq("user_id", userId).in("id", doomed);
-  }
-  return ids.filter((id) => !doomed.includes(id));
+function checkSpan(startsAt: Date, endsAt: Date): string | null {
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) return "Pick a start and an end.";
+  if (endsAt <= startsAt) return "End must be after start";
+  const minutes = (endsAt.getTime() - startsAt.getTime()) / 60_000;
+  if (minutes < 5) return "A slot lasts at least 5 minutes.";
+  if (minutes > 24 * 60) return "A slot lasts 24 hours at most.";
+  return null;
 }
 
-/** Next free position at the bottom of a block. */
-async function nextPosition(db: SupabaseClient, userId: string, blockId: string): Promise<number> {
-  const { data: last } = await db
-    .from("scheduled_block_tasks")
-    .select("position")
-    .eq("user_id", userId)
-    .eq("scheduled_block_id", blockId)
-    .order("position", { ascending: false })
-    .limit(1);
-  return (last?.[0]?.position ?? -1) + 1;
+/** The week a time belongs to, created if needed. */
+async function weekOf(db: SupabaseClient, userId: string, at: Date): Promise<string> {
+  const week = await ensureWeek(db, userId, isoWeekStartInTimeZone(at, APP_TIMEZONE));
+  return week.id;
 }
 
-/** An empty block on the grid, in the week `weekStart` (created if needed). */
-export async function insertBlock(
-  db: SupabaseClient,
-  userId: string,
-  input: { weekStart: string; startsAt: Date; endsAt: Date; description: string | null; sourceBlockId?: string | null },
-): Promise<string> {
-  const week = await ensureWeek(db, userId, input.weekStart);
+async function readSession(db: SupabaseClient, userId: string, id: string): Promise<SessionRow | null> {
   const { data, error } = await db
-    .from("scheduled_blocks")
+    .from("task_sessions")
+    .select(SESSION_READ)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as SessionRow | null) ?? null;
+}
+
+/** A new session for an existing task. Fails with a sentence if it already has a planned one. */
+async function insertSession(
+  db: SupabaseClient,
+  userId: string,
+  input: { taskId: string; startsAt: Date; endsAt: Date },
+): Promise<Result<string>> {
+  const weekId = await weekOf(db, userId, input.startsAt);
+  const { data, error } = await db
+    .from("task_sessions")
     .insert({
       user_id: userId,
-      week_id: week.id,
+      task_id: input.taskId,
+      week_id: weekId,
       starts_at: input.startsAt.toISOString(),
       ends_at: input.endsAt.toISOString(),
-      description: input.description?.trim() || null,
-      source_block_id: input.sourceBlockId ?? null,
     })
     .select("id")
     .single();
-  if (error) throw error;
-  return data.id as string;
+  if (error) {
+    if (isOnePlannedViolation(error)) return { ok: false, error: ALREADY_PLANNED };
+    throw error;
+  }
+  return { ok: true, value: data.id as string };
 }
 
 /**
- * Drop a backlog task onto the grid: a block holding just that task.
- *
- * The block itself carries no category and no description: the task inside it
- * is what says what this hour counts as.
+ * Put an existing task on the grid: dropped from the rail, picked in the draw
+ * popup, or chosen by Claude. The slot is `minutes` long, or ends at `endsAt`.
  */
 export async function placeTask(
   db: SupabaseClient,
   userId: string,
-  input: { weekStart: string; taskId: string; startsAt: string; minutes: number },
-): Promise<string> {
-  const { data: task, error: taskError } = await db
+  input: { taskId: string; startsAt: string; minutes?: number; endsAt?: string },
+): Promise<Result<string>> {
+  const { data: task, error } = await db
     .from("tasks")
-    .select("id")
+    .select("id, status")
     .eq("id", input.taskId)
     .eq("user_id", userId)
-    .single();
-  if (taskError) throw taskError;
+    .maybeSingle();
+  if (error) throw error;
+  if (!task) return { ok: false, error: "No such task." };
+  if (task.status === "done" || task.status === "dropped") {
+    return { ok: false, error: `This task is ${task.status}; reopen it before planning it.` };
+  }
 
   const startsAt = new Date(input.startsAt);
-  const endsAt = new Date(startsAt.getTime() + input.minutes * 60_000);
-  const blockId = await insertBlock(db, userId, { weekStart: input.weekStart, startsAt, endsAt, description: null });
+  const endsAt = input.endsAt
+    ? new Date(input.endsAt)
+    : new Date(startsAt.getTime() + (input.minutes ?? 0) * 60_000);
+  const problem = checkSpan(startsAt, endsAt);
+  if (problem) return { ok: false, error: problem };
 
-  const { error: linkError } = await db.from("scheduled_block_tasks").insert({
-    user_id: userId,
-    scheduled_block_id: blockId,
-    task_id: task.id,
-    planned_minutes: input.minutes,
-    position: 0,
-  });
-  if (linkError) throw linkError;
-
-  await syncTaskStatus(db, userId, [task.id]);
-  return blockId;
+  return insertSession(db, userId, { taskId: task.id as string, startsAt, endsAt });
 }
 
 /**
- * Drop a reusable block onto the grid.
- *
- * A bundle lands as one scheduled block sized to the sum of its items, not as
- * one block per item — so it stays a single thing you can move and resize. Each
- * item becomes a task inside it, which is what gives the block its categories:
- * the item's own, or the template's default when the item has none.
+ * A new task straight on the grid, from a range drawn there. It is a task
+ * like any other: skipping its slot sends it to the backlog, where it waits
+ * to be planned again. Its estimate is the length drawn.
  */
-export async function placeTemplate(
+export async function createTaskAt(
   db: SupabaseClient,
   userId: string,
-  input: { weekStart: string; blockId: string; startsAt: string },
-): Promise<string> {
-  const { data: block, error: blockError } = await db
-    .from("blocks")
-    .select("id, default_minutes, default_category_id, block_items(position, label, estimated_minutes, category_id)")
-    .eq("id", input.blockId)
-    .eq("user_id", userId)
-    .single();
-  if (blockError) throw blockError;
-
-  const items = (block.block_items ?? []) as {
-    position: number;
-    label: string;
-    estimated_minutes: number;
-    category_id: string | null;
-  }[];
-  const itemMinutes = items.reduce((sum, i) => sum + i.estimated_minutes, 0);
-  const minutes = itemMinutes > 0 ? itemMinutes : block.default_minutes;
-
-  const startsAt = new Date(input.startsAt);
-  const endsAt = new Date(startsAt.getTime() + minutes * 60_000);
-  // No description: a placed template is labelled by its own name, which is
-  // resolved from source_block_id when rendering.
-  const createdId = await insertBlock(db, userId, {
-    weekStart: input.weekStart,
-    startsAt,
-    endsAt,
-    description: null,
-    sourceBlockId: block.id,
-  });
-
-  // A template with no steps still has to account for its time, so it lands
-  // as a single task of the default category covering the whole block.
-  const steps: NewChild[] =
-    items.length > 0
-      ? [...items]
-          .sort((a, b) => a.position - b.position)
-          .map((i) => ({
-            categoryId: i.category_id ?? block.default_category_id,
-            description: i.label,
-            minutes: i.estimated_minutes,
-          }))
-      : [{ categoryId: block.default_category_id, description: null, minutes }];
-
-  await insertAdHocTasks(db, userId, createdId, steps);
-  return createdId;
-}
-
-/**
- * A block from a timeframe, around one new task of `categoryId`. The category
- * belongs to the task, not to the block: a block has none.
- */
-export async function createDrawnBlock(
-  db: SupabaseClient,
-  userId: string,
-  input: { weekStart: string; categoryId: string; description: string | null; startsAt: string; endsAt: string },
-): Promise<Result<string>> {
+  input: { categoryId: string; description: string | null; notes?: string | null; startsAt: string; endsAt: string; priority?: number },
+): Promise<Result<{ sessionId: string; taskId: string }>> {
   if (!input.categoryId) return { ok: false, error: "Pick a category" };
   const startsAt = new Date(input.startsAt);
   const endsAt = new Date(input.endsAt);
-  if (endsAt <= startsAt) return { ok: false, error: "End must be after start" };
+  const problem = checkSpan(startsAt, endsAt);
+  if (problem) return { ok: false, error: problem };
   const minutes = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
+  const description = input.description?.trim() || null;
+  if (description && description.length > TASK_LIMITS.maxDescription) {
+    return { ok: false, error: `Description is limited to ${TASK_LIMITS.maxDescription} characters.` };
+  }
 
-  const id = await insertBlock(db, userId, {
-    weekStart: input.weekStart,
-    startsAt,
-    endsAt,
-    description: input.description,
-  });
-  await insertAdHocTasks(db, userId, id, [
-    { categoryId: input.categoryId, description: input.description?.trim() || null, minutes },
-  ]);
-  return { ok: true, value: id };
+  const { data: task, error } = await db
+    .from("tasks")
+    .insert({
+      user_id: userId,
+      category_id: input.categoryId,
+      description,
+      notes: input.notes?.trim() || null,
+      estimated_minutes: Math.min(Math.max(minutes, TASK_LIMITS.minMinutes), TASK_LIMITS.maxMinutes),
+      priority: input.priority ?? 3,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  try {
+    const placed = await insertSession(db, userId, { taskId: task.id as string, startsAt, endsAt });
+    if (!placed.ok) throw new Error(placed.error);
+    return { ok: true, value: { sessionId: placed.value, taskId: task.id as string } };
+  } catch (e) {
+    // No task left behind without the slot it was drawn for.
+    await db.from("tasks").delete().eq("user_id", userId).eq("id", task.id);
+    throw e;
+  }
 }
 
 /**
- * Move or resize: both are just a new start/end pair. A single task that
- * filled its block follows the resize (see resizedChildMinutes).
+ * Move or resize a session: both are a new start/end pair.
+ *
+ * A slot that has not started is simply moved. One whose start has passed is
+ * rescheduled instead (see `moveReschedules`): it stays where it was as
+ * skipped, and the task gets a new planned slot — so a missed attempt is never
+ * erased by dragging it to tomorrow. A skipped slot does not move at all.
+ *
+ * Returns the id of the session now planned, which is new after a reschedule.
  */
-export async function moveBlock(
+export async function moveSession(
   db: SupabaseClient,
   userId: string,
-  input: { id: string; startsAt: string; endsAt: string },
-): Promise<Result> {
+  input: { id: string; startsAt: string; endsAt: string; now?: number },
+): Promise<Result<{ id: string; rescheduled: boolean }>> {
   const starts = new Date(input.startsAt);
   const ends = new Date(input.endsAt);
-  if (ends <= starts) return { ok: false, error: "End must be after start" };
+  const problem = checkSpan(starts, ends);
+  if (problem) return { ok: false, error: problem };
 
-  // Read the span and the tasks before writing: a resize carries a single
-  // task along with the block, and that rule needs the old span.
-  const { data: before, error: readError } = await db
-    .from("scheduled_blocks")
-    .select("starts_at, ends_at, scheduled_block_tasks(task_id, planned_minutes, position)")
-    .eq("id", input.id)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (readError) throw readError;
-  if (!before) return { ok: false, error: "Block not found" };
+  const session = await readSession(db, userId, input.id);
+  if (!session) return { ok: false, error: "This slot no longer exists." };
+  if (session.status === "skipped") {
+    return { ok: false, error: "A skipped slot stays where it was. Plan the task again instead." };
+  }
+
+  const now = input.now ?? Date.now();
+  const moved = Date.parse(session.starts_at) !== starts.getTime();
+  if (moved && moveReschedules(session, now)) {
+    return reschedule(db, userId, { id: session.id, startsAt: starts, endsAt: ends });
+  }
+
+  const patch: Record<string, unknown> = {
+    starts_at: starts.toISOString(),
+    ends_at: ends.toISOString(),
+  };
+  // Keep the week in step, so the week's totals follow a slot dragged across
+  // a Sunday night.
+  const newWeek = isoWeekStartInTimeZone(starts, APP_TIMEZONE);
+  if (newWeek !== isoWeekStartInTimeZone(new Date(session.starts_at), APP_TIMEZONE)) {
+    patch.week_id = await weekOf(db, userId, starts);
+  }
 
   const { error, count } = await db
-    .from("scheduled_blocks")
-    .update({ starts_at: starts.toISOString(), ends_at: ends.toISOString(), sync_state: "pending" }, { count: "exact" })
-    .eq("id", input.id)
+    .from("task_sessions")
+    .update(patch, { count: "exact" })
+    .eq("id", session.id)
     .eq("user_id", userId);
   if (error) throw error;
-  if (!count) return { ok: false, error: "This block cannot be changed from here." };
-
-  const links = [...(before.scheduled_block_tasks ?? [])].sort(
-    (a, b) => a.position - b.position || a.task_id.localeCompare(b.task_id),
-  );
-  const fromMinutes = Math.round(
-    (new Date(before.ends_at).getTime() - new Date(before.starts_at).getTime()) / 60_000,
-  );
-  const toMinutes = Math.round((ends.getTime() - starts.getTime()) / 60_000);
-  const resized = resizedChildMinutes(
-    links.map((l) => l.planned_minutes),
-    fromMinutes,
-    toMinutes,
-  );
-  for (const [i, link] of links.entries()) {
-    if (resized[i] === link.planned_minutes) continue;
-    const { error: linkError } = await db
-      .from("scheduled_block_tasks")
-      .update({ planned_minutes: resized[i] })
-      .eq("user_id", userId)
-      .eq("scheduled_block_id", input.id)
-      .eq("task_id", link.task_id);
-    if (linkError) throw linkError;
-  }
-  return { ok: true };
+  if (!count) return { ok: false, error: "This slot cannot be changed from here." };
+  return { ok: true, value: { id: session.id, rescheduled: false } };
 }
 
-export async function patchBlock(
+/**
+ * Skip a slot (if still planned) and plan the task again at a new time, in one
+ * transaction (`reschedule_session`). From a skipped or done slot, this only
+ * plans the new one: "do it again".
+ */
+export async function reschedule(
   db: SupabaseClient,
   userId: string,
-  input: { id: string; description?: string | null; status?: "planned" | "done" | "skipped"; actualMinutes?: number | null },
-): Promise<Result> {
-  const patch: Record<string, unknown> = {};
-  if (input.description !== undefined) patch.description = input.description?.trim() || null;
-  if (input.status !== undefined) patch.status = input.status;
-  if (input.actualMinutes !== undefined) patch.actual_minutes = input.actualMinutes;
-  if (Object.keys(patch).length === 0) return { ok: true };
-
-  const { data: updated, error } = await db
-    .from("scheduled_blocks")
-    .update(patch)
-    .eq("id", input.id)
-    .eq("user_id", userId)
-    .select("scheduled_block_tasks(task_id)")
-    .maybeSingle();
-  if (error) throw error;
-  if (!updated) return { ok: false, error: "This block cannot be changed from here." };
-
-  // Skipping a block (or un-skipping it) changes whether its tasks are still
-  // placed: a skipped block's tasks go back to the backlog rail.
-  if (input.status !== undefined) {
-    await syncTaskStatus(
-      db,
-      userId,
-      (updated.scheduled_block_tasks ?? []).map((l) => l.task_id as string),
-    );
+  input: { id: string; startsAt: Date; endsAt: Date },
+): Promise<Result<{ id: string; rescheduled: boolean }>> {
+  const problem = checkSpan(input.startsAt, input.endsAt);
+  if (problem) return { ok: false, error: problem };
+  const weekId = await weekOf(db, userId, input.startsAt);
+  const { data, error } = await db.rpc("reschedule_session", {
+    p_session_id: input.id,
+    p_week_id: weekId,
+    p_starts_at: input.startsAt.toISOString(),
+    p_ends_at: input.endsAt.toISOString(),
+  });
+  if (error) {
+    if (isOnePlannedViolation(error)) return { ok: false, error: ALREADY_PLANNED };
+    if (error.code === "42501" || error.code === "P0002") return { ok: false, error: error.message };
+    throw error;
   }
+  return { ok: true, value: { id: data as string, rescheduled: true } };
+}
+
+/**
+ * Mark a slot done, skipped, or planned again (undo).
+ *
+ * Done marks the task done; skipped sends it back to the backlog, keeping the
+ * slot as history. Back to planned is refused when the task already has
+ * another planned slot.
+ */
+export async function setSessionStatus(
+  db: SupabaseClient,
+  userId: string,
+  input: { id: string; status: SessionStatus },
+): Promise<Result> {
+  const { error, count } = await db
+    .from("task_sessions")
+    .update({ status: input.status }, { count: "exact" })
+    .eq("id", input.id)
+    .eq("user_id", userId);
+  if (error) {
+    if (isOnePlannedViolation(error)) return { ok: false, error: ALREADY_PLANNED };
+    throw error;
+  }
+  if (!count) return { ok: false, error: "This slot cannot be changed from here." };
   return { ok: true };
 }
 
-export async function removeBlock(db: SupabaseClient, userId: string, id: string): Promise<Result> {
-  // Read the links first: after the cascade there is nothing left to
-  // recompute task status from, nor to tell the ad-hoc tasks apart.
-  const { data: links } = await db
-    .from("scheduled_block_tasks")
-    .select("task_id")
-    .eq("user_id", userId)
-    .eq("scheduled_block_id", id);
+/**
+ * Take a task off the grid and back to the backlog.
+ *
+ * A slot that has not started yet is deleted: nothing happened there. One the
+ * clock has reached is skipped instead, so it stays in the task's history.
+ */
+export async function sendToBacklog(
+  db: SupabaseClient,
+  userId: string,
+  input: { id: string; now?: number },
+): Promise<Result<{ deleted: boolean }>> {
+  const session = await readSession(db, userId, input.id);
+  if (!session) return { ok: true, value: { deleted: true } };
+  if (session.status !== "planned") {
+    return { ok: false, error: `This slot is ${session.status}; there is nothing to take off the grid.` };
+  }
+  if (canUnschedule(session, input.now ?? Date.now())) {
+    const r = await deleteSession(db, userId, session.id);
+    return r.ok ? { ok: true, value: { deleted: true } } : r;
+  }
+  const r = await setSessionStatus(db, userId, { id: session.id, status: "skipped" });
+  return r.ok ? { ok: true, value: { deleted: false } } : r;
+}
 
+/** Delete a slot outright. Its Google event goes with it (0026's tombstone trigger). */
+export async function deleteSession(db: SupabaseClient, userId: string, id: string): Promise<Result> {
   const { error, count } = await db
-    .from("scheduled_blocks")
+    .from("task_sessions")
     .delete({ count: "exact" })
     .eq("id", id)
     .eq("user_id", userId);
   if (error) throw error;
-  // Nothing deleted: already gone (a double tap — fine), or a block RLS keeps
-  // this caller from deleting. Either way its tasks must not be touched.
+  // Nothing deleted: already gone (a double tap — fine), or a slot RLS keeps
+  // this caller from deleting.
   if (!count) {
-    return links?.length ? { ok: false, error: "This block cannot be deleted from here." } : { ok: true };
+    const still = await readSession(db, userId, id);
+    return still ? { ok: false, error: "This slot cannot be deleted from here." } : { ok: true };
   }
-
-  const survivors = await dropAdHocTasks(
-    db,
-    userId,
-    (links ?? []).map((l) => l.task_id as string),
-  );
-  await syncTaskStatus(db, userId, survivors);
   return { ok: true };
-}
-
-/** Work a backlog task inside an existing block (or change how long, if it is there). */
-export async function attachTask(
-  db: SupabaseClient,
-  userId: string,
-  input: { scheduledBlockId: string; taskId: string; plannedMinutes: number },
-): Promise<void> {
-  const position = await nextPosition(db, userId, input.scheduledBlockId);
-  const { error } = await db.from("scheduled_block_tasks").upsert({
-    user_id: userId,
-    scheduled_block_id: input.scheduledBlockId,
-    task_id: input.taskId,
-    planned_minutes: input.plannedMinutes,
-    position,
-  });
-  if (error) throw error;
-  await syncTaskStatus(db, userId, [input.taskId]);
 }
 
 /**
- * Add a new task directly inside a block.
- *
- * This is how a block gets its second category without a trip through the
- * backlog — the block is a container, and this is what fills it.
+ * A task finished or abandoned outside the grid (backlog, editor, Claude)
+ * closes its live slot too, so the grid does not keep a planned slot for work
+ * that is over:
+ * - done: a slot already started becomes done; one still to come is deleted;
+ * - dropped: a slot already started is skipped; one still to come is deleted.
+ * Best effort through the connector, which may not touch Arthur's slots.
  */
-export async function addTaskToBlock(
+export async function closeLiveSession(
   db: SupabaseClient,
   userId: string,
-  input: { scheduledBlockId: string; categoryId: string; description: string | null; minutes: number },
-): Promise<Result> {
-  if (!input.categoryId) return { ok: false, error: "Pick a category" };
-  if (!(input.minutes > 0)) return { ok: false, error: "Give it a duration" };
-
-  // Ownership is enforced by RLS on the insert below, but reading the block
-  // first turns a silent no-op into a message.
-  const { data: block, error: blockError } = await db
-    .from("scheduled_blocks")
-    .select("id")
-    .eq("id", input.scheduledBlockId)
+  taskId: string,
+  outcome: "done" | "dropped",
+  now = Date.now(),
+): Promise<void> {
+  const { data, error } = await db
+    .from("task_sessions")
+    .select(SESSION_READ)
     .eq("user_id", userId)
-    .maybeSingle();
-  if (blockError) throw blockError;
-  if (!block) return { ok: false, error: "Block not found" };
-
-  const position = await nextPosition(db, userId, block.id);
-  await insertAdHocTasks(
-    db,
-    userId,
-    block.id,
-    [{ categoryId: input.categoryId, description: input.description, minutes: input.minutes }],
-    position,
-  );
-  return { ok: true };
-}
-
-/** Change how much of a block a task claims — and so what the week counts. */
-export async function setBlockTaskMinutes(
-  db: SupabaseClient,
-  userId: string,
-  input: { scheduledBlockId: string; taskId: string; plannedMinutes: number },
-): Promise<Result> {
-  if (!(input.plannedMinutes > 0)) return { ok: false, error: "Give it a duration" };
-  const { error } = await db
-    .from("scheduled_block_tasks")
-    .update({ planned_minutes: input.plannedMinutes })
-    .eq("user_id", userId)
-    .eq("scheduled_block_id", input.scheduledBlockId)
-    .eq("task_id", input.taskId);
+    .eq("task_id", taskId)
+    .eq("status", "planned");
   if (error) throw error;
-  return { ok: true };
-}
-
-/** Take a task out of a block: a backlog task goes back to the rail, an ad-hoc one goes away. */
-export async function detachTask(
-  db: SupabaseClient,
-  userId: string,
-  input: { scheduledBlockId: string; taskId: string },
-): Promise<Result> {
-  const { error, count } = await db
-    .from("scheduled_block_tasks")
-    .delete({ count: "exact" })
-    .eq("user_id", userId)
-    .eq("scheduled_block_id", input.scheduledBlockId)
-    .eq("task_id", input.taskId);
-  if (error) throw error;
-  // Nothing removed: already out, or not this caller's block to change. The
-  // task stays as it is either way.
-  if (!count) return { ok: true };
-
-  const survivors = await dropAdHocTasks(db, userId, [input.taskId]);
-  await syncTaskStatus(db, userId, survivors);
-  return { ok: true };
+  for (const s of (data ?? []) as SessionRow[]) {
+    if (canUnschedule(s, now)) {
+      await db.from("task_sessions").delete().eq("user_id", userId).eq("id", s.id);
+    } else {
+      await db
+        .from("task_sessions")
+        .update({ status: outcome === "done" ? "done" : "skipped" })
+        .eq("user_id", userId)
+        .eq("id", s.id);
+    }
+  }
 }

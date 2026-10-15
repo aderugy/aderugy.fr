@@ -1,13 +1,13 @@
 /**
- * What a block reminder says. Pure, like `push-events.ts`, whose title it
- * reuses so the lock screen and the Google event name a block the same way.
+ * What a reminder says. Pure, like `push-events.ts`, whose title it reuses so
+ * the lock screen and the Google event name a slot the same way.
  */
-import { titleFor, type PushBlock } from "./push-events.ts";
+import { titleFor, type PushSession } from "./push-events.ts";
 
 export type ReminderPayload = {
   title: string;
   body: string;
-  /** Replaces an earlier notification for the same block (a moved block). */
+  /** Replaces an earlier notification for the same slot (a moved slot). */
   tag: string;
   /** Opened on click, relative to the site. */
   url: string;
@@ -32,32 +32,31 @@ function until(startsAt: string, now: Date): string {
 }
 
 export function reminderFor(
-  block: PushBlock,
+  session: PushSession,
   { timeZone, now = new Date() }: { timeZone: string; now?: Date },
 ): ReminderPayload {
-  const when = `${clock(block.starts_at, timeZone)}–${clock(block.ends_at, timeZone)} · ${until(block.starts_at, now)}`;
+  const when = `${clock(session.starts_at, timeZone)}–${clock(session.ends_at, timeZone)} · ${until(session.starts_at, now)}`;
 
-  // The title already names the template or the categories; the tasks' own
-  // descriptions are what tells two "poker" blocks apart. Three lines at most:
-  // a lock screen shows little more.
-  const tasks = [...block.tasks]
-    .sort((a, b) => a.position - b.position)
-    .map((t) => t.description?.trim())
-    .filter(Boolean) as string[];
-  const shown = tasks.slice(0, 3).map((t) => `• ${t}`);
-  if (tasks.length > 3) shown.push(`+${tasks.length - 3} more`);
+  // The title names the category and the task. The first lines of the notes
+  // say what to start with — three at most: a lock screen shows little more.
+  const notes = (session.notes ?? "")
+    .split("\n")
+    .map((l) => l.replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/, "").replace(/^#+\s*/, "").trim())
+    .filter(Boolean);
+  const shown = notes.slice(0, 3).map((t) => `• ${t}`);
+  if (notes.length > 3) shown.push(`+${notes.length - 3} more`);
 
   return {
-    title: titleFor(block),
+    title: titleFor(session),
     body: [when, ...shown].join("\n"),
-    tag: `block-${block.id}`,
+    tag: `session-${session.id}`,
     url: "/agenda",
   };
 }
 
 export const TEST_REMINDER: ReminderPayload = {
   title: "Notifications are on",
-  body: "Blocks on your agenda will remind you here before they start.",
+  body: "Tasks on your agenda will remind you here before they start.",
   tag: "test",
   url: "/agenda/settings",
 };

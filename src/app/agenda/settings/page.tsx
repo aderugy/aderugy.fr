@@ -57,8 +57,8 @@ export default async function SettingsPage({
       .eq("archived", false)
       .order("position"),
     supabase
-      .from("push_status")
-      .select("pending, failed, synced, last_block_error")
+      .from("session_push_status")
+      .select("pending, failed, synced, last_error")
       .eq("user_id", user.id)
       .maybeSingle(),
     // Errors when the OAuth server is not enabled on the project — the section

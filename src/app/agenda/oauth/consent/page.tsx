@@ -104,11 +104,12 @@ export default async function ConsentPage({
           <p className="font-medium">It will be able to</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
             <li>read, add, edit, complete and delete tasks in your backlog;</li>
+            <li>read your week and plan tasks on it — and move or skip only the slots it planned;</li>
             <li>read your category tree.</li>
           </ul>
           <p className="mt-3 font-medium">It will not be able to</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
-            <li>change categories, your week, blocks or objectives;</li>
+            <li>change categories, your week&apos;s theme or objectives, or the slots you planned yourself;</li>
             <li>reach Google Calendar, poker or maths data.</li>
           </ul>
           <p className="mt-3 text-xs text-muted">

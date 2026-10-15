@@ -13,12 +13,19 @@ export type Filters = {
   categoryId: string | null;
   priorities: number[];
   deadline: DeadlineFilter;
+  /** Only tasks that were planned before and skipped at least once. */
+  skippedBefore: boolean;
 };
 
-export const NO_FILTERS: Filters = { categoryId: null, priorities: [], deadline: "all" };
+export const NO_FILTERS: Filters = { categoryId: null, priorities: [], deadline: "all", skippedBefore: false };
 
 export function activeFilterCount(f: Filters): number {
-  return (f.categoryId ? 1 : 0) + (f.priorities.length ? 1 : 0) + (f.deadline !== "all" ? 1 : 0);
+  return (
+    (f.categoryId ? 1 : 0) +
+    (f.priorities.length ? 1 : 0) +
+    (f.deadline !== "all" ? 1 : 0) +
+    (f.skippedBefore ? 1 : 0)
+  );
 }
 
 /**
@@ -125,6 +132,19 @@ export function FilterPanel({
               {DEADLINE_FILTER_LABELS[key]}
             </Chip>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <Heading>History</Heading>
+        <div className="flex flex-wrap gap-1.5">
+          <Chip
+            active={filters.skippedBefore}
+            onClick={() => onChange({ ...filters, skippedBefore: !filters.skippedBefore })}
+            title="Tasks that were on the grid before and got skipped"
+          >
+            ↺ Skipped before
+          </Chip>
         </div>
       </section>
     </div>

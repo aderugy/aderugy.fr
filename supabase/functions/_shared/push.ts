@@ -9,13 +9,13 @@ import {
   deletePushEvent,
   putPushEvent,
 } from "./google.ts";
-import { eventFor, type PushBlock } from "./push-events.ts";
+import { eventFor, type PushSession } from "./push-events.ts";
 import { readRefreshToken } from "./db.ts";
 
 export const WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
 
 const CALENDAR_NAME = "Agenda";
-/** A block that has failed this many times waits for an edit to try again. */
+/** A session that has failed this many times waits for an edit to try again. */
 const MAX_ATTEMPTS = 8;
 const BATCH = 100;
 /** Keeps one invocation well inside the Edge Function wall-clock limit. */
@@ -59,12 +59,12 @@ export async function writeAccessToken(admin: SupabaseClient, account: Account) 
 }
 
 /**
- * Forget everything that was pushed: every block goes back in the queue with no
- * event id. Used when the calendar holding those events is gone.
+ * Forget everything that was pushed: every session goes back in the queue with
+ * no event id. Used when the calendar holding those events is gone.
  */
 async function resetPushState(admin: SupabaseClient, userId: string) {
   const { error } = await admin
-    .from("scheduled_blocks")
+    .from("task_sessions")
     .update({
       sync_state: "pending",
       google_event_id: null,
@@ -83,7 +83,7 @@ async function resetPushState(admin: SupabaseClient, userId: string) {
  *
  * Also drops any `calendar_sources` row for it. A reconnect lists every
  * calendar Google knows, this one included, and mirroring it back into the
- * planner would draw every block twice.
+ * planner would draw every session twice.
  */
 async function createCalendar(admin: SupabaseClient, userId: string, accessToken: string) {
   const timeZone = Deno.env.get("APP_TIMEZONE") ?? "Europe/Paris";
@@ -120,16 +120,10 @@ type Row = {
   id: string;
   starts_at: string;
   ends_at: string;
-  description: string | null;
   status: string;
   updated_at: string;
   push_attempts: number;
-  source: { name: string } | null;
-  scheduled_block_tasks: {
-    planned_minutes: number;
-    position: number;
-    tasks: { description: string | null; category_id: string | null } | null;
-  }[];
+  tasks: { description: string | null; notes: string | null; category_id: string | null } | null;
 };
 
 function isRateLimit(error: unknown) {
@@ -144,7 +138,7 @@ function isRateLimit(error: unknown) {
  * Bring the Agenda calendar in line with the plan, for one user.
  *
  * Idempotent and safe to run concurrently: the lease makes a second caller skip,
- * and a block is marked synced only if it has not changed since it was read —
+ * and a session is marked synced only if it has not changed since it was read —
  * an edit made mid-push leaves it pending for the next run instead of being
  * recorded as done with the old times.
  */
@@ -222,10 +216,8 @@ export async function pushUser(admin: SupabaseClient, userId: string): Promise<P
 
     while (!rateLimited && operations < MAX_OPERATIONS) {
       const { data, error } = await admin
-        .from("scheduled_blocks")
-        .select(
-          "id, starts_at, ends_at, description, status, updated_at, push_attempts, source:blocks(name), scheduled_block_tasks(planned_minutes, position, tasks(description, category_id))",
-        )
+        .from("task_sessions")
+        .select("id, starts_at, ends_at, status, updated_at, push_attempts, tasks(description, notes, category_id)")
         .eq("user_id", userId)
         .or(`sync_state.eq.pending,and(sync_state.eq.failed,push_attempts.lt.${MAX_ATTEMPTS})`)
         // What is coming up matters more than a backfill of past weeks.
@@ -240,25 +232,18 @@ export async function pushUser(admin: SupabaseClient, userId: string): Promise<P
         if (operations >= MAX_OPERATIONS) break;
         operations++;
 
-        const block: PushBlock = {
+        const session: PushSession = {
           id: row.id,
           starts_at: row.starts_at,
           ends_at: row.ends_at,
-          description: row.description,
           status: row.status,
-          templateName: row.source?.name ?? null,
-          tasks: row.scheduled_block_tasks.map((l) => ({
-            categoryName: l.tasks?.category_id
-              ? (categoryName.get(l.tasks.category_id) ?? null)
-              : null,
-            description: l.tasks?.description ?? null,
-            minutes: l.planned_minutes,
-            position: l.position,
-          })),
+          categoryName: row.tasks?.category_id ? (categoryName.get(row.tasks.category_id) ?? null) : null,
+          description: row.tasks?.description ?? null,
+          notes: row.tasks?.notes ?? null,
         };
 
         try {
-          const event = eventFor(block, appUrl);
+          const event = eventFor(session, appUrl);
           try {
             await putPushEvent(accessToken, calendarId, event);
           } catch (error) {
@@ -270,7 +255,7 @@ export async function pushUser(admin: SupabaseClient, userId: string): Promise<P
           }
 
           await admin
-            .from("scheduled_blocks")
+            .from("task_sessions")
             .update({
               google_event_id: event.id,
               google_synced_at: new Date().toISOString(),
@@ -283,7 +268,7 @@ export async function pushUser(admin: SupabaseClient, userId: string): Promise<P
           upserted++;
         } catch (error) {
           if (isRateLimit(error)) {
-            // Not this block's fault. Leave it pending; the cron resumes.
+            // Not this session's fault. Leave it pending; the cron resumes.
             rateLimited = true;
             break;
           }
@@ -292,7 +277,7 @@ export async function pushUser(admin: SupabaseClient, userId: string): Promise<P
           failed++;
           givenUp.add(row.id);
           await admin
-            .from("scheduled_blocks")
+            .from("task_sessions")
             .update({
               sync_state: "failed",
               push_attempts: row.push_attempts + 1,
@@ -345,7 +330,7 @@ export async function enablePush(admin: SupabaseClient, userId: string) {
   const account = await loadAccount(admin, userId);
   if (account.disconnected_at) throw new Error("Connect Google Calendar first");
   // Fails early, with the message that says what to do, rather than on the
-  // first block.
+  // first session.
   await writeAccessToken(admin, account);
 
   const { error } = await admin

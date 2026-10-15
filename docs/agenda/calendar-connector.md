@@ -1,18 +1,21 @@
 # The week grid in the Claude connector
 
-The connector (`/api/mcp`) covered the backlog only; since migration `0019` it
-also reads the whole week grid and can plan blocks. Tools in
+The connector (`/api/mcp`) reads the whole week grid and can plan tasks on it
+(since migration `0019`; on slots rather than blocks since `0026`). Tools in
 `src/server/mcp/calendar-tools.ts`:
 
 | Tool | What it does |
 |---|---|
-| `get_week` | A week, Monday→Sunday in `APP_TIMEZONE`: blocks with their tasks (category, minutes, who planned them), calendar events and all-day items, theme, guidelines, objectives with progress, minutes per category. |
-| `find_free_slots` | Gaps between blocks (not skipped) and busy calendar events, inside given hours, up to 14 days. |
-| `list_block_templates` | The template library. |
-| `create_block` | A block holding backlog tasks and/or new one-off tasks. Length from `end`, `minutes`, or the sum of its tasks. Warns about overlaps and the grid's 06:00–23:00. |
-| `place_template` | A template at a time, as the planner does it. |
-| `update_block` / `delete_block` | Move, resize, relabel, mark done/skipped, delete — **Claude's own blocks only**. |
-| `add_to_block` / `remove_from_block` | Fill or empty Claude's own blocks. |
+| `get_week` | A week, Monday→Sunday in `APP_TIMEZONE`: every slot (task, category, status — missed included — and who planned it), calendar events and all-day items, theme, guidelines, objectives with progress, minutes per category. |
+| `find_free_slots` | Gaps between slots (not skipped) and busy calendar events, inside given hours, up to 14 days. |
+| `schedule_task` | A slot for a backlog task (`task_id`) or a new task (`new_task`). Length from `end`, `minutes`, or the task's estimate. Refused when the task already has a planned slot. Warns about overlaps and the grid's 06:00–23:00. |
+| `move_session` | Move or resize — **Claude's own slots only**. A slot already started is rescheduled instead: it stays as skipped and a new one is planned. |
+| `skip_session` | Skip — the slot stays as history, the task goes back to the backlog. Claude's own slots only. |
+| `unschedule_session` | Back to the backlog: deleted if not started, skipped otherwise. Claude's own slots only. |
+
+The backlog tools (`src/server/mcp/backlog-tools.ts`) show each task's planned
+slot and how often it was skipped; marking a task done or dropped closes its
+planned slot when Claude planned it.
 
 Times go in and out as local wall time (`"2026-10-09T18:00"`), converted with
 `src/lib/agenda/zoned.ts` — the planner's `lib/time.ts` uses the runtime's zone,
@@ -20,22 +23,21 @@ which is UTC on Vercel.
 
 ## Who may change what
 
-`scheduled_blocks.created_by` (`app` | `claude`) is set from the token on insert
-and never changes. Enforced by RLS (0019), checked first by the tools so the
-answer is a sentence:
+`task_sessions.created_by` (`app` | `claude`) is forced to `claude` for a
+connector token on insert and never changes after. Enforced by RLS (0026),
+checked first by the tools so the answer is a sentence:
 
 | | Connected app (Claude) |
 |---|---|
-| `scheduled_blocks` | read all; insert; update/delete only `created_by = 'claude'` |
-| `scheduled_block_tasks` | read all; write only inside Claude's blocks |
+| `task_sessions` | read all; insert; update/delete only `created_by = 'claude'`; `reschedule_session` on Arthur's slot raises 42501 |
 | `weeks` | read; insert a bare row (no theme/guidelines); no update/delete |
-| `objectives`, `blocks`, `block_items`, `calendar_sources`, `external_events`, `hidden_external_events` | read only |
+| `objectives`, `calendar_sources`, `external_events`, `hidden_external_events` | read only |
 | `google_*` | nothing |
 
-For everyone, a block must sit in one of the caller's weeks and a link must join
-the caller's block to the caller's task.
+For everyone, a slot must sit in one of the caller's weeks and point at the
+caller's task.
 
-Claude's blocks are pushed to Google like Arthur's: the triggers of 0011 mark
+Claude's slots are pushed to Google like Arthur's: the triggers of 0026 mark
 them pending and the cron sweep pushes them within a minute (the push function
 does not accept connector tokens, so there is no immediate nudge).
 
@@ -53,9 +55,11 @@ listed in the settings, each with "Show again".
 
 ## Shared code
 
-The grid's writes moved from `src/server/actions/schedule.ts` into
-`src/server/agenda/schedule.ts`, taking the client to act through; the server
-actions are thin wrappers, the tools call the same functions. A delete or
-detach that RLS turned into a no-op never touches the block's tasks.
+The grid's writes live in `src/server/agenda/schedule.ts`, taking the client to
+act through; the server actions (`src/server/actions/schedule.ts`) are thin
+wrappers, the tools call the same functions. The rules about time — missed,
+when a move becomes a reschedule, when a slot may be deleted — are pure
+functions in `src/lib/agenda/sessions.ts`.
 
-Tests: `supabase/tests/calendar_oauth_test.sql`, `src/lib/agenda/zoned.test.ts`.
+Tests: `supabase/tests/task_sessions_test.sql`, `src/lib/agenda/sessions.test.ts`,
+`src/lib/agenda/zoned.test.ts`.

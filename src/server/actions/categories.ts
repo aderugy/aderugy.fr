@@ -91,7 +91,7 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
     const inUse = [
       usage.tasks > 0 && `${usage.tasks} task${usage.tasks > 1 ? "s" : ""}`,
       usage.scheduled > 0 &&
-        `${usage.scheduled} scheduled block${usage.scheduled > 1 ? "s" : ""}`,
+        `${usage.scheduled} slot${usage.scheduled > 1 ? "s" : ""} on the grid`,
       usage.templates > 0 &&
         `${usage.templates} template${usage.templates > 1 ? "s" : ""}`,
     ].filter(Boolean) as string[];

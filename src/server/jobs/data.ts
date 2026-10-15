@@ -33,7 +33,7 @@ import {
  * should show as a sentence.
  *
  * Interviews' time and their place on the agenda live in ./agenda.ts: that
- * part writes scheduled blocks, which only the browser may do.
+ * part writes the agenda, which only the browser may do.
  */
 
 export const APPLICATION_COLUMNS =
@@ -43,7 +43,7 @@ const LIST_COLUMNS =
 export const COMPANY_COLUMNS = "id, name, website, notes, created_at, updated_at";
 export const TAG_COLUMNS = "id, name, color, position";
 export const INTERVIEW_COLUMNS =
-  "id, application_id, scheduled_block_id, kind, starts_at, ends_at, with_whom, location, prep_notes, debrief_notes, created_at, updated_at";
+  "id, application_id, session_id, kind, starts_at, ends_at, with_whom, location, prep_notes, debrief_notes, created_at, updated_at";
 
 /** Run a validation that throws a sentence; turn it into a Result. */
 function attempt<T>(fn: () => T): { ok: true; value: T } | { ok: false; error: string } {
@@ -706,7 +706,7 @@ export async function getApplicationDetail(
       .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
     interviews: [...interviews].sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at)),
     events: [...application_events].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)),
-    // The interview's own block task is shown as the interview, not as a task.
+    // The interview's own task is shown as the interview, not as a task.
     tasks: ((tasksRes.data ?? []) as LinkedTask[]).filter((t) => !t.ad_hoc),
   };
 }
@@ -734,7 +734,7 @@ export type InterviewPatch = {
 
 /**
  * The interview's own fields. Its time is not here: moving an interview moves
- * its block, which is ./agenda.ts. A connected app may only send `prepNotes`
+ * its slot, which is ./agenda.ts. A connected app may only send `prepNotes`
  * (the database refuses anything else from it — migration 0017).
  */
 export async function patchInterview(

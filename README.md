@@ -4,9 +4,10 @@ Personal website and utility tools. Next.js (App Router) · Tailwind · Supabase
 
 Six tools live here so far:
 
-- **`/agenda`** — a weekly planner: typed tasks in a backlog, reusable blocks,
-  and a week grid you assemble by hand. Claude can read the week and plan blocks of its own
-  through the connector ([docs/agenda/calendar-connector.md](docs/agenda/calendar-connector.md)).
+- **`/agenda`** — a weekly planner: typed tasks in a backlog, placed by hand
+  on a week grid, with every attempt kept (done, skipped, rescheduled). Claude can
+  read the week and plan slots of its own through the connector
+  ([docs/agenda/calendar-connector.md](docs/agenda/calendar-connector.md)).
 - **`/poker`** — pot odds, drawing equity and the fold equity a semi-bluff
   needs, with the site's rake taken off the pot. No account and nothing stored:
   the whole model is pure functions in `src/lib/poker.ts`, and the page is
@@ -183,34 +184,34 @@ anyway.
 All-day events go to a slim strip above the grid rather than filling a column —
 they mark a day, they do not consume ten hours of it.
 
-### 6. Pushing your blocks to Google
+### 6. Pushing your plan to Google
 
-**Settings → Push blocks to Google → Start pushing.** A connection made before
+**Settings → Push your plan to Google → Start pushing.** A connection made before
 this feature existed is read-only, so the button first says **Allow in Google**
 and goes through consent once more.
 
 - The app creates an **Agenda** calendar in your Google account and writes every
-  block there: create, move, resize, rename, mark done, delete. It never writes
-  anywhere else — the scope does not allow it.
+  slot there: create, move, resize, rename, mark done or skipped, delete. It
+  never writes anywhere else — the scope does not allow it.
 - **One-way.** The plan is the source of truth; an edit made to an Agenda event
-  in Google is overwritten by the next push of that block. The Agenda calendar
-  is never mirrored back into the planner (that would draw every block twice).
-- The title is what the grid shows — template name, else the block's
-  description, else its task categories (`grind · reading`) — with `✓` for done
-  and `✕` for skipped. The event body lists the tasks and their minutes.
-  Skipped blocks are marked *free*, so they do not make you look busy.
-- **Stop pushing** deletes the Agenda calendar from Google. Your blocks here are
+  in Google is overwritten by the next push of that slot. The Agenda calendar
+  is never mirrored back into the planner (that would draw every slot twice).
+- The title is what the grid shows — the category leaf and the task's
+  description (`grind — Winamax NL50`) — with `✓` for done and `✕` for skipped.
+  The event body is the task's notes. Skipped slots stay in Google as history,
+  marked *free* so they do not make you look busy.
+- **Stop pushing** deletes the Agenda calendar from Google. Your plan here is
   untouched; starting again recreates it from scratch. Disconnecting Google
   deletes it too.
 
-How it stays current: triggers mark a block `pending` on any change that
-affects its event — including edits to its tasks, a category rename or a
-template rename — so no write path can forget. Every schedule action then nudges
-`google-push` after its response, so a move on the grid reaches your phone in
-seconds; a `pg_cron` job sweeps once a minute for anything that missed, and
-retries failures up to 8 times. Deleted blocks leave a tombstone so the event
-can still be removed after the row is gone. Event ids are derived from block
-ids, so a retried insert can never create a duplicate.
+How it stays current: triggers mark a slot `pending` on any change that affects
+its event — including an edit to its task or a category rename — so no write
+path can forget. Every schedule action then nudges `google-push` after its
+response, so a move on the grid reaches your phone in seconds; a `pg_cron` job
+sweeps once a minute for anything that missed, and retries failures up to 8
+times. Deleted slots leave a tombstone so the event can still be removed after
+the row is gone. Event ids are derived from slot ids, so a retried insert can
+never create a duplicate.
 
 Every table is protected by row-level security (`user_id = auth.uid()`), so the
 database is the security boundary, not the UI. The Next app holds no
@@ -218,7 +219,7 @@ service-role key and no Google client secret: the only elevated credential in
 the system lives inside Supabase Edge Functions, which is also the only place
 that talks to Google.
 
-## Installing the app and block reminders
+## Installing the app and reminders
 
 The site is installable (`src/app/manifest.ts`): Chrome or Edge on a computer
 (install icon in the address bar), Android, and iPhone via Share → Add to Home
@@ -228,14 +229,14 @@ Screen. It opens on `/agenda`; the other tools are shortcuts on the icon.
 so a deploy is never hidden behind a stale copy.
 
 Reminders: each device turns them on from **/agenda → Settings →
-Notifications**, and then gets one notification per planned block, a chosen
+Notifications**, and then gets one notification per planned slot, a chosen
 number of minutes before it starts (10 by default). On iPhone this only works
 from the installed app, not from a Safari tab.
 
 How it works: devices are rows in `push_subscriptions`; the `web-push` Edge
 Function, swept every minute by pg_cron, sends what
-`blocks_due_for_reminder()` returns and records it in `block_reminders_sent`,
-keyed on the start time, so moving a block makes it due again. Encryption and
+`sessions_due_for_reminder()` returns and records it in `session_reminders_sent`,
+keyed on the start time, so moving a slot makes it due again. Encryption and
 VAPID signing are in `supabase/functions/_shared/webpush.ts`, with no
 dependency, tested against RFC 8291's own vector.
 
@@ -394,19 +395,33 @@ used straight from MDX (`<Convergence />`) once declared in
 | Concept | Meaning |
 |---|---|
 | **Category** | A node in your own tree describing the *type* of work — `poker > grind`, `studies > SCIA > NLP`. Colors cascade to children. |
-| **Task** | One thing to do: a category, an estimate, a priority, an optional deadline. Sits in the backlog until placed. |
-| **Block** | A reusable template. No steps → a *shape* (`Deep work, 2h`). With steps → a *bundle* (`Morning routine`), sized to the sum of its parts. |
-| **Scheduled block** | A concrete placement on the week grid. Tasks attach to it many-to-many, so one task can span several sessions. |
+| **Task** | One thing to do: a category, an estimate, a priority, an optional deadline, Markdown notes. Sits in the backlog until placed. |
+| **Slot** (`task_sessions`) | A task placed on the grid: one task, one span of time, drawn as the task. Status *planned*, *done* or *skipped*; a planned slot whose time is over is *missed* (computed, never stored). A task has at most one planned slot; its skipped and done slots are its history. |
 | **Week** | Monday date, plus a theme, guidelines and objectives. |
+
+A task's status follows its slots (trigger, migration 0026): *scheduled* while
+it has a planned slot, *backlog* otherwise, *done* when a slot is done.
+
+| On the grid | Slot | Task |
+|---|---|---|
+| Move a slot that has not started | new time | — |
+| Move a slot already started, or **Reschedule** | old one → skipped, a new one planned | stays scheduled |
+| **Skip → backlog** | → skipped, stays on the grid | back to the backlog |
+| **Back to backlog** (not started) | deleted | back to the backlog |
+| **Done** | → done | done |
+
+Blocks and templates were removed in October 2026; `0026` carried every block
+over as slots, and `0027` drops the old tables.
 
 ## Using it
 
-- **Backlog** — build the category tree, then add tasks against it.
-- **Blocks** — define the recurring shapes of your week.
-- **Week** — drag tasks or blocks from the left rail onto the grid. Drag a
-  placed block to move it, pull its bottom edge to resize, double-click empty
-  space for an ad-hoc block, click one to open its detail panel. Day totals turn
-  red past ten hours.
+- **Backlog** — build the category tree, then add tasks against it. Slots whose
+  time is over and that were not done wait in **Past, not done**: mark them done
+  or send them back to the backlog. A task skipped before carries a badge.
+- **Week** — drag tasks from the left rail onto the grid, or draw a range and
+  create a task there or pick one from the backlog. Drag a slot to move it, pull
+  its bottom edge to resize, click one to open it: done, skip, reschedule, its
+  notes and its history. Day totals turn red past ten hours.
 
 Everything snaps to 15 minutes between 06:00 and 23:00 (`src/lib/time.ts`).
 
@@ -417,6 +432,6 @@ Everything snaps to 15 minutes between 06:00 and 23:00 (`src/lib/time.ts`).
 - Times are stored as `timestamptz` and rendered in the browser's local zone.
   The default week is resolved with `NEXT_PUBLIC_APP_TIMEZONE` so the server
   (UTC) and the browser agree on which Monday to open.
-- Google Calendar sync is not built yet; `scheduled_blocks` already carries the
-  `google_event_id` / `sync_state` columns so adding it is a feature, not a
-  migration of live planning data.
+- Slots, not tasks, carry the Google sync columns (`google_event_id`,
+  `sync_state`): each attempt is its own event, so a skipped one can stay in
+  Google as history.

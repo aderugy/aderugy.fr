@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
  * Tailwind's breakpoints, mirrored here because the layout has to branch in
  * JavaScript as well as in CSS. The grid cannot be made to show one day at a
  * time with a media query alone: how many columns exist is a render decision,
- * and the pointer maths that places a block reads from the same number.
+ * and the pointer maths that places a slot reads from the same number.
  *
  * Keep in step with the `md:` / `xl:` prefixes used in the agenda components.
  */

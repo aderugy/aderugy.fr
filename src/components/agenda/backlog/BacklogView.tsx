@@ -20,6 +20,7 @@ import {
 } from "@/lib/agenda/ranking";
 import { fmtDuration } from "@/lib/time";
 import { deleteTask, updateTask } from "@/server/actions/tasks";
+import { setSlotStatus, slotToBacklog } from "@/server/actions/schedule";
 import { Sheet } from "@/components/ui/Sheet";
 import { CategoryTree } from "../CategoryTree";
 import { QuickAdd } from "./QuickAdd";
@@ -33,7 +34,7 @@ import {
 import { PRIORITY_STYLE, type BacklogTask } from "./shared";
 
 type GroupBy = "none" | "category";
-type SectionKey = "backlog" | "scheduled";
+type SectionKey = "backlog" | "past" | "scheduled";
 
 type ViewPrefs = {
   sort: SortKey;
@@ -70,7 +71,8 @@ function loadPrefs(): ViewPrefs {
 
 /**
  * The backlog: what is waiting to be planned, and — apart, never mixed in —
- * what is already on the grid. Ranked by urgency (priority, lifted by a
+ * what is already on the grid, with the slots whose time is over and that
+ * still need a verdict (done, or back to the backlog) in a group of their own. Ranked by urgency (priority, lifted by a
  * close deadline), filterable from the side column or the Filters sheet, and
  * edited by tapping a row.
  */
@@ -181,6 +183,7 @@ export function BacklogView({
       if (subtree && !subtree.has(t.category_id)) return false;
       if (filters.priorities.length && !filters.priorities.includes(t.priority)) return false;
       if (!matchesDeadline(t.deadline, filters.deadline, today)) return false;
+      if (filters.skippedBefore && !(t.skipped_count ?? 0)) return false;
       if (terms.length) {
         const haystack = [t.description, t.notes, byId.get(t.category_id)?.path]
           .filter(Boolean)
@@ -196,11 +199,20 @@ export function BacklogView({
     () => filtered.filter((t) => t.status === "backlog").sort(comparator(prefs.sort, today)),
     [filtered, prefs.sort, today],
   );
+  // Slots whose time is over and that were neither done nor skipped: each
+  // needs a verdict, so they come before what is still to happen.
+  const past = useMemo(
+    () =>
+      filtered
+        .filter((t) => t.status === "scheduled" && t.missed)
+        .sort((a, b) => Date.parse(a.scheduled_at ?? "") - Date.parse(b.scheduled_at ?? "")),
+    [filtered],
+  );
   // What is on the grid reads best in the order it will happen.
   const scheduled = useMemo(
     () =>
       filtered
-        .filter((t) => t.status === "scheduled")
+        .filter((t) => t.status === "scheduled" && !t.missed)
         .sort(
           (a, b) =>
             (a.scheduled_at ? Date.parse(a.scheduled_at) : Infinity) -
@@ -224,6 +236,11 @@ export function BacklogView({
       return next;
     });
 
+  /**
+   * Done closes the task's slot too: one already started is marked done, one
+   * still to come is taken off the grid (server/agenda/schedule.ts). Undo
+   * reopens the slot when it is still there, and the task with it.
+   */
   const markDone = (task: BacklogTask) => {
     const previous: TaskStatus = task.status;
     hide(task.id, true);
@@ -238,12 +255,29 @@ export function BacklogView({
         text: `Done · ${task.description || byId.get(task.category_id)?.name || "task"}`,
         undo: () => {
           startTransition(async () => {
-            const back = await updateTask({ id: task.id, status: previous });
+            let back = task.session_id
+              ? await setSlotStatus({ id: task.session_id, status: "planned" })
+              : await updateTask({ id: task.id, status: previous });
+            // The slot was still to come, so it was deleted: the task waits in
+            // the backlog to be planned again.
+            if (!back.ok && task.session_id) back = await updateTask({ id: task.id, status: "backlog" });
             if (back.ok) hide(task.id, false);
             else setToast({ text: back.error, tone: "error" });
           });
         },
       });
+    });
+  };
+
+  /** A past slot not done: skipped, kept as history, and the task back to plan. */
+  const toBacklog = (task: BacklogTask) => {
+    if (!task.session_id) return;
+    hide(task.id, true);
+    startTransition(async () => {
+      const result = await slotToBacklog(task.session_id!);
+      hide(task.id, false);
+      if (!result.ok) setToast({ text: result.error, tone: "error" });
+      else setToast({ text: "Back to the backlog · the missed slot stays on the grid as skipped" });
     });
   };
 
@@ -285,6 +319,7 @@ export function BacklogView({
   );
 
   const renderList = (list: BacklogTask[], section: SectionKey) => {
+    const onToBacklog = section === "past" ? toBacklog : undefined;
     if (prefs.groupBy === "none") {
       return (
         <TaskList
@@ -294,6 +329,7 @@ export function BacklogView({
           onOpen={setEditingId}
           onDone={markDone}
           onDelete={remove}
+          onToBacklog={onToBacklog}
         />
       );
     }
@@ -339,6 +375,7 @@ export function BacklogView({
                   onOpen={setEditingId}
                   onDone={markDone}
                   onDelete={remove}
+                  onToBacklog={onToBacklog}
                 />
               )}
             </div>
@@ -432,7 +469,7 @@ export function BacklogView({
             ))}
           </div>
 
-          {(filters.priorities.length > 0 || filters.deadline !== "all") && (
+          {(filters.priorities.length > 0 || filters.deadline !== "all" || filters.skippedBefore) && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs lg:hidden">
               {filters.priorities.length > 0 && (
                 <Chip active onClick={() => setFilters({ ...filters, priorities: [] })}>
@@ -442,6 +479,11 @@ export function BacklogView({
               {filters.deadline !== "all" && (
                 <Chip active onClick={() => setFilters({ ...filters, deadline: "all" })}>
                   {DEADLINE_FILTER_LABELS[filters.deadline]} ✕
+                </Chip>
+              )}
+              {filters.skippedBefore && (
+                <Chip active onClick={() => setFilters({ ...filters, skippedBefore: false })}>
+                  ↺ Skipped before ✕
                 </Chip>
               )}
             </div>
@@ -469,6 +511,19 @@ export function BacklogView({
           >
             {renderList(backlog, "backlog")}
           </Section>
+
+          {past.length > 0 && (
+            <Section
+              title="Past, not done"
+              subtitle="the slot is over — done, or back to the backlog?"
+              tasks={past}
+              folded={isFolded("section:past")}
+              onToggle={() => toggleFold("section:past")}
+              empty={null}
+            >
+              {renderList(past, "past")}
+            </Section>
+          )}
 
           <Section
             title="Scheduled"
@@ -502,8 +557,8 @@ export function BacklogView({
                 onClick={() => setFiltersOpen(false)}
                 className="ml-auto rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-white"
               >
-                Show {backlog.length + scheduled.length} task
-                {backlog.length + scheduled.length === 1 ? "" : "s"}
+                Show {backlog.length + past.length + scheduled.length} task
+                {backlog.length + past.length + scheduled.length === 1 ? "" : "s"}
               </button>
             </div>
           }
@@ -662,6 +717,7 @@ function TaskList({
   onOpen,
   onDone,
   onDelete,
+  onToBacklog,
 }: {
   tasks: BacklogTask[];
   byId: Map<string, CategoryNode>;
@@ -669,6 +725,8 @@ function TaskList({
   onOpen: (id: string) => void;
   onDone: (task: BacklogTask) => void;
   onDelete: (task: BacklogTask) => void;
+  /** Only for past slots: skip it and send the task back to plan. */
+  onToBacklog?: (task: BacklogTask) => void;
 }) {
   return (
     <ul className="divide-y divide-line">
@@ -681,6 +739,7 @@ function TaskList({
           onOpen={() => onOpen(task.id)}
           onDone={() => onDone(task)}
           onDelete={() => onDelete(task)}
+          onToBacklog={onToBacklog ? () => onToBacklog(task) : undefined}
         />
       ))}
     </ul>
@@ -701,6 +760,7 @@ function TaskRow({
   onOpen,
   onDone,
   onDelete,
+  onToBacklog,
 }: {
   task: BacklogTask;
   category: CategoryNode | null;
@@ -708,6 +768,7 @@ function TaskRow({
   onOpen: () => void;
   onDone: () => void;
   onDelete: () => void;
+  onToBacklog?: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   useEffect(() => {
@@ -765,11 +826,30 @@ function TaskRow({
             </span>
           )}
           {task.status === "scheduled" && task.scheduled_label && (
-            <span className="text-accent">▦ {task.scheduled_label}</span>
+            <span className={task.missed ? "text-amber-600 dark:text-amber-500" : "text-accent"}>
+              ▦ {task.scheduled_label}
+              {task.missed ? " · missed" : ""}
+            </span>
+          )}
+          {(task.skipped_count ?? 0) > 0 && (
+            <span title="Planned before, and skipped">
+              ↺ skipped {task.skipped_count}×{task.last_skipped_label ? ` · ${task.last_skipped_label}` : ""}
+            </span>
           )}
           {task.notes && <span title="Has notes">¶</span>}
         </span>
       </button>
+
+      {onToBacklog && (
+        <button
+          type="button"
+          onClick={onToBacklog}
+          title="Not done: skip the slot (it stays on the grid as history) and plan the task again later"
+          className="mt-2 h-7 shrink-0 rounded-md border border-line px-2 text-xs text-muted hover:border-accent hover:text-foreground"
+        >
+          Back to backlog
+        </button>
+      )}
 
       <button
         type="button"

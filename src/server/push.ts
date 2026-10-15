@@ -3,9 +3,9 @@ import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Ask Supabase to push this user's pending blocks to Google, after the response.
+ * Ask Supabase to push this user's pending slots to Google, after the response.
  *
- * The action has already written the block and the database has already marked
+ * The action has already written the slot and the database has already marked
  * it pending (a trigger does that, so no write path can forget). This is only
  * the nudge that makes it show up in Google within seconds rather than at the
  * next cron minute — so it never delays the response, and a failure here costs

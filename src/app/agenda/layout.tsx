@@ -5,7 +5,6 @@ import { SignOutButton } from "@/components/agenda/SignOutButton";
 const nav = [
   { href: "/agenda", label: "Week" },
   { href: "/agenda/backlog", label: "Backlog" },
-  { href: "/agenda/blocks", label: "Blocks" },
   { href: "/agenda/settings", label: "Settings" },
 ];
 

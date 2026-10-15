@@ -2,10 +2,10 @@ import { adminClient, callerFromRequest, isServiceRole, json } from "../_shared/
 import { disablePush, enablePush, pushUser } from "../_shared/push.ts";
 
 /**
- * Writes planned blocks to the app's own "Agenda" calendar in Google.
+ * Writes planned sessions to the app's own "Agenda" calendar in Google.
  *
  * - The service-role key with `{ due: true }` ⇒ the cron sweep: every user with
- *   pending blocks or deletions to carry out.
+ *   pending sessions or deletions to carry out.
  * - A user JWT ⇒ `{ action: "enable" | "disable" }` from the settings page, or
  *   an empty body — "push mine now", fired by the app after each edit.
  */

@@ -5,7 +5,7 @@ const tools = [
   {
     href: "/agenda",
     name: "Agenda",
-    description: "Plan the week: typed tasks, reusable blocks, a timetable.",
+    description: "Plan the week: a backlog of typed tasks, placed on a timetable.",
   },
   {
     href: "/poker",

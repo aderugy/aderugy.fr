@@ -1,35 +1,29 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { adminClient, callerFromRequest, isServiceRole, json } from "../_shared/db.ts";
-import type { PushBlock } from "../_shared/push-events.ts";
+import type { PushSession } from "../_shared/push-events.ts";
 import { reminderFor, TEST_REMINDER, type ReminderPayload } from "../_shared/reminders.ts";
 import { sendPush, type VapidKeys } from "../_shared/webpush.ts";
 
 /**
  * Notifications on Arthur's devices (Web Push). Not to be confused with
- * `google-push`, which writes blocks to Google Calendar.
+ * `google-push`, which writes sessions to Google Calendar.
  *
  * - The service-role key with `{ due: true }` ⇒ the cron sweep: one reminder
- *   per planned block, `lead_minutes` before it starts, to every device.
+ *   per planned session, `lead_minutes` before it starts, to every device.
  * - A user JWT with `{ action: "test" }` ⇒ a test notification to the caller's
  *   own devices, from the settings page.
  */
 
 type Subscription = { id: string; endpoint: string; p256dh: string; auth: string };
 
-type DueRow = { scheduled_block_id: string; user_id: string; starts_at: string; ends_at: string };
+type DueRow = { session_id: string; user_id: string; starts_at: string; ends_at: string };
 
-type BlockRow = {
+type SessionRow = {
   id: string;
   starts_at: string;
   ends_at: string;
-  description: string | null;
   status: string;
-  source: { name: string } | null;
-  scheduled_block_tasks: {
-    planned_minutes: number;
-    position: number;
-    tasks: { description: string | null; category_id: string | null } | null;
-  }[];
+  tasks: { description: string | null; notes: string | null; category_id: string | null } | null;
 };
 
 function vapidKeys(): VapidKeys {
@@ -63,8 +57,8 @@ async function sendToUser(
         result = await sendPush(sub, payload, vapid, {
           ttl,
           urgency: "high",
-          // Topics are ≤ 32 base64url chars: the block id without dashes fits.
-          topic: payload.tag.replace(/^block-/, "").replaceAll("-", "").slice(0, 32),
+          // Topics are ≤ 32 base64url chars: the session id without dashes fits.
+          topic: payload.tag.replace(/^(session|block)-/, "").replaceAll("-", "").slice(0, 32),
         });
       } catch (error) {
         result = { ok: false as const, gone: false, status: 0, message: String(error) };
@@ -109,78 +103,71 @@ async function subscriptionsOf(admin: SupabaseClient, userIds: string[]) {
 }
 
 async function sweep(admin: SupabaseClient, vapid: VapidKeys) {
-  const { data: due, error } = await admin.rpc("blocks_due_for_reminder", {});
+  const { data: due, error } = await admin.rpc("sessions_due_for_reminder", {});
   if (error) throw error;
   const rows = (due ?? []) as DueRow[];
   if (rows.length === 0) return { sent: 0, results: [] };
 
-  const ids = rows.map((r) => r.scheduled_block_id);
+  const ids = rows.map((r) => r.session_id);
   const userIds = [...new Set(rows.map((r) => r.user_id))];
 
   // Claim first, so a sweep overlapping this one does not ring twice. A
   // reminder that reached no device is released below for the next minute.
-  const { error: claimError } = await admin.from("block_reminders_sent").upsert(
+  const { error: claimError } = await admin.from("session_reminders_sent").upsert(
     rows.map((r) => ({
-      scheduled_block_id: r.scheduled_block_id,
+      session_id: r.session_id,
       user_id: r.user_id,
       starts_at: r.starts_at,
       sent_at: new Date().toISOString(),
     })),
-    { onConflict: "scheduled_block_id" },
+    { onConflict: "session_id" },
   );
   if (claimError) throw claimError;
 
-  const [{ data: blocks, error: blocksError }, { data: categories }, subs] = await Promise.all([
+  const [{ data: sessions, error: sessionsError }, { data: categories }, subs] = await Promise.all([
     admin
-      .from("scheduled_blocks")
-      .select(
-        "id, starts_at, ends_at, description, status, source:blocks(name), scheduled_block_tasks(planned_minutes, position, tasks(description, category_id))",
-      )
+      .from("task_sessions")
+      .select("id, starts_at, ends_at, status, tasks(description, notes, category_id)")
       .in("id", ids),
     admin.from("categories").select("id, name").in("user_id", userIds),
     subscriptionsOf(admin, userIds),
   ]);
-  if (blocksError) throw blocksError;
+  if (sessionsError) throw sessionsError;
 
   const categoryName = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
-  const byId = new Map(((blocks ?? []) as unknown as BlockRow[]).map((b) => [b.id, b]));
+  const byId = new Map(((sessions ?? []) as unknown as SessionRow[]).map((s) => [s.id, s]));
   const timeZone = Deno.env.get("APP_TIMEZONE") ?? "Europe/Paris";
   const now = new Date();
 
   const results = [];
   for (const due of rows) {
-    const row = byId.get(due.scheduled_block_id);
+    const row = byId.get(due.session_id);
     if (!row) continue;
 
-    const block: PushBlock = {
+    const session: PushSession = {
       id: row.id,
       starts_at: row.starts_at,
       ends_at: row.ends_at,
-      description: row.description,
       status: row.status,
-      templateName: row.source?.name ?? null,
-      tasks: row.scheduled_block_tasks.map((l) => ({
-        categoryName: l.tasks?.category_id ? (categoryName.get(l.tasks.category_id) ?? null) : null,
-        description: l.tasks?.description ?? null,
-        minutes: l.planned_minutes,
-        position: l.position,
-      })),
+      categoryName: row.tasks?.category_id ? (categoryName.get(row.tasks.category_id) ?? null) : null,
+      description: row.tasks?.description ?? null,
+      notes: row.tasks?.notes ?? null,
     };
 
-    // Useless once the block has started: let the push service drop it then.
-    const ttl = Math.max(60, Math.floor((new Date(block.starts_at).getTime() - now.getTime()) / 1000));
+    // Useless once the slot has started: let the push service drop it then.
+    const ttl = Math.max(60, Math.floor((new Date(session.starts_at).getTime() - now.getTime()) / 1000));
     const outcome = await sendToUser(
       admin,
       vapid,
       subs.get(due.user_id) ?? [],
-      reminderFor(block, { timeZone, now }),
+      reminderFor(session, { timeZone, now }),
       ttl,
     );
 
     if (outcome.delivered === 0 && outcome.retryable > 0) {
-      await admin.from("block_reminders_sent").delete().eq("scheduled_block_id", block.id);
+      await admin.from("session_reminders_sent").delete().eq("session_id", session.id);
     }
-    results.push({ block: block.id, ...outcome });
+    results.push({ session: session.id, ...outcome });
   }
   return { sent: results.filter((r) => r.delivered > 0).length, results };
 }

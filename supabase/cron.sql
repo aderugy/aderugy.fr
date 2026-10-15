@@ -82,10 +82,10 @@ select cron.schedule(
         and archived_at is null $$
 );
 
--- Push planned blocks to the Agenda calendar. The app already pushes right after
+-- Push planned sessions to the Agenda calendar. The app already pushes right after
 -- each edit; this catches whatever that missed — a kick lost to a cold start, a
 -- rate limit, an edit made outside the app's actions (a rename, a SQL fix) —
--- and retries failed blocks. Once a minute, since it is what makes a move on
+-- and retries failed sessions. Once a minute, since it is what makes a move on
 -- the grid show up on your phone.
 select cron.schedule(
   'google-push-due',
@@ -95,14 +95,15 @@ select cron.schedule(
       where exists (select 1 from public.users_due_for_push()) $$
 );
 
--- Block reminders (Web Push) to every device that opted in, lead_minutes
--- before each planned block. Once a minute, checked in SQL first like the
--- Google push, so a quiet minute costs a query and no invocation.
+-- Reminders (Web Push) to every device that opted in, lead_minutes before
+-- each planned session. Once a minute, checked in SQL first like the Google
+-- push, so a quiet minute costs a query and no invocation. (The job keeps its
+-- old name so re-running this file replaces it instead of adding a second.)
 select cron.schedule(
   'block-reminders-due',
   '* * * * *',
   $$ select public.invoke_edge('web-push', '{"due": true}'::jsonb)
-      where exists (select 1 from public.blocks_due_for_reminder(1)) $$
+      where exists (select 1 from public.sessions_due_for_reminder(1)) $$
 );
 
 -- Flash cards: notes in the trash for 30 days, and images no note uses any

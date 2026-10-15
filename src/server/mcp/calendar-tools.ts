@@ -22,35 +22,31 @@ import {
   gaps,
   minutesByCategory,
   overlapping,
+  sessionLabel,
   weekDates,
-  type ViewBlock,
+  type ViewSession,
 } from "@/lib/agenda/week-view";
-import { loadCategoryPaths } from "@/server/agenda/tasks";
-import { getBlock, loadBlocks, loadEvents, loadTemplates, loadWeek } from "@/server/agenda/week";
+import { isMissed } from "@/lib/agenda/sessions";
+import { getSession, loadEvents, loadSessions, loadWeek } from "@/server/agenda/week";
 import {
-  addTaskToBlock,
-  attachTask,
-  detachTask,
-  insertAdHocTasks,
-  insertBlock,
-  moveBlock,
-  patchBlock,
-  placeTemplate,
-  removeBlock,
-  setBlockTaskMinutes,
+  createTaskAt,
+  moveSession,
+  placeTask,
+  sendToBacklog,
+  setSessionStatus,
 } from "@/server/agenda/schedule";
-import { livePlacements, syncTaskStatus } from "@/server/weeks";
+import { TASK_COLUMNS, isInterviewTask, loadCategoryPaths, type TaskRow } from "@/server/agenda/tasks";
 import { callerOf } from "./auth";
 
 /**
  * The /agenda week grid as MCP tools, on the same connector as the backlog.
  *
- * Reading covers everything Arthur sees on the grid: blocks and the tasks in
- * them, the calendars' events, the week's theme and objectives, the template
- * library. Writing is limited to the blocks Claude created — enforced by
- * migration 0019 in the database, and checked here first so the answer is a
- * sentence rather than a silent no-op. Every write goes through
- * server/agenda/schedule.ts, the same code as the planner's buttons.
+ * Reading covers everything Arthur sees on the grid: the slots (sessions) of
+ * his tasks, the calendars' events, the week's theme and objectives. Writing
+ * is limited to the slots Claude created — enforced by migration 0026 in the
+ * database, and checked here first so the answer is a sentence rather than a
+ * silent no-op. Every write goes through server/agenda/schedule.ts, the same
+ * code as the planner's buttons.
  *
  * Times are read and written in Arthur's zone (APP_TIMEZONE), never UTC.
  */
@@ -60,14 +56,14 @@ const TZ = APP_TIMEZONE;
 export const CALENDAR_INSTRUCTIONS = `Arthur's week grid (aderugy.fr/agenda), in ${TZ} time.
 
 How the data works:
-- The grid holds blocks: spans of time. A block has no category of its own; the tasks inside it do, each with its planned minutes — that is what the week's totals count. A block can come from a template ("Morning routine") or hold an interview from /jobs.
+- The grid holds slots ("sessions"): one task at one span of time. A slot is drawn as its task — category and description — and counts for its length against the task's category in the week's totals. A task has at most one planned slot.
+- Slot status: planned, done, skipped. A planned slot whose time is over is "missed" until Arthur marks it done or skips it. Skipping keeps the slot as history and sends the task back to the backlog; rescheduling skips the old slot and plans a new one, so the trace stays.
 - His Google calendars (school timetable, etc.) are mirrored in as events: read-only, and they count towards their calendar's category. Events he hid (a class he skips, a meeting he is not going to) are left out: that time is free.
 - Each week can have a theme, guidelines and objectives (read-only here).
-- Block status: planned, done, skipped. A backlog task inside a skipped block is back in the backlog.
 
-What you may do: read any week (get_week), find free time (find_free_slots), list templates, and plan blocks — create_block (backlog tasks and/or new one-off tasks), place_template. You may move, resize, edit, mark done/skipped or delete only the blocks you created ("by Claude" in get_week); Arthur's own blocks are his — propose changes to him instead. Blocks you plan are pushed to his Google "Agenda" calendar like his own.
+What you may do: read any week (get_week), find free time (find_free_slots), and plan tasks — schedule_task puts a backlog task (task_id, from list_tasks) or a new task on the grid. You may move, skip or unschedule only the slots you planned ("by Claude" in get_week); Arthur's own slots are his — propose changes to him instead. Slots you plan are pushed to his Google "Agenda" calendar like his own.
 
-Times: write them as local wall time, "YYYY-MM-DDTHH:MM" (e.g. "2026-10-09T18:00"). Look at the week before planning and do not stack blocks on top of commitments unless asked; the tools warn about overlaps.`;
+Times: write them as local wall time, "YYYY-MM-DDTHH:MM" (e.g. "2026-10-09T18:00"). Look at the week before planning and do not stack slots on top of commitments unless asked; the tools warn about overlaps.`;
 
 /* ------------------------------------------------------------- shapes */
 
@@ -80,7 +76,7 @@ const localDay = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
   .describe("A date, YYYY-MM-DD.");
-const blockId = z.string().uuid().describe("Block id, from get_week or create_block.");
+const sessionId = z.string().uuid().describe("Slot (session) id, from get_week or schedule_task.");
 const minutesIn = z.number().int().min(5).max(1440);
 const categoryRef = z.string().min(1).describe('Category path such as "poker > grind", a unique leaf name, or an id (list_categories).');
 
@@ -108,45 +104,34 @@ function resolveCategory(categories: CategoryPathRow[], ref: string): { id: stri
   return `${r.error}${hint}`;
 }
 
-function span(b: Pick<ViewBlock, "starts_at" | "ends_at">) {
+function span(b: Pick<ViewSession, "starts_at" | "ends_at">) {
   return `${fmtWhen(b.starts_at, TZ)}–${fmtClock(b.ends_at, TZ)}`;
 }
 
-function taskLine(t: ViewBlock["tasks"][number], paths: Map<string, string>): string {
-  const path = paths.get(t.category_id) ?? "?";
-  return `${path}${t.description ? ` — ${t.description}` : ""} ${fmtMinutes(t.minutes)}${t.ad_hoc ? "" : ` (backlog task ${t.task_id})`}`;
-}
-
-function blockLine(b: ViewBlock, paths: Map<string, string>): string {
-  // A block named by its template, description or interview shows that name;
-  // one named by nothing is described by its tasks alone.
-  const named = b.interview ?? b.template ?? b.description;
+function sessionLine(s: ViewSession, paths: Map<string, string>, now: number): string {
+  const state = isMissed(s, now) ? "missed" : s.status !== "planned" ? s.status : "";
   const head = [
-    `${fmtClock(b.starts_at, TZ)}–${fmtClock(b.ends_at, TZ)}`,
-    named ?? "",
-    b.status !== "planned" ? b.status : "",
-    b.created_by === "claude" ? "by Claude" : "",
+    `${fmtClock(s.starts_at, TZ)}–${fmtClock(s.ends_at, TZ)}`,
+    sessionLabel(s, paths),
+    state,
+    s.created_by === "claude" ? "by Claude" : "",
   ].filter(Boolean);
-  const inside = b.tasks.length ? `${head.length > 1 ? ": " : " · "}${b.tasks.map((t) => taskLine(t, paths)).join("; ")}` : " · (empty)";
-  const total = b.tasks.reduce((s, t) => s + t.minutes, 0);
-  const length = Math.round((Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60_000);
-  const fill = total > length ? ` [tasks ask ${fmtMinutes(total)} in ${fmtMinutes(length)}]` : total < length && b.tasks.length ? ` [${fmtMinutes(length - total)} unattributed]` : "";
-  return `- ${head.join(" · ")}${inside}${fill} (block ${b.id})`;
+  return `- ${head.join(" · ")} (slot ${s.id}, task ${s.task_id})`;
 }
 
-/** Warnings about where a block lands: overlaps, off the grid's hours, fill. */
+/** Warnings about where a slot lands: overlaps, off the grid's hours. */
 async function warningsFor(
   db: SupabaseClient,
   userId: string,
   start: Date,
   end: Date,
-  exceptBlockId?: string,
+  exceptSessionId?: string,
 ): Promise<string[]> {
   const s = { start: start.getTime(), end: end.getTime() };
   const wide = { start: s.start - 86_400_000, end: s.end + 86_400_000 };
-  const [blocks, events] = await Promise.all([loadBlocks(db, userId, wide), loadEvents(db, userId, wide)]);
+  const [sessions, events] = await Promise.all([loadSessions(db, userId, wide), loadEvents(db, userId, wide)]);
   const out: string[] = [];
-  const hits = overlapping(s, busySpans(blocks, events, exceptBlockId));
+  const hits = overlapping(s, busySpans(sessions, events, exceptSessionId));
   if (hits.length) {
     out.push(
       `Overlaps ${hits
@@ -161,26 +146,23 @@ async function warningsFor(
   return out;
 }
 
-function placedText(when: string, blockIdValue: string, inside: string[], warnings: string[]): string {
-  return [
-    `Planned ${when} (block ${blockIdValue}).`,
-    inside.length ? `Inside: ${inside.join("; ")}.` : "",
-    ...warnings.map((w) => `Warning: ${w}`),
-    "It shows on Arthur's grid now, and in his Google Agenda calendar at the next push (about a minute) if he has the push on.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+const PUSH_NOTE =
+  "It shows on Arthur's grid now, and in his Google Agenda calendar at the next push (about a minute) if he has the push on.";
+
+/** A slot Claude may change, or the sentence saying why not. */
+async function ownSession(db: SupabaseClient, userId: string, id: string, paths: Map<string, string> | null = null): Promise<ViewSession | string> {
+  const s = await getSession(db, userId, id);
+  if (!s) return `No slot with id ${id}.`;
+  if (s.created_by !== "claude") {
+    return `That slot (${sessionLabel(s, paths)}, ${span(s)}) is Arthur's: you can only change slots you planned. Suggest the change to him instead.`;
+  }
+  return s;
 }
 
-/** A block Claude may change, or the sentence saying why not. */
-async function ownBlock(db: SupabaseClient, userId: string, id: string): Promise<ViewBlock | string> {
-  const b = await getBlock(db, userId, id);
-  if (!b) return `No block with id ${id}.`;
-  if (b.created_by !== "claude") {
-    const named = b.interview ?? b.template ?? b.description;
-    return `That block (${named ? `${named}, ` : ""}${span(b)}) is Arthur's: you can only change blocks you created. Suggest the change to him instead.`;
-  }
-  return b;
+/** Start and end from a start plus an end, a length, or a default length. */
+function endFrom(start: Date, input: { end?: string; minutes?: number }, fallbackMinutes: number): Date | string {
+  if (input.end) return time(input.end, "end");
+  return new Date(start.getTime() + (input.minutes ?? fallbackMinutes) * 60_000);
 }
 
 /* -------------------------------------------------------------- tools */
@@ -191,7 +173,7 @@ export function registerCalendarTools(server: McpServer) {
     {
       title: "Read a week of the planner",
       description:
-        "One week of Arthur's grid, Monday to Sunday, in his local time: every block with the tasks inside it (category, minutes, who planned it), his calendars' events, all-day items, the week's theme, guidelines and objectives with progress, and the minutes per category. Start here before planning.",
+        "One week of Arthur's grid, Monday to Sunday, in his local time: every slot (task, category, status, who planned it), his calendars' events, all-day items, the week's theme, guidelines and objectives with progress, and the minutes per category. Start here before planning.",
       inputSchema: z.object({
         date: localDay.optional().describe("Any day of the week wanted. Default: today."),
       }),
@@ -200,18 +182,19 @@ export function registerCalendarTools(server: McpServer) {
     async ({ date }, ctx) => {
       const { db, userId } = callerOf(ctx.http?.authInfo);
       const monday = mondayOf(date ?? today());
-      const [{ span: week, blocks, events, intent }, categories] = await Promise.all([
+      const [{ span: week, sessions, events, intent }, categories] = await Promise.all([
         loadWeek(db, userId, monday, TZ),
         loadCategoryPaths(db, userId),
       ]);
       const paths = new Map(categories.map((c) => [c.id, c.path]));
       const days = weekDates(monday);
+      const now = Date.now();
 
       const out: string[] = [`# Week of ${fmtDayHeading(monday)} ${monday.slice(0, 4)} (${monday} → ${days[6]}, ${TZ})`];
       if (intent.theme) out.push(`Theme: ${intent.theme}`);
       if (intent.guidelines) out.push(`Guidelines: ${intent.guidelines}`);
 
-      const totals = minutesByCategory(blocks, events, week);
+      const totals = minutesByCategory(sessions, events, week);
       const rolled = (rootId: string, m: Map<string, number>) => {
         let sum = 0;
         for (const id of subtreeOf(categories, rootId)) sum += m.get(id) ?? 0;
@@ -239,7 +222,7 @@ export function registerCalendarTools(server: McpServer) {
           return t >= dayStart && t < dayEnd;
         };
         const items: { at: number; text: string }[] = [];
-        for (const b of blocks) if (inDay(b.starts_at)) items.push({ at: Date.parse(b.starts_at), text: blockLine(b, paths) });
+        for (const s of sessions) if (inDay(s.starts_at)) items.push({ at: Date.parse(s.starts_at), text: sessionLine(s, paths, now) });
         for (const e of events) {
           if (e.all_day) continue;
           const s = Math.max(Date.parse(e.starts_at), dayStart);
@@ -259,7 +242,7 @@ export function registerCalendarTools(server: McpServer) {
 
       const ids = new Set([...totals.planned.keys(), ...totals.external.keys()]);
       if (ids.size) {
-        out.push("", "## Minutes by category (own blocks + calendars, leaf categories)");
+        out.push("", "## Minutes by category (own slots + calendars, leaf categories; skipped slots excluded)");
         const rows = [...ids]
           .map((id) => ({
             id,
@@ -284,7 +267,7 @@ export function registerCalendarTools(server: McpServer) {
     {
       title: "Find free time",
       description:
-        "Gaps in Arthur's days where nothing is planned and no calendar event is busy, between the hours given. Blocks marked skipped and all-day events do not count as busy.",
+        "Gaps in Arthur's days where nothing is planned and no calendar event is busy, between the hours given. Skipped slots and all-day events do not count as busy.",
       inputSchema: z.object({
         from: localDay.optional().describe("First day. Default: today."),
         to: localDay.optional().describe("Last day, included. Default: same as from. At most 14 days."),
@@ -309,8 +292,8 @@ export function registerCalendarTools(server: McpServer) {
 
       const range = { start: startOfLocalDay(from, TZ).getTime(), end: startOfLocalDay(addDaysISO(to, 1), TZ).getTime() };
       const wide = { start: range.start - 86_400_000, end: range.end };
-      const [blocks, events] = await Promise.all([loadBlocks(db, userId, wide), loadEvents(db, userId, range)]);
-      const busy = busySpans(blocks, events);
+      const [sessions, events] = await Promise.all([loadSessions(db, userId, wide), loadEvents(db, userId, range)]);
+      const busy = busySpans(sessions, events);
       const now = Date.now();
 
       const out: string[] = [];
@@ -336,315 +319,173 @@ export function registerCalendarTools(server: McpServer) {
   );
 
   server.registerTool(
-    "list_block_templates",
+    "schedule_task",
     {
-      title: "List block templates",
-      description: "Arthur's reusable blocks (\"Morning routine\", \"Deep work\"): length, default category, preferred part of the day, and the steps a bundle holds. Place one with place_template.",
-      inputSchema: z.object({}),
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async (_input, ctx) => {
-      const { db, userId } = callerOf(ctx.http?.authInfo);
-      const [templates, categories] = await Promise.all([loadTemplates(db, userId), loadCategoryPaths(db, userId)]);
-      if (!templates.length) return ok("No templates.");
-      const paths = new Map(categories.map((c) => [c.id, c.path]));
-      return ok(
-        templates
-          .map((t) => {
-            const len = t.items.length ? t.items.reduce((s, i) => s + i.estimated_minutes, 0) : t.default_minutes;
-            const head = `- ${t.name} — ${fmtMinutes(len)} · ${paths.get(t.default_category_id) ?? "?"}${t.preferred_daypart ? ` · ${t.preferred_daypart}` : ""} (template ${t.id})`;
-            const steps = t.items.map((i) => `    - ${i.label} ${fmtMinutes(i.estimated_minutes)}${i.category_id ? ` (${paths.get(i.category_id) ?? "?"})` : ""}`);
-            return [head, ...steps].join("\n");
-          })
-          .join("\n"),
-      );
-    },
-  );
-
-  server.registerTool(
-    "create_block",
-    {
-      title: "Plan a block on the grid",
+      title: "Plan a task on the grid",
       description:
-        "Put a block on Arthur's week and fill it: backlog tasks (by id, from list_tasks) and/or new one-off tasks that exist only in this block. The block lasts until `end`, or `minutes`, or the sum of its tasks. A backlog task's minutes default to what is left of its estimate. Its tasks become 'scheduled'. Warns about overlaps; does not refuse them.",
+        "Give a task a slot on Arthur's week: an existing backlog task (task_id, from list_tasks) or a new task (new_task) created for that slot. The slot lasts until `end`, or `minutes`, or — for a backlog task — its estimate. The task becomes 'scheduled'. A task already planned elsewhere is refused: it has at most one planned slot. Warns about overlaps; does not refuse them.",
       inputSchema: z.object({
         start: localTime,
         end: localTime.optional(),
         minutes: minutesIn.optional().describe("Length, when no end is given."),
-        tasks: z
-          .array(z.object({ task_id: z.string().uuid(), minutes: minutesIn.optional() }))
-          .max(20)
+        task_id: z.string().uuid().optional().describe("A backlog task to plan."),
+        new_task: z
+          .object({
+            category: categoryRef,
+            description: z.string().max(500).optional(),
+            notes: z.string().max(10_000).optional().describe("Markdown: context, links, checklist."),
+            priority: z.number().int().min(1).max(4).optional(),
+          })
           .optional()
-          .describe("Backlog tasks to work in this block, in order."),
-        new_tasks: z
-          .array(z.object({ category: categoryRef, description: z.string().max(500).optional(), minutes: minutesIn }))
-          .max(20)
-          .optional()
-          .describe("One-off tasks created inside the block (deleted with it)."),
-        description: z.string().max(500).optional().describe("A label for the block itself; usually leave empty — the tasks name it."),
-      }),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    },
-    async (input, ctx) => {
-      const { db, userId } = callerOf(ctx.http?.authInfo);
-      const start = time(input.start, "start");
-      if (typeof start === "string") return failure(start);
-      if (!input.tasks?.length && !input.new_tasks?.length) {
-        return failure("Put at least one task in the block (tasks or new_tasks): a block counts as nothing until a task says what its time is.");
-      }
-
-      const categories = await loadCategoryPaths(db, userId);
-      const paths = new Map(categories.map((c) => [c.id, c.path]));
-      const fresh: { categoryId: string; description: string | null; minutes: number; label: string }[] = [];
-      for (const n of input.new_tasks ?? []) {
-        const c = resolveCategory(categories, n.category);
-        if (typeof c === "string") return failure(`Nothing was planned. ${c}`);
-        fresh.push({ categoryId: c.id, description: n.description?.trim() || null, minutes: n.minutes, label: `${c.path}${n.description ? ` — ${n.description}` : ""}` });
-      }
-
-      const backlog: { id: string; minutes: number; label: string }[] = [];
-      if (input.tasks?.length) {
-        const ids = [...new Set(input.tasks.map((t) => t.task_id))];
-        const { data, error } = await db
-          .from("tasks")
-          .select("id, category_id, description, estimated_minutes, status, ad_hoc")
-          .eq("user_id", userId)
-          .in("id", ids);
-        if (error) throw error;
-        const rows = new Map((data ?? []).map((t) => [t.id as string, t]));
-        const placed = await livePlacements(db, ids);
-        for (const t of input.tasks) {
-          const row = rows.get(t.task_id);
-          if (!row) return failure(`Nothing was planned. No task with id ${t.task_id}.`);
-          if (row.ad_hoc) return failure(`Nothing was planned. Task ${t.task_id} belongs to another block.`);
-          if (row.status === "done" || row.status === "dropped") return failure(`Nothing was planned. Task ${t.task_id} is ${row.status}.`);
-          if (backlog.some((b) => b.id === t.task_id)) continue;
-          const left = row.estimated_minutes - (placed.get(t.task_id)?.minutes ?? 0);
-          const minutes = t.minutes ?? Math.max(15, left > 0 ? left : row.estimated_minutes);
-          const path = paths.get(row.category_id as string) ?? "?";
-          backlog.push({ id: t.task_id, minutes, label: `${path}${row.description ? ` — ${row.description}` : ""}` });
-        }
-      }
-
-      const total = [...backlog, ...fresh].reduce((s, t) => s + t.minutes, 0);
-      let end: Date;
-      if (input.end) {
-        const e = time(input.end, "end");
-        if (typeof e === "string") return failure(e);
-        end = e;
-      } else {
-        end = new Date(start.getTime() + (input.minutes ?? total) * 60_000);
-      }
-      const length = Math.round((end.getTime() - start.getTime()) / 60_000);
-      if (length < 5) return failure("The block must end at least 5 minutes after it starts.");
-      if (length > 1440) return failure("A block lasts 24 hours at most.");
-
-      const warnings = await warningsFor(db, userId, start, end);
-      if (total > length) warnings.push(`The tasks ask ${fmtMinutes(total)} in a ${fmtMinutes(length)} block.`);
-
-      const id = await insertBlock(db, userId, {
-        weekStart: mondayOf(localDate(start, TZ)),
-        startsAt: start,
-        endsAt: end,
-        description: input.description ?? null,
-      });
-      try {
-        if (backlog.length) {
-          const { error } = await db.from("scheduled_block_tasks").insert(
-            backlog.map((t, i) => ({ user_id: userId, scheduled_block_id: id, task_id: t.id, planned_minutes: t.minutes, position: i })),
-          );
-          if (error) throw error;
-        }
-        await insertAdHocTasks(db, userId, id, fresh, backlog.length);
-        await syncTaskStatus(db, userId, backlog.map((t) => t.id));
-      } catch (e) {
-        // All or nothing: a half-filled block would count wrong.
-        await removeBlock(db, userId, id);
-        throw e;
-      }
-      const inside = [...backlog, ...fresh].map((t) => `${t.label} ${fmtMinutes(t.minutes)}`);
-      return ok(placedText(`${fmtWhen(start, TZ)}–${fmtClock(end, TZ)}`, id, inside, warnings));
-    },
-  );
-
-  server.registerTool(
-    "place_template",
-    {
-      title: "Place a template on the grid",
-      description: "Put one of Arthur's block templates at a time: it lands as one block holding the template's steps, sized to their sum (list_block_templates).",
-      inputSchema: z.object({
-        template: z.string().min(1).describe("Template name (any case) or id."),
-        start: localTime,
-      }),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    },
-    async ({ template, start: rawStart }, ctx) => {
-      const { db, userId } = callerOf(ctx.http?.authInfo);
-      const start = time(rawStart, "start");
-      if (typeof start === "string") return failure(start);
-      const templates = await loadTemplates(db, userId);
-      const t =
-        templates.find((x) => x.id === template) ??
-        templates.find((x) => x.name.toLowerCase() === template.trim().toLowerCase());
-      if (!t) return failure(`No template "${template}". Templates: ${templates.map((x) => `"${x.name}"`).join(", ") || "none"}.`);
-      const len = t.items.length ? t.items.reduce((s, i) => s + i.estimated_minutes, 0) : t.default_minutes;
-      const end = new Date(start.getTime() + len * 60_000);
-      const warnings = await warningsFor(db, userId, start, end);
-      const id = await placeTemplate(db, userId, {
-        weekStart: mondayOf(localDate(start, TZ)),
-        blockId: t.id,
-        startsAt: start.toISOString(),
-      });
-      return ok(placedText(`${t.name}, ${fmtWhen(start, TZ)}–${fmtClock(end, TZ)}`, id, t.items.map((i) => `${i.label} ${fmtMinutes(i.estimated_minutes)}`), warnings));
-    },
-  );
-
-  server.registerTool(
-    "update_block",
-    {
-      title: "Move or edit a block you planned",
-      description:
-        "Move, resize, relabel, or mark done/skipped a block you created. Giving only `start` moves the block and keeps its length; only `end` changes its length. Skipping a block sends its backlog tasks back to the backlog. Arthur's own blocks cannot be changed.",
-      inputSchema: z.object({
-        block_id: blockId,
-        start: localTime.optional(),
-        end: localTime.optional(),
-        description: z.string().max(500).nullable().optional(),
-        status: z.enum(["planned", "done", "skipped"]).optional(),
-      }),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    },
-    async (input, ctx) => {
-      const { db, userId } = callerOf(ctx.http?.authInfo);
-      const b = await ownBlock(db, userId, input.block_id);
-      if (typeof b === "string") return failure(b);
-      const warnings: string[] = [];
-      let when = span(b);
-
-      if (input.start !== undefined || input.end !== undefined) {
-        const oldStart = Date.parse(b.starts_at);
-        const oldEnd = Date.parse(b.ends_at);
-        let start = new Date(oldStart);
-        let end = new Date(oldEnd);
-        if (input.start !== undefined) {
-          const s = time(input.start, "start");
-          if (typeof s === "string") return failure(s);
-          start = s;
-          if (input.end === undefined) end = new Date(s.getTime() + (oldEnd - oldStart));
-        }
-        if (input.end !== undefined) {
-          const e = time(input.end, "end");
-          if (typeof e === "string") return failure(e);
-          end = e;
-        }
-        const length = (end.getTime() - start.getTime()) / 60_000;
-        if (length < 5 || length > 1440) return failure("A block lasts between 5 minutes and 24 hours.");
-        warnings.push(...(await warningsFor(db, userId, start, end, b.id)));
-        const r = await moveBlock(db, userId, { id: b.id, startsAt: start.toISOString(), endsAt: end.toISOString() });
-        if (!r.ok) return failure(r.error);
-        when = `${fmtWhen(start, TZ)}–${fmtClock(end, TZ)}`;
-      }
-      if (input.description !== undefined || input.status !== undefined) {
-        const r = await patchBlock(db, userId, { id: b.id, description: input.description, status: input.status });
-        if (!r.ok) return failure(r.error);
-      }
-      return ok([`Updated: ${when}${input.status ? ` · ${input.status}` : ""} (block ${b.id}).`, ...warnings.map((w) => `Warning: ${w}`)].join("\n"));
-    },
-  );
-
-  server.registerTool(
-    "delete_block",
-    {
-      title: "Delete a block you planned",
-      description: "Remove a block you created. Its backlog tasks go back to the backlog; its one-off tasks are deleted with it. Arthur's own blocks cannot be deleted.",
-      inputSchema: z.object({ block_id: blockId }),
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    },
-    async ({ block_id }, ctx) => {
-      const { db, userId } = callerOf(ctx.http?.authInfo);
-      const b = await ownBlock(db, userId, block_id);
-      if (typeof b === "string") return failure(b);
-      const r = await removeBlock(db, userId, b.id);
-      if (!r.ok) return failure(r.error);
-      return ok(`Deleted the block of ${span(b)}.`);
-    },
-  );
-
-  server.registerTool(
-    "add_to_block",
-    {
-      title: "Add a task to a block you planned",
-      description:
-        "Put a backlog task (task_id) or a new one-off task (new_task) into a block you created, for `minutes`. A task already in the block gets the new minutes instead.",
-      inputSchema: z.object({
-        block_id: blockId,
-        task_id: z.string().uuid().optional(),
-        new_task: z.object({ category: categoryRef, description: z.string().max(500).optional() }).optional(),
-        minutes: minutesIn,
+          .describe("A new task, created and planned in one go. Skipping its slot later sends it to the backlog like any task."),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (input, ctx) => {
       const { db, userId } = callerOf(ctx.http?.authInfo);
       if (!input.task_id === !input.new_task) return failure("Give either task_id or new_task.");
-      const b = await ownBlock(db, userId, input.block_id);
-      if (typeof b === "string") return failure(b);
+      const start = time(input.start, "start");
+      if (typeof start === "string") return failure(start);
+      const categories = await loadCategoryPaths(db, userId);
+      const paths = new Map(categories.map((c) => [c.id, c.path]));
 
       if (input.task_id) {
-        if (b.tasks.some((t) => t.task_id === input.task_id)) {
-          const r = await setBlockTaskMinutes(db, userId, { scheduledBlockId: b.id, taskId: input.task_id, plannedMinutes: input.minutes });
-          if (!r.ok) return failure(r.error);
-          return ok(`That task now has ${fmtMinutes(input.minutes)} in the block of ${span(b)}.`);
-        }
-        const { data: task, error } = await db
+        const { data, error } = await db
           .from("tasks")
-          .select("id, status, ad_hoc")
+          .select(TASK_COLUMNS)
           .eq("user_id", userId)
           .eq("id", input.task_id)
           .maybeSingle();
         if (error) throw error;
+        const task = data as TaskRow | null;
         if (!task) return failure(`No task with id ${input.task_id}.`);
-        if (task.ad_hoc) return failure("That task belongs to another block.");
+        if (isInterviewTask(task)) return failure("That task is an interview's slot; Arthur moves it from /jobs.");
         if (task.status === "done" || task.status === "dropped") return failure(`That task is ${task.status}.`);
-        await attachTask(db, userId, { scheduledBlockId: b.id, taskId: task.id, plannedMinutes: input.minutes });
-      } else {
-        const categories = await loadCategoryPaths(db, userId);
-        const c = resolveCategory(categories, input.new_task!.category);
-        if (typeof c === "string") return failure(c);
-        const r = await addTaskToBlock(db, userId, {
-          scheduledBlockId: b.id,
-          categoryId: c.id,
-          description: input.new_task!.description ?? null,
-          minutes: input.minutes,
-        });
+        const end = endFrom(start, input, task.estimated_minutes);
+        if (typeof end === "string") return failure(end);
+        const warnings = await warningsFor(db, userId, start, end);
+        const r = await placeTask(db, userId, { taskId: task.id, startsAt: start.toISOString(), endsAt: end.toISOString() });
         if (!r.ok) return failure(r.error);
+        const label = `${paths.get(task.category_id) ?? "?"}${task.description ? ` — ${task.description}` : ""}`;
+        return ok(
+          [`Planned ${label}, ${fmtWhen(start, TZ)}–${fmtClock(end, TZ)} (slot ${r.value}).`, ...warnings.map((w) => `Warning: ${w}`), PUSH_NOTE].join("\n"),
+        );
       }
-      const total = b.tasks.reduce((s, t) => s + t.minutes, 0) + input.minutes;
-      const length = Math.round((Date.parse(b.ends_at) - Date.parse(b.starts_at)) / 60_000);
+
+      const n = input.new_task!;
+      const c = resolveCategory(categories, n.category);
+      if (typeof c === "string") return failure(`Nothing was planned. ${c}`);
+      if (!input.end && !input.minutes) return failure("Give the new task's slot an end or a length (minutes).");
+      const end = endFrom(start, input, 60);
+      if (typeof end === "string") return failure(end);
+      const warnings = await warningsFor(db, userId, start, end);
+      const r = await createTaskAt(db, userId, {
+        categoryId: c.id,
+        description: n.description ?? null,
+        notes: n.notes ?? null,
+        priority: n.priority,
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+      });
+      if (!r.ok) return failure(r.error);
       return ok(
-        [`Added to the block of ${span(b)}.`, total > length ? `Warning: its tasks now ask ${fmtMinutes(total)} in ${fmtMinutes(length)}; lengthen it with update_block if needed.` : ""]
-          .filter(Boolean)
-          .join("\n"),
+        [
+          `Planned a new task ${c.path}${n.description ? ` — ${n.description}` : ""}, ${fmtWhen(start, TZ)}–${fmtClock(end, TZ)} (slot ${r.value.sessionId}, task ${r.value.taskId}).`,
+          ...warnings.map((w) => `Warning: ${w}`),
+          PUSH_NOTE,
+        ].join("\n"),
       );
     },
   );
 
   server.registerTool(
-    "remove_from_block",
+    "move_session",
     {
-      title: "Take a task out of a block you planned",
-      description: "A backlog task goes back to the backlog; a one-off task is deleted.",
-      inputSchema: z.object({ block_id: blockId, task_id: z.string().uuid() }),
+      title: "Move or resize a slot you planned",
+      description:
+        "Move or resize a slot you planned. Giving only `start` keeps its length; only `end` changes its length. A slot whose start has already passed is rescheduled instead: it stays where it was as skipped (history), and the task gets a new planned slot. Skipped slots do not move. Arthur's own slots cannot be changed.",
+      inputSchema: z.object({
+        session_id: sessionId,
+        start: localTime.optional(),
+        end: localTime.optional(),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (input, ctx) => {
+      const { db, userId } = callerOf(ctx.http?.authInfo);
+      if (input.start === undefined && input.end === undefined) return failure("Give a new start, a new end, or both.");
+      const s = await ownSession(db, userId, input.session_id);
+      if (typeof s === "string") return failure(s);
+      const oldStart = Date.parse(s.starts_at);
+      const oldEnd = Date.parse(s.ends_at);
+      let start = new Date(oldStart);
+      let end = new Date(oldEnd);
+      if (input.start !== undefined) {
+        const t = time(input.start, "start");
+        if (typeof t === "string") return failure(t);
+        start = t;
+        if (input.end === undefined) end = new Date(t.getTime() + (oldEnd - oldStart));
+      }
+      if (input.end !== undefined) {
+        const t = time(input.end, "end");
+        if (typeof t === "string") return failure(t);
+        end = t;
+      }
+      const warnings = await warningsFor(db, userId, start, end, s.id);
+      const r = await moveSession(db, userId, { id: s.id, startsAt: start.toISOString(), endsAt: end.toISOString() });
+      if (!r.ok) return failure(r.error);
+      const when = `${fmtWhen(start, TZ)}–${fmtClock(end, TZ)}`;
+      return ok(
+        [
+          r.value.rescheduled
+            ? `Rescheduled to ${when} (new slot ${r.value.id}); the slot of ${span(s)} stays as skipped.`
+            : `Moved to ${when} (slot ${s.id}).`,
+          ...warnings.map((w) => `Warning: ${w}`),
+        ].join("\n"),
+      );
+    },
+  );
+
+  server.registerTool(
+    "skip_session",
+    {
+      title: "Skip a slot you planned",
+      description:
+        "Mark a slot you planned as skipped: it stays on the grid as history and the task goes back to the backlog. Arthur's own slots cannot be changed.",
+      inputSchema: z.object({ session_id: sessionId }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ session_id }, ctx) => {
+      const { db, userId } = callerOf(ctx.http?.authInfo);
+      const s = await ownSession(db, userId, session_id);
+      if (typeof s === "string") return failure(s);
+      if (s.status === "skipped") return ok(`The slot of ${span(s)} was already skipped.`);
+      const r = await setSessionStatus(db, userId, { id: s.id, status: "skipped" });
+      if (!r.ok) return failure(r.error);
+      return ok(`Skipped the slot of ${span(s)}; the task is back in the backlog.`);
+    },
+  );
+
+  server.registerTool(
+    "unschedule_session",
+    {
+      title: "Take a slot you planned off the grid",
+      description:
+        "Send the task of a slot you planned back to the backlog. A slot that has not started is deleted (nothing happened there); one already started is skipped instead, so it stays as history. Arthur's own slots cannot be changed.",
+      inputSchema: z.object({ session_id: sessionId }),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ block_id, task_id }, ctx) => {
+    async ({ session_id }, ctx) => {
       const { db, userId } = callerOf(ctx.http?.authInfo);
-      const b = await ownBlock(db, userId, block_id);
-      if (typeof b === "string") return failure(b);
-      if (!b.tasks.some((t) => t.task_id === task_id)) return failure("That task is not in this block.");
-      const r = await detachTask(db, userId, { scheduledBlockId: b.id, taskId: task_id });
+      const s = await ownSession(db, userId, session_id);
+      if (typeof s === "string") return failure(s);
+      const r = await sendToBacklog(db, userId, { id: s.id });
       if (!r.ok) return failure(r.error);
-      return ok(`Removed from the block of ${span(b)}.`);
+      return ok(
+        r.value.deleted
+          ? `Took the slot of ${span(s)} off the grid; the task is back in the backlog.`
+          : `The slot of ${span(s)} had started, so it was skipped (kept as history); the task is back in the backlog.`,
+      );
     },
   );
 }

@@ -199,7 +199,7 @@ export function InterviewCard({
           {fmtDateTime(i.starts_at)}–{fmtTimeOnly(i.ends_at)}
         </button>
         <span className="ml-auto">
-          {i.scheduled_block_id ? (
+          {i.session_id ? (
             <Link href={`/agenda?w=${week}`} className="text-muted hover:text-foreground">
               on the agenda ↗
             </Link>
@@ -265,7 +265,7 @@ export function InterviewCard({
         )}
       </div>
 
-      {!i.scheduled_block_id && !past && (
+      {!i.session_id && !past && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-2">
           <div className="min-w-48 flex-1">
             <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} placeholder="Counts as…" />
@@ -284,7 +284,7 @@ export function InterviewCard({
         <ErrorLine error={error} />
         {confirmDelete ? (
           <>
-            <span className="text-muted">Delete{i.scheduled_block_id ? " (and its agenda block)" : ""}?</span>
+            <span className="text-muted">Delete{i.session_id ? " (and its agenda slot)" : ""}?</span>
             <button onClick={() => setConfirmDelete(false)} className="text-muted">
               Keep
             </button>

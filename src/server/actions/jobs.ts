@@ -25,7 +25,7 @@ import {
   putInterviewOnAgenda as putOnAgenda,
   removeApplication,
   removeInterview,
-  retitleInterviewBlock,
+  retitleInterviewSession,
   scheduleInterview as scheduleInterviewRow,
   type NewInterview,
 } from "@/server/jobs/agenda";
@@ -126,11 +126,11 @@ async function retitleInterviewsOf(
     .from("interviews")
     .select("id, applications!inner(company_id)")
     .eq("user_id", userId)
-    .not("scheduled_block_id", "is", null);
+    .not("session_id", "is", null);
   q = "applicationId" in of ? q.eq("application_id", of.applicationId) : q.eq("applications.company_id", of.companyId);
   const { data, error } = await q;
   if (error) throw error;
-  for (const row of data ?? []) await retitleInterviewBlock(supabase, userId, row.id as string);
+  for (const row of data ?? []) await retitleInterviewSession(supabase, userId, row.id as string);
   if ((data ?? []).length) await queuePush(supabase);
 }
 
@@ -224,7 +224,7 @@ export async function updateInterview(id: string, patch: InterviewPatch): Promis
     const r = await patchInterview(supabase, user.id, id, patch);
     if (!r.ok) return r;
     if (patch.kind !== undefined) {
-      await retitleInterviewBlock(supabase, user.id, id);
+      await retitleInterviewSession(supabase, user.id, id);
       await queuePush(supabase);
     }
     refresh();

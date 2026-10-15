@@ -9,6 +9,7 @@ import { TASK_LIMITS, parseDeadline } from "@/lib/agenda/backlog";
 import { deadlineShortcuts } from "@/lib/agenda/ranking";
 import { fmtDuration } from "@/lib/time";
 import { updateTask, deleteTask } from "@/server/actions/tasks";
+import { TaskHistory } from "./TaskHistory";
 import { ESTIMATE_PRESETS, PRIORITY_STYLE, type BacklogTask } from "./shared";
 
 /**
@@ -322,6 +323,8 @@ export function TaskEditor({
             </button>
           )}
         </Field>
+
+        <TaskHistory taskId={task.id} />
 
         {error && <p className="text-xs text-red-500">{error}</p>}
         <p className="hidden text-[11px] text-muted sm:block">

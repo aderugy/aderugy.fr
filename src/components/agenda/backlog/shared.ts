@@ -2,10 +2,17 @@ import type { Task } from "@/lib/types";
 
 /** A task as the backlog page shows it. */
 export type BacklogTask = Task & {
-  /** For a scheduled task: when its next (or last) block starts, as an instant. */
+  /** For a scheduled task: when its planned slot starts, as an instant. */
   scheduled_at: string | null;
   /** The same, formatted in the app's time zone ("Thu 9 Oct 18:00"). */
   scheduled_label: string | null;
+  /** The planned slot, if any. */
+  session_id?: string | null;
+  /** Its planned slot is over and was neither done nor skipped. */
+  missed?: boolean;
+  /** How many slots of this task were skipped, and the last one's date. */
+  skipped_count?: number;
+  last_skipped_label?: string | null;
 };
 
 /**
