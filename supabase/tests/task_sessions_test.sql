@@ -1,11 +1,11 @@
--- Migration 0025: blocks become task sessions — the backfill, the triggers
+-- Migration 0026: blocks become task sessions — the backfill, the triggers
 -- that keep tasks and Google in step, the week's totals, the push queue,
 -- reminders, and who may change what (Arthur, Claude, someone else).
 --
 -- Run after stub.sql and every migration (see oauth_scope_test.sql for the
 -- commands), from the repository root:
 --   psql -d t -f supabase/tests/task_sessions_test.sql   # ends with ALL CHECKS PASSED
--- The blocks are seeded first and 0025 is re-applied, which is also what
+-- The blocks are seeded first and 0026 is re-applied, which is also what
 -- checks that it is re-runnable: its backfill picks them up.
 \set ON_ERROR_STOP 1
 
@@ -81,7 +81,7 @@ insert into public.block_reminders_sent (scheduled_block_id, user_id, starts_at)
   ('b1000000-0000-4000-8000-0000000000d1', 'aaaaaaaa-0000-4000-8000-0000000000d1', now() + interval '1 day');
 
 -- ============================================================== backfill
-\i supabase/migrations/0025_task_sessions.sql
+\i supabase/migrations/0026_task_sessions.sql
 
 create function pg_temp.s(p_task text) returns public.task_sessions language sql as $$
   select * from public.task_sessions where task_id = ('7a000000-0000-4000-8000-0000000000' || p_task)::uuid
@@ -119,10 +119,10 @@ select pg_temp.check(
   exists (select 1 from public.session_reminders_sent where session_id = 'b1000000-0000-4000-8000-0000000000d1'),
   'a reminder already sent for a block stays sent');
 
-\i supabase/migrations/0025_task_sessions.sql
+\i supabase/migrations/0026_task_sessions.sql
 select pg_temp.check(
   (select count(*) from public.task_sessions where user_id = 'aaaaaaaa-0000-4000-8000-0000000000d1') = 10,
-  're-running 0025 adds nothing');
+  're-running 0026 adds nothing');
 
 -- ============================================================== triggers
 

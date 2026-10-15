@@ -36,7 +36,7 @@ export async function ensureWeek(
 
 /**
  * Per task: its live session and its history, from `task_session_summary`
- * (migration 0025). A task with no session has no entry.
+ * (migration 0026). A task with no session has no entry.
  *
  * There is no status to recompute after a write any more: a trigger keeps a
  * task's status in step with its sessions.

@@ -11,7 +11,7 @@ import type { Result } from "@/server/agenda/tasks";
  * The week grid's writes, shared by the planner's server actions and the
  * Claude connector — on the model of server/agenda/tasks.ts. Every function
  * takes the client to act through (cookie-bound for the UI, bearer-token for
- * Claude); both run as the user under RLS, so the rules of migration 0025 (a
+ * Claude); both run as the user under RLS, so the rules of migration 0026 (a
  * connected app changes only the sessions it created) apply to the connector
  * without anything here having to know.
  *
@@ -36,7 +36,7 @@ type SessionRow = {
   status: SessionStatus;
 };
 
-/** The unique index allowing one planned session per task (0025). */
+/** The unique index allowing one planned session per task (0026). */
 const ONE_PLANNED = "task_sessions_one_planned_idx";
 
 function isOnePlannedViolation(e: unknown): boolean {
@@ -304,7 +304,7 @@ export async function sendToBacklog(
   return r.ok ? { ok: true, value: { deleted: false } } : r;
 }
 
-/** Delete a slot outright. Its Google event goes with it (0025's tombstone trigger). */
+/** Delete a slot outright. Its Google event goes with it (0026's tombstone trigger). */
 export async function deleteSession(db: SupabaseClient, userId: string, id: string): Promise<Result> {
   const { error, count } = await db
     .from("task_sessions")

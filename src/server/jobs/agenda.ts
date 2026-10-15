@@ -18,7 +18,7 @@ import { INTERVIEW_COLUMNS, getInterview } from "./data";
  * ("Interview · Betclic (technical)").
  *
  * The session is the source of truth for the time once it exists: moving the
- * interview here moves the session, and a trigger (migration 0025) copies any
+ * interview here moves the session, and a trigger (migration 0026) copies any
  * move of the session back onto the interview, so a drag on the grid is enough.
  *
  * Browser only: scheduling from Claude is deliberately not offered.

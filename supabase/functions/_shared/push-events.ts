@@ -34,7 +34,7 @@ export type GoogleEventBody = {
  * Google event ids are base32hex (`a-v`, `0-9`), 5 to 1024 characters. A uuid
  * without its dashes is lowercase hex, which is a subset — so the session id
  * itself is the event id, and a retried insert is recognised (409) instead of
- * creating a duplicate. A session that took over a block (migration 0025)
+ * creating a duplicate. A session that took over a block (migration 0026)
  * kept the block's id, so it updates the block's event in place.
  */
 export function eventIdFor(sessionId: string): string {

@@ -398,7 +398,7 @@ used straight from MDX (`<Convergence />`) once declared in
 | **Slot** (`task_sessions`) | A task placed on the grid: one task, one span of time, drawn as the task. Status *planned*, *done* or *skipped*; a planned slot whose time is over is *missed* (computed, never stored). A task has at most one planned slot; its skipped and done slots are its history. |
 | **Week** | Monday date, plus a theme, guidelines and objectives. |
 
-A task's status follows its slots (trigger, migration 0025): *scheduled* while
+A task's status follows its slots (trigger, migration 0026): *scheduled* while
 it has a planned slot, *backlog* otherwise, *done* when a slot is done.
 
 | On the grid | Slot | Task |
@@ -409,8 +409,8 @@ it has a planned slot, *backlog* otherwise, *done* when a slot is done.
 | **Back to backlog** (not started) | deleted | back to the backlog |
 | **Done** | → done | done |
 
-Blocks and templates were removed in October 2026; `0025` carried every block
-over as slots, and `0026` drops the old tables.
+Blocks and templates were removed in October 2026; `0026` carried every block
+over as slots, and `0027` drops the old tables.
 
 ## Using it
 
