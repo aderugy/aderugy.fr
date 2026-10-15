@@ -34,7 +34,7 @@ export type Task = {
   status: TaskStatus;
   splittable: boolean;
   /**
-   * Legacy (dropped in 0027): set on tasks drawn inside a block before
+   * Legacy (dropped in 0028): set on tasks drawn inside a block before
    * sessions, and still on an interview's own task, which the backlog leaves
    * out because the interview stands for it.
    */

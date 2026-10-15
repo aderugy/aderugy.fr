@@ -43,7 +43,7 @@ import { callerOf } from "./auth";
  *
  * Reading covers everything Arthur sees on the grid: the slots (sessions) of
  * his tasks, the calendars' events, the week's theme and objectives. Writing
- * is limited to the slots Claude created — enforced by migration 0026 in the
+ * is limited to the slots Claude created — enforced by migration 0027 in the
  * database, and checked here first so the answer is a sentence rather than a
  * silent no-op. Every write goes through server/agenda/schedule.ts, the same
  * code as the planner's buttons.

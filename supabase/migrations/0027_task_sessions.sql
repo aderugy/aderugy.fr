@@ -14,7 +14,7 @@
 --
 -- It ships in one deploy with the code that reads sessions, and deletes
 -- nothing: blocks, their tasks, templates and their triggers stay, unused,
--- until phase 3 (0027) drops them. What the live system reads is switched
+-- until phase 3 (0028) drops them. What the live system reads is switched
 -- over at the end ("switch-over"): the week's totals, the Google push queue
 -- and the reminders job now look at sessions.
 --
@@ -28,7 +28,7 @@
 --   * multi-task block    → one session per task, back to back in block order,
 --                           each as long as its planned minutes; the first one
 --                           keeps the block's id (and its Google event);
---   * empty block         → not carried over (its event goes in 0027);
+--   * empty block         → not carried over (its event goes in 0028);
 --   * block done          → session done, task done;
 --   * block skipped       → session skipped, task back to the backlog;
 --   * block planned, over → a backlog task: session skipped, back to the
@@ -60,7 +60,7 @@ create table if not exists public.task_sessions (
                      check (sync_state in ('pending', 'synced', 'failed')),
   push_attempts    int not null default 0,
   push_error       text,
-  -- Where the row came from, for checking the backfill. Dropped in 0027.
+  -- Where the row came from, for checking the backfill. Dropped in 0028.
   legacy_block_id  uuid,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
@@ -424,7 +424,7 @@ create trigger task_sessions_push_delete
   after delete on public.task_sessions
   for each row execute function public.push_on_session_delete();
 
--- The cron calls this by name. Blocks stay in until 0027 so either pusher
+-- The cron calls this by name. Blocks stay in until 0028 so either pusher
 -- version finds its work during the switch.
 create or replace function public.users_due_for_push(p_max_attempts int default 8)
 returns table (user_id uuid)
@@ -528,7 +528,7 @@ $$;
 grant execute on function public.task_session_summary(uuid[]) to authenticated;
 
 -- What a category is used by. "scheduled" now counts sessions, which is what
--- blocks holding its tasks amounted to; templates stay until 0027.
+-- blocks holding its tasks amounted to; templates stay until 0028.
 create or replace function public.category_usage(p_id uuid)
 returns table (tasks bigint, scheduled bigint, templates bigint, descendants bigint)
 language sql
@@ -638,7 +638,7 @@ create policy "oauth clients delete their own sessions" on public.task_sessions
 -- ------------------------------------------------------------ switch-over
 -- This migration ships with the code that reads sessions (phase 2), so from
 -- here on the database stops looking at blocks for anything live. Blocks and
--- their tables stay, untouched, until 0027 drops them.
+-- their tables stay, untouched, until 0028 drops them.
 
 -- The week's totals, from sessions: a session counts for its own length
 -- against its task's category, unless it was skipped. As in 0024, events
