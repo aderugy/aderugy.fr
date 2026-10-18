@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Markdown } from "@/components/ui/Markdown";
 import { SessionInterview } from "@/components/jobs/SessionInterview";
 import { categoryIndex, DEFAULT_COLOR } from "@/lib/categories";
 import { canUnschedule, isMissed, sessionMinutes } from "@/lib/agenda/sessions";
-import { fmtDuration, fmtTime, minutesOfDay, toISODate } from "@/lib/time";
+import { fmtDuration, fmtTime, fromISODate, minutesOfDay, toISODate } from "@/lib/time";
 import type { Category, SessionStatus, TaskSession } from "@/lib/types";
 import {
   deleteSlot,
@@ -18,7 +18,7 @@ import {
 } from "@/server/actions/schedule";
 import { updateTask } from "@/server/actions/tasks";
 import { TaskEditor } from "./backlog/TaskEditor";
-import type { BacklogTask } from "./backlog/shared";
+import { PRIORITY_STYLE, type BacklogTask } from "./backlog/shared";
 
 type Props = {
   session: TaskSession;
@@ -62,6 +62,15 @@ export function SessionDetail({ session, categories, now, onClose }: Props) {
   const [rescheduling, setRescheduling] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  // The title grows with its text (field-sizing is not in every browser yet).
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
 
   const index = useMemo(() => categoryIndex(categories), [categories]);
   const category = task ? index.get(task.category_id) : undefined;
@@ -110,6 +119,8 @@ export function SessionDetail({ session, categories, now, onClose }: Props) {
 
   const others = (history ?? []).filter((h) => h.id !== session.id);
   const skippedBefore = others.filter((h) => h.status === "skipped").length;
+  const overdue =
+    task.deadline !== null && task.status !== "done" && now !== null && task.deadline < toISODate(new Date(now));
 
   const asBacklogTask: BacklogTask = {
     ...task,
@@ -153,16 +164,19 @@ export function SessionDetail({ session, categories, now, onClose }: Props) {
 
       {session.interview && <SessionInterview interview={session.interview} />}
 
-      <div className="rounded border border-line bg-surface p-2" style={{ borderLeft: `3px solid ${category?.effectiveColor ?? DEFAULT_COLOR}` }}>
-        <div className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate font-medium" title={category?.path}>
-            {category?.name ?? "Uncategorised"}
-          </span>
-          <span className="shrink-0 tabular-nums text-muted" title="The task's estimate">
-            est. {fmtDuration(task.estimated_minutes)}
-          </span>
-        </div>
+      {/* The task itself, given room: the description is the title, in full. */}
+      <section className="space-y-2 border-l-[3px] pl-2.5" style={{ borderColor: category?.effectiveColor ?? DEFAULT_COLOR }}>
+        <p className="text-[11px] leading-snug text-muted">
+          {(category?.path ?? "Uncategorised").split(" > ").map((part, i, all) => (
+            <span key={i}>
+              {i > 0 && <span className="mx-1 opacity-60">›</span>}
+              <span className={i === all.length - 1 ? "font-medium text-foreground" : ""}>{part}</span>
+            </span>
+          ))}
+        </p>
+
         <textarea
+          ref={titleRef}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={() => {
@@ -170,24 +184,59 @@ export function SessionDetail({ session, categories, now, onClose }: Props) {
               run(() => updateTask({ id: task.id, description: description.trim() || null }));
             }
           }}
-          rows={2}
+          onKeyDown={(e) => {
+            // Enter saves, like a title; Shift+Enter still breaks the line.
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
+          rows={1}
           placeholder="What this task is"
-          className="mt-1 w-full resize-none rounded border border-line bg-background px-2 py-1 outline-none focus:border-accent"
+          className="-mx-1 block w-[calc(100%+0.5rem)] resize-none overflow-hidden rounded border border-transparent bg-transparent px-1 py-0.5 text-[15px] font-semibold leading-snug outline-none hover:border-line focus:border-accent focus:bg-background"
         />
-        {task.notes && (
-          <details className="mt-1" open>
-            <summary className="cursor-pointer text-[10px] text-muted hover:text-foreground">Notes</summary>
-            <Markdown source={task.notes} className="mt-1 text-xs" />
-          </details>
-        )}
+
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+          <dt className="text-muted">Estimate</dt>
+          <dd className="tabular-nums">
+            {fmtDuration(task.estimated_minutes)}
+            {task.estimated_minutes !== minutes && (
+              <span className="text-muted"> · slot {fmtDuration(minutes)}</span>
+            )}
+          </dd>
+          <dt className="text-muted">Priority</dt>
+          <dd>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: PRIORITY_STYLE[task.priority]?.color }} />
+              {PRIORITY_STYLE[task.priority]?.label ?? `P${task.priority}`}
+            </span>
+          </dd>
+          {task.deadline && (
+            <>
+              <dt className="text-muted">Deadline</dt>
+              <dd className={overdue ? "font-medium text-red-500" : ""}>
+                {fromISODate(task.deadline).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
+                {overdue && " · overdue"}
+              </dd>
+            </>
+          )}
+        </dl>
+
+        {task.notes ? (
+          <div className="border-t border-line pt-2">
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted">Notes</p>
+            <Markdown source={task.notes} className="text-xs leading-relaxed" />
+          </div>
+        ) : null}
+
         <button
           onClick={() => setEditing(true)}
           disabled={temp}
-          className="mt-1 text-[11px] text-muted underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
+          className="text-[11px] text-muted underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
         >
-          Edit task…
+          {task.notes ? "Edit task…" : "Edit task / add notes…"}
         </button>
-      </div>
+      </section>
 
       {/* What can happen to this slot depends on where the clock is. */}
       {session.status === "planned" && (
