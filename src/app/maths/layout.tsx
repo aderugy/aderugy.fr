@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
 import { MathsNav } from "@/components/maths/MathsNav";
@@ -39,9 +39,7 @@ async function CompteurRevision() {
 
 export default async function MathsLayout({ children }: LayoutProps<"/maths">) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   // Le proxy protège déjà ce segment ; ce garde évite une page vide si le
   // proxy était mal configuré.
   if (!user) redirect(LOGIN_PATH);

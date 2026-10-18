@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SpotList } from "@/components/poker/SpotList";
 import type { PokerSpot } from "@/lib/solver/types";
@@ -8,9 +8,7 @@ export const metadata = { title: "Solver notes — Poker" };
 
 export default async function SpotsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   if (!user) redirect(LOGIN_PATH);
 
   const { data, error } = await supabase

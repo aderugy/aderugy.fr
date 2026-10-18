@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
 
@@ -15,9 +15,7 @@ export const metadata = { title: "Jobs — aderugy.fr" };
 
 export default async function JobsLayout({ children }: LayoutProps<"/jobs">) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   // The proxy already gates this segment; this keeps a misconfigured proxy
   // from rendering an empty page.
   if (!user) redirect(LOGIN_PATH);

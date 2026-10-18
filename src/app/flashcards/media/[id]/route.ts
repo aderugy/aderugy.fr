@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { loadMedia } from "@/server/flashcards/data";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -12,9 +12,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/flashcards/media/[i
   const { id } = await ctx.params;
   if (!UUID.test(id)) return new Response("Not found", { status: 404 });
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   if (!user) return new Response("Unauthorized", { status: 401 });
   const media = await loadMedia(supabase, user.id, id);
   if (!media) return new Response("Not found", { status: 404 });

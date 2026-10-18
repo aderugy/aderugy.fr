@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { PokerHeader } from "@/components/poker/PokerHeader";
 import { LiveNav } from "@/components/poker/live/ui";
@@ -8,9 +8,7 @@ export const metadata = { title: "Live — Poker" };
 
 export default async function LiveLayout({ children }: LayoutProps<"/poker/live">) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   // The proxy already gates this; the guard keeps a misconfigured proxy from
   // rendering a blank, signed-out page.
   if (!user) redirect(LOGIN_PATH);

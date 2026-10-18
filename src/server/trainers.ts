@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import type { PokerNode } from "@/lib/solver/types";
 import { entryLabel } from "@/lib/trainer/labels";
 import type { Trainer, TrainerAnswer, TrainerHand, TrainerNodeRow, TrainerSession } from "@/lib/trainer/types";
@@ -15,9 +15,7 @@ const HAND_SELECT =
 
 async function userClient() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   if (!user) throw new Error("Not authenticated");
   return { supabase, user };
 }
