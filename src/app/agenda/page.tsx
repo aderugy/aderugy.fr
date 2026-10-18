@@ -1,60 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
-import { ensureWeek } from "@/server/weeks";
 import { addDays, fromISODate, isoWeekStartInTimeZone, toISODate } from "@/lib/time";
 import { WeekPlanner } from "@/components/agenda/WeekPlanner";
 import { withoutHidden } from "@/lib/external";
-import type { InterviewOnSession } from "@/lib/jobs/types";
-import { LISTED_TASKS } from "@/server/agenda/tasks";
-import type {
-  CalendarSource,
-  Category,
-  ExternalEvent,
-  GoogleAccount,
-  HiddenEventRule,
-  Objective,
-  Task,
-  TaskSession,
-} from "@/lib/types";
+import { loadWeekPage } from "@/server/agenda/week-page";
 
 export const metadata = { title: "Week — Agenda" };
-
-type InterviewRow = Omit<InterviewOnSession, "company" | "role_title"> & {
-  session_id: string;
-  applications: { role_title: string; companies: { name: string } | { name: string }[] | null } | null;
-};
-
-/**
- * Mark the sessions that hold a /jobs interview. A separate query rather than
- * an embed, and its failure ignored: the week must still render without it.
- */
-async function withInterviews(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  sessions: TaskSession[],
-): Promise<TaskSession[]> {
-  if (sessions.length === 0) return sessions;
-  const { data, error } = await supabase
-    .from("interviews")
-    .select("id, application_id, session_id, kind, prep_notes, debrief_notes, applications(role_title, companies(name))")
-    .in(
-      "session_id",
-      sessions.map((s) => s.id),
-    );
-  if (error || !data?.length) return sessions;
-
-  const bySession = new Map<string, InterviewOnSession>();
-  for (const row of data as unknown as InterviewRow[]) {
-    const { applications, session_id, ...rest } = row;
-    const c = applications?.companies;
-    bySession.set(session_id, {
-      ...rest,
-      role_title: applications?.role_title ?? "",
-      company: (Array.isArray(c) ? c[0]?.name : c?.name) ?? "",
-    });
-  }
-  return sessions.map((s) => (bySession.has(s.id) ? { ...s, interview: bySession.get(s.id)! } : s));
-}
 
 const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "Europe/Paris";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -70,107 +22,18 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   // misconfigured proxy must not render a blank page.
   if (!user) redirect(LOGIN_PATH);
 
-  const week = await ensureWeek(supabase, user.id, weekStart);
-
   const weekStartDate = fromISODate(weekStart);
-  const rangeStart = addDays(weekStartDate, -1).toISOString();
-  const rangeEnd = addDays(weekStartDate, 8).toISOString();
+  const load = await loadWeekPage(supabase, user.id, {
+    weekStart,
+    rangeStart: addDays(weekStartDate, -1).toISOString(),
+    rangeEnd: addDays(weekStartDate, 8).toISOString(),
+  });
 
-  const [
-    categoriesRes,
-    tasksRes,
-    scheduledRes,
-    objectivesRes,
-    externalRes,
-    sourcesRes,
-    googleRes,
-    syncRes,
-    hiddenRes,
-  ] = await Promise.all([
-      supabase
-        .from("categories")
-        .select("id, parent_id, name, color, position, archived")
-        .eq("user_id", user.id)
-        .eq("archived", false)
-        .order("position"),
-      supabase
-        .from("tasks")
-        .select(
-          "id, category_id, description, notes, estimated_minutes, priority, deadline, status, splittable, ad_hoc, completed_at, created_at",
-        )
-        .eq("user_id", user.id)
-        .in("status", ["backlog", "scheduled"])
-        // The rail is for work waiting on a slot; an interview's own task is
-        // the interview, and reaches the grid through its session.
-        .or(LISTED_TASKS)
-        .order("created_at"),
-      // Filtered by time range rather than week_id so a session shows where
-      // it actually sits, whatever week it was planned from.
-      supabase
-        .from("task_sessions")
-        .select(
-          "id, task_id, week_id, starts_at, ends_at, status, created_by, tasks(id, category_id, description, notes, estimated_minutes, priority, deadline, status, created_at)",
-        )
-        .eq("user_id", user.id)
-        .gte("starts_at", rangeStart)
-        .lt("starts_at", rangeEnd)
-        .order("starts_at"),
-      supabase
-        .from("objectives")
-        .select("id, week_id, title, category_id, target_minutes, done, position")
-        .eq("week_id", week.id)
-        .order("position"),
-      // The mirror of what Google says you are already committed to, plus the
-      // archives: events a calendar deleted once they were over, which the
-      // planner keeps so a week already lived does not lose its hours. Read-only
-      // either way, and fetched for the same window as the grid.
-      supabase
-        .from("external_events")
-        .select(
-          "calendar_source_id, external_event_id, title, starts_at, ends_at, all_day, status, transparency, attendee_response, archived_at",
-        )
-        .eq("user_id", user.id)
-        .lt("starts_at", rangeEnd)
-        .gt("ends_at", rangeStart)
-        .order("starts_at"),
-      supabase
-        .from("calendar_sources")
-        .select(
-          "id, provider, external_id, display_name, color, category_id, enabled, include_all_day, include_free, include_declined, position",
-        )
-        .eq("user_id", user.id)
-        .order("position"),
-      supabase
-        .from("google_accounts")
-        .select(
-          "google_email, connected_at, disconnected_at, last_error, last_error_at",
-        )
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("google_sync_state")
-        .select("google_calendar_id, last_synced_at")
-        .eq("user_id", user.id),
-      // Events Arthur hid. Unreadable rules hide nothing rather than fail the week.
-      supabase
-        .from("hidden_external_events")
-        .select("id, calendar_source_id, external_event_id, title, label, starts_at, created_at")
-        .eq("user_id", user.id),
-    ]);
-
-  // Calendar errors are deliberately excluded: a broken integration degrades the
-  // planner, it does not replace it with an error page.
-  const error =
-    categoriesRes.error ??
-    tasksRes.error ??
-    scheduledRes.error ??
-    objectivesRes.error;
-
-  if (error) {
+  if (!load.ok) {
     return (
       <main className="mx-auto max-w-lg px-5 py-16 text-sm sm:px-6 sm:py-20">
         <h1 className="font-medium">Could not load the week</h1>
-        <p className="mt-2 text-muted">{error.message}</p>
+        <p className="mt-2 text-muted">{load.error}</p>
         <p className="mt-4 text-muted">
           If this is a fresh project, run the migration in{" "}
           <code>supabase/migrations</code> first.
@@ -178,16 +41,10 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
       </main>
     );
   }
-
-  const sessions = await withInterviews(
-    supabase,
-    ((scheduledRes.data ?? []) as unknown as TaskSession[]).filter((s) => s.tasks),
-  );
+  const w = load.data;
 
   // The weakest link decides how fresh the picture is, so report the oldest.
-  const syncTimes = ((syncRes.data ?? []) as { last_synced_at: string | null }[]).map(
-    (row) => row.last_synced_at,
-  );
+  const syncTimes = w.syncState.map((row) => row.last_synced_at);
   const oldestSyncAt = syncTimes.includes(null)
     ? null
     : syncTimes.sort()[0] ?? null;
@@ -195,14 +52,14 @@ export default async function AgendaPage({ searchParams }: PageProps<"/agenda">)
   return (
     <WeekPlanner
       weekStart={toISODate(weekStartDate)}
-      week={week}
-      categories={(categoriesRes.data ?? []) as Category[]}
-      tasks={(tasksRes.data ?? []) as Task[]}
-      sessions={sessions}
-      objectives={(objectivesRes.data ?? []) as Objective[]}
-      externalEvents={withoutHidden((externalRes.data ?? []) as ExternalEvent[], (hiddenRes.data ?? []) as HiddenEventRule[])}
-      calendarSources={(sourcesRes.data ?? []) as CalendarSource[]}
-      googleAccount={(googleRes.data ?? null) as GoogleAccount | null}
+      week={w.week}
+      categories={w.categories}
+      tasks={w.tasks}
+      sessions={w.sessions}
+      objectives={w.objectives}
+      externalEvents={withoutHidden(w.externalEvents, w.hiddenEvents)}
+      calendarSources={w.calendarSources}
+      googleAccount={w.googleAccount}
       oldestSyncAt={oldestSyncAt}
     />
   );
