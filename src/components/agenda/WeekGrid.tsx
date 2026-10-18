@@ -173,8 +173,13 @@ type Props = {
   onMove: (id: string, startsAt: Date, endsAt: Date) => void;
   /** Slots whose start has passed: moving one reschedules it, which the drag says. */
   reschedulingIds: ReadonlySet<string>;
-  /** Only meaningful while the body is showing fewer than seven days. */
-  onFocusDay: (dayIndex: number) => void;
+  /**
+   * A tap on a day header. On the one-day grid it picks the day shown; at any
+   * width it is also how a single day is read in the time-by-category panel.
+   */
+  onDayClick: (dayIndex: number) => void;
+  /** The day the time panel is currently broken down for, if any. */
+  breakdownDay: number | null;
 };
 
 export function WeekGrid({
@@ -190,7 +195,8 @@ export function WeekGrid({
   onDraw,
   onMove,
   reschedulingIds,
-  onFocusDay,
+  onDayClick,
+  breakdownDay,
 }: Props) {
   const colsRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -673,26 +679,31 @@ export function WeekGrid({
               </>
             );
 
-            if (!isPicker) {
-              return (
-                <div key={label} className="px-1 py-2 text-center">
-                  {body}
-                </div>
-              );
-            }
+            // The full week: a header is a toggle for reading that one day in
+            // the time panel. On the one-day grid it is the picker as well.
+            const inBreakdown = breakdownDay === i;
 
             return (
               <button
                 key={label}
                 type="button"
-                onClick={() => onFocusDay(i)}
-                aria-pressed={focused}
+                onClick={() => onDayClick(i)}
+                aria-pressed={isPicker ? focused : inBreakdown}
+                title={
+                  isPicker
+                    ? undefined
+                    : inBreakdown
+                      ? "Back to the whole week's time by category"
+                      : "Show this day's time by category"
+                }
                 className={`m-0.5 rounded-md px-0.5 py-1.5 text-center transition-colors ${
                   focused
-                    ? "bg-accent text-white"
-                    : isToday
-                      ? "text-accent hover:bg-line/50"
-                      : "hover:bg-line/50"
+                    ? `bg-accent text-white ${inBreakdown ? "ring-2 ring-white/60 ring-inset" : ""}`
+                    : inBreakdown
+                      ? "bg-accent/15 ring-1 ring-accent ring-inset"
+                      : isToday
+                        ? "text-accent hover:bg-line/50"
+                        : "hover:bg-line/50"
                 }`}
               >
                 {body}

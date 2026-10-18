@@ -121,10 +121,16 @@ export function WeekPlanner({
    * itself from a new `sessions` prop.
    */
   const [pickedDay, setPickedDay] = useState<number | null>(null);
+  /**
+   * The day the time-by-category panel is reading instead of the whole week.
+   * A lens like hidden categories: never stored, and forgotten with the week.
+   */
+  const [breakdownDay, setBreakdownDay] = useState<number | null>(null);
   const [pickedFor, setPickedFor] = useState(weekStart);
   if (pickedFor !== weekStart) {
     setPickedFor(weekStart);
     setPickedDay(null);
+    setBreakdownDay(null);
   }
 
   const todayIndex = hydrated ? dayIndexOf(weekStartDate, new Date()) : -1;
@@ -240,6 +246,33 @@ export function WeekPlanner({
     [items, weekStartDate],
   );
 
+  /**
+   * The one day the time panel is broken down for, if any. Same rules as the
+   * week: a session belongs to the day it starts on, and a calendar event is
+   * clipped to the day so an overnight one splits across the two.
+   */
+  const breakdown = useMemo(() => {
+    if (breakdownDay === null) return null;
+    const dayStart = addDays(weekStartDate, breakdownDay);
+    return {
+      dayIndex: breakdownDay,
+      date: dayStart,
+      sessions: weekItems.filter(
+        (s) => dayIndexOf(weekStartDate, new Date(s.starts_at)) === breakdownDay,
+      ),
+      externalMinutes: googleConnected
+        ? externalMinutesByCategory(externalEvents, calendarSources, dayStart, 1)
+        : new Map<string, number>(),
+    };
+  }, [
+    breakdownDay,
+    weekStartDate,
+    weekItems,
+    externalEvents,
+    calendarSources,
+    googleConnected,
+  ]);
+
   // Skipped slots stay on the grid as history but are not time planned.
   const totalMinutes = weekItems.filter(counts).reduce((sum, s) => sum + sessionMinutes(s), 0);
 
@@ -306,6 +339,27 @@ export function WeekPlanner({
       else for (const c of subtree) next.add(c);
       return next;
     });
+  }
+
+  /**
+   * A day header is a toggle for reading that day in the time panel. On the
+   * one-day grid it is first the picker: tapping another day shows it (and
+   * carries an open breakdown along), tapping the day already shown toggles
+   * its breakdown. Either way the panel has to be on screen to be any use, so
+   * a narrow layout opens it when a breakdown starts.
+   */
+  function onDayClick(dayIndex: number) {
+    if (!wideGrid && dayIndex !== focusDay) {
+      setPickedDay(dayIndex);
+      if (breakdownDay !== null) setBreakdownDay(dayIndex);
+      return;
+    }
+    const next = breakdownDay === dayIndex ? null : dayIndex;
+    setBreakdownDay(next);
+    if (next !== null) {
+      setSelectedId(null);
+      if (!wideLayout) setDrawer("detail");
+    }
   }
 
   function onDraw(range: DrawnRange) {
@@ -529,7 +583,8 @@ export function WeekPlanner({
             onDraw={onDraw}
             onMove={onMove}
             reschedulingIds={reschedulingIds}
-            onFocusDay={setPickedDay}
+            breakdownDay={breakdownDay}
+            onDayClick={onDayClick}
           />
         </div>
 
@@ -559,6 +614,8 @@ export function WeekPlanner({
               objectives={objectives}
               sessions={weekItems}
               externalMinutes={externalMinutes}
+              breakdown={breakdown}
+              onClearBreakdown={() => setBreakdownDay(null)}
               hiddenCategories={hiddenCategories}
               onToggleCategory={onToggleCategory}
               onShowAllCategories={() => setHiddenCategories(new Set())}
