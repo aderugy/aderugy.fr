@@ -176,10 +176,12 @@ export function externalMinutesByCategory(
   events: ExternalEvent[],
   sources: CalendarSource[],
   weekStart: Date,
+  /** How many days from `weekStart` to count: 7 for the week, 1 for a single day. */
+  days = 7,
 ): Map<string, number> {
   const byId = new Map(sources.map((s) => [s.id, s]));
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
+  weekEnd.setDate(weekEnd.getDate() + days);
 
   const out = new Map<string, number>();
 

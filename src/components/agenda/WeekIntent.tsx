@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import { buildTree, flattenTree, subtreeIds } from "@/lib/categories";
 import type { CategoryNode } from "@/lib/categories";
@@ -23,6 +23,17 @@ type Props = {
   sessions: TaskSession[];
   /** Minutes per category already committed by a connected calendar. */
   externalMinutes: Map<string, number>;
+  /**
+   * One day to read the time panel for instead of the week. Objectives keep
+   * measuring the week: their targets are weekly.
+   */
+  breakdown: {
+    dayIndex: number;
+    date: Date;
+    sessions: TaskSession[];
+    externalMinutes: Map<string, number>;
+  } | null;
+  onClearBreakdown: () => void;
   /** Categories being read past: still listed, still greyed, never counted. */
   hiddenCategories: ReadonlySet<string>;
   onToggleCategory: (id: string) => void;
@@ -38,6 +49,8 @@ export function WeekIntent({
   objectives,
   sessions,
   externalMinutes,
+  breakdown,
+  onClearBreakdown,
   hiddenCategories,
   onToggleCategory,
   onShowAllCategories,
@@ -51,41 +64,33 @@ export function WeekIntent({
   const flat = useMemo(() => flattenTree(tree), [tree]);
 
   /**
-   * Minutes scheduled this week per category: `direct` is what was booked on
-   * the category itself, `rolled` adds everything below it in the tree.
-   *
-   * A session counts for its own length against its task's category; a
-   * skipped one is history and counts for nothing (lib/agenda/sessions).
+   * Minutes per category: `direct` is what was booked on the category itself,
+   * `rolled` adds everything below it in the tree, `counted` leaves out what
+   * is hidden. Computed for the week (objectives) and, when a day is picked,
+   * again for that day (the time panel).
    */
+  const tally = useCallback(
+    (list: TaskSession[], external: Map<string, number>) =>
+      tallyMinutes(list, external, categories, flat, hiddenCategories),
+    [categories, flat, hiddenCategories],
+  );
+  const week_ = useMemo(
+    () => tally(sessions, externalMinutes),
+    [tally, sessions, externalMinutes],
+  );
+  const shown = useMemo(
+    () =>
+      breakdown ? tally(breakdown.sessions, breakdown.externalMinutes) : week_,
+    [tally, breakdown, week_],
+  );
+
+  /** The week's rolled totals, for objectives whatever the panel is showing. */
+  const weekMinutesByCategory = week_.rolled;
   const {
     direct: directMinutes,
     rolled: minutesByCategory,
     counted: countedByCategory,
-  } = useMemo(() => {
-    const direct = sessionMinutesByCategory(
-      sessions.map((s) => ({ ...s, category_id: s.tasks?.category_id ?? null })),
-    ).planned;
-    // Hours a calendar already committed count the same as hours you planned:
-    // the objective asks where your time goes, not how much of it you typed in.
-    for (const [categoryId, minutes] of externalMinutes) {
-      direct.set(categoryId, (direct.get(categoryId) ?? 0) + minutes);
-    }
-    const rolled = new Map<string, number>();
-    const counted = new Map<string, number>();
-    for (const c of flat) {
-      const ids = subtreeIds(categories, c.id);
-      let sum = 0;
-      let shown = 0;
-      for (const id of ids) {
-        const minutes = direct.get(id) ?? 0;
-        sum += minutes;
-        if (!hiddenCategories.has(id)) shown += minutes;
-      }
-      rolled.set(c.id, sum);
-      counted.set(c.id, shown);
-    }
-    return { direct, rolled, counted };
-  }, [sessions, externalMinutes, categories, flat, hiddenCategories]);
+  } = shown;
 
   const totalMinutes = useMemo(
     () => tree.reduce((sum, root) => sum + (countedByCategory.get(root.id) ?? 0), 0),
@@ -241,7 +246,7 @@ export function WeekIntent({
         <ul className="mt-1 space-y-1">
           {objectives.map((o) => {
             const scheduledMinutes = o.category_id
-              ? (minutesByCategory.get(o.category_id) ?? 0)
+              ? (weekMinutesByCategory.get(o.category_id) ?? 0)
               : 0;
             const pct = o.target_minutes
               ? Math.min(100, Math.round((scheduledMinutes / o.target_minutes) * 100))
@@ -291,7 +296,23 @@ export function WeekIntent({
 
       <div className="mt-2">
         <div className="flex items-baseline gap-2">
-          <span className="flex-1 text-muted">Time by category</span>
+          <span className="flex-1 text-muted">
+            Time by category
+            {breakdown && (
+              <button
+                type="button"
+                onClick={onClearBreakdown}
+                className="ml-1.5 rounded bg-accent/15 px-1.5 py-px text-[10px] text-accent hover:bg-accent/25"
+                title="Back to the whole week"
+              >
+                {breakdown.date.toLocaleDateString("en-GB", {
+                  weekday: "short",
+                  day: "numeric",
+                })}{" "}
+                ×
+              </button>
+            )}
+          </span>
           {hiddenCategories.size > 0 && (
             <button
               type="button"
@@ -307,6 +328,9 @@ export function WeekIntent({
           )}
         </div>
         <ul className="mt-1 space-y-0.5">{renderShare(tree, totalMinutes, 0)}</ul>
+        {breakdown && totalMinutes === 0 && (
+          <p className="mt-1 text-[11px] text-muted">Nothing planned that day.</p>
+        )}
       </div>
     </div>
   );
@@ -382,4 +406,39 @@ function NewObjective({
       )}
     </form>
   );
+}
+
+/**
+ * A session counts for its own length against its task's category; a skipped
+ * one is history and counts for nothing (lib/agenda/sessions). Hours a
+ * calendar already committed count the same as hours you planned: the
+ * question is where your time goes, not how much of it you typed in.
+ */
+function tallyMinutes(
+  sessions: TaskSession[],
+  externalMinutes: Map<string, number>,
+  categories: Category[],
+  flat: CategoryNode[],
+  hiddenCategories: ReadonlySet<string>,
+) {
+  const direct = sessionMinutesByCategory(
+    sessions.map((s) => ({ ...s, category_id: s.tasks?.category_id ?? null })),
+  ).planned;
+  for (const [categoryId, minutes] of externalMinutes) {
+    direct.set(categoryId, (direct.get(categoryId) ?? 0) + minutes);
+  }
+  const rolled = new Map<string, number>();
+  const counted = new Map<string, number>();
+  for (const c of flat) {
+    let sum = 0;
+    let shown = 0;
+    for (const id of subtreeIds(categories, c.id)) {
+      const minutes = direct.get(id) ?? 0;
+      sum += minutes;
+      if (!hiddenCategories.has(id)) shown += minutes;
+    }
+    rolled.set(c.id, sum);
+    counted.set(c.id, shown);
+  }
+  return { direct, rolled, counted };
 }
