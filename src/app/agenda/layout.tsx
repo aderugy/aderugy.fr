@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
 
 const nav = [
@@ -10,9 +10,7 @@ const nav = [
 
 export default async function AgendaLayout({ children }: LayoutProps<"/agenda">) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
 
   // The login page renders inside this layout too, before there is a user.
   if (!user) return <>{children}</>;

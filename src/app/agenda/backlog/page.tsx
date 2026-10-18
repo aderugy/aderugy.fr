@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { BacklogView } from "@/components/agenda/backlog/BacklogView";
 import type { BacklogTask } from "@/components/agenda/backlog/shared";
@@ -14,9 +14,7 @@ const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "Europe/Paris";
 
 export default async function BacklogPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   // Defence in depth: the proxy already gates this, but a bypassed or
   // misconfigured proxy must not render a blank page.
   if (!user) redirect(LOGIN_PATH);

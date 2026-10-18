@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SpotView } from "@/components/poker/SpotView";
 import { asSetup, type PokerSpot } from "@/lib/solver/types";
@@ -11,9 +11,7 @@ export default async function SpotPage({
   const { spotId } = await params;
   const { node: focusNode } = await searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   if (!user) redirect(LOGIN_PATH);
 
   const { data, error } = await supabase

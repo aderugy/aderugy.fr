@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { exportNotes } from "@/server/flashcards/data";
 import { toCsvRow } from "@/lib/flashcards/text";
 
@@ -15,9 +15,7 @@ export async function GET(req: Request) {
   const deck = url.searchParams.get("deck");
   const format = url.searchParams.get("format") === "json" ? "json" : "csv";
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const { notes, reviews, paths, decks } = await exportNotes(supabase, user.id, deck || null);

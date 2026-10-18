@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { GoogleConnection } from "@/components/agenda/GoogleConnection";
 import { HiddenEvents } from "@/components/agenda/HiddenEvents";
@@ -25,9 +25,7 @@ export default async function SettingsPage({
   const params = await searchParams;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   if (!user) redirect(LOGIN_PATH);
 
   const [accountRes, sourcesRes, syncRes, categoriesRes, pushRes, grantsRes, devicesRes, prefsRes, hiddenRes] =

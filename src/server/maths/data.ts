@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 
 /**
  * État mutable du parcours /maths, par utilisateur, dans Supabase.
@@ -67,9 +67,7 @@ export type DonneesMaths = {
 
 async function userClient() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await userFromClaims(supabase);
   if (!user) throw new Error("Not authenticated");
   return { supabase, user };
 }

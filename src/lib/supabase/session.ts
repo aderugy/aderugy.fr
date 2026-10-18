@@ -75,11 +75,19 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  // Do not run code between createServerClient and getUser: a stray await here
-  // is the classic cause of randomly signed-out users.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Do not run code between createServerClient and getClaims: a stray await
+  // here is the classic cause of randomly signed-out users.
+  //
+  // getClaims verifies the access token locally against the cached JWKS, and
+  // still refreshes an expired session (rotated cookies land via setAll). The
+  // getUser it replaces asked Supabase Auth over the network on every
+  // navigation and every server action, before anything else could start.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims as Record<string, unknown> | undefined;
+  const user =
+    claims && typeof claims.sub === "string" && claims.role === "authenticated"
+      ? { id: claims.sub }
+      : null;
 
   if (!user && !onLoginPage) {
     return redirectKeepingCookies(request, response, LOGIN_PATH, { next: path + request.nextUrl.search });
