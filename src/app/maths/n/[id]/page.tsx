@@ -184,11 +184,6 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
                         exerciseId={e.id}
                         kind={e.kind}
                         difficulty={e.difficulty}
-                        statement={<Mdx source={e.statement} />}
-                        hints={e.hints.map((h, k) => (
-                          <Mdx key={k} source={h} />
-                        ))}
-                        solution={<Mdx source={e.solution} />}
                         tentatives={tentatives
                           .filter((t) => t.exerciseKey === key)
                           .map((t) => ({

@@ -10,7 +10,9 @@ import {
   setManual,
 } from "@/server/maths/data";
 import { loadGraph } from "@/lib/maths/graph/load";
-import { cardKey, exerciseKey } from "@/lib/maths/content";
+import { cardKey, exerciseKey, loadExercises } from "@/lib/maths/content";
+import { compiler } from "@/lib/maths/mdx";
+import { createClient, userFromClaims } from "@/lib/supabase/server";
 import {
   carteNeuve,
   joursEcoules,
@@ -131,4 +133,29 @@ export async function enregistrerTentative(
 
   revalidatePath(`/maths/n/${nodeId}`);
   revalidatePath("/maths");
+}
+
+/**
+ * Énoncé, indices et correction d'un exercice, rendus à la demande.
+ *
+ * La page de nœud ne les embarque plus : ils sont repliés à l'affichage, et
+ * les envoyer tous gonflait la charge de la page de plus de moitié pour du
+ * contenu que l'on n'ouvre qu'un exercice à la fois. Le rendu sort du cache
+ * de compilation (lib/maths/mdx), donc l'appel coûte un aller-retour, pas
+ * une compilation.
+ */
+export async function contenuExercice(nodeId: string, exerciseId: string) {
+  const user = await userFromClaims(await createClient());
+  if (!user) throw new Error("Not authenticated");
+  assertConcept(nodeId);
+  const exercice = loadExercises(loadGraph().byId.get(nodeId)!).find(
+    (e) => e.id === exerciseId,
+  );
+  if (!exercice) throw new Error(`exercice inconnu : ${nodeId}/${exerciseId}`);
+  const [statement, solution, ...hints] = await Promise.all([
+    compiler(exercice.statement),
+    compiler(exercice.solution),
+    ...exercice.hints.map(compiler),
+  ]);
+  return { statement, hints, solution };
 }
