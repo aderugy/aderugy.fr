@@ -1,0 +1,30 @@
+---
+kind: calcul
+difficulty: 2
+after: riemann
+---
+Déterminer la nature des séries de termes généraux suivants ($n \ge 1$).
+
+1. $u_n = \dfrac{n + 1}{n^3 + 2}$
+2. $u_n = \dfrac{1}{\sqrt{n^2 + n}}$
+3. $u_n = 1 - \cos\dfrac1n$
+4. $u_n = \dfrac{\ln n}{n^2}$
+
+<!-- indice -->
+Chercher pour chaque terme un équivalent de la forme $c / n^\alpha$ ; les
+termes sont tous positifs, donc le critère des équivalents s'applique.
+
+<!-- indice -->
+Pour 3, $1 - \cos x \sim x^2/2$ en $0$ (admis ici, démontré au nœud
+[derivation-taylor](/maths/n/derivation-taylor)). Pour 4, aucun équivalent en
+$1/n^\alpha$ : comparer à $1/n^{3/2}$.
+
+<!-- solution -->
+1. $u_n \sim \frac{n}{n^3} = \frac{1}{n^2}$ : converge.
+2. $u_n \sim \frac{1}{n}$ : diverge.
+3. $u_n \sim \frac{1}{2n^2}$ : converge.
+4. $\frac{\ln n}{n^2} = \frac{1}{n^{3/2}} \cdot \frac{\ln n}{\sqrt n}$, et
+   $\frac{\ln n}{\sqrt n} \to 0$, donc $u_n \le \frac{1}{n^{3/2}}$ pour $n$ assez
+   grand : converge par comparaison à une série de Riemann d'exposant
+   $3/2 > 1$. Le logarithme ne pèse rien face à une puissance, même petite :
+   on « sacrifie » une puissance $n^{1/2}$ pour l'absorber.

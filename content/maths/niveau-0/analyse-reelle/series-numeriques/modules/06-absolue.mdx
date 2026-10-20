@@ -1,0 +1,88 @@
+---
+title: Convergence absolue et séries alternées
+minutes: 9
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: qcm
+  question: '$\sum \frac{(-1)^n}{n}$ est :'
+  choix:
+  - 'absolument convergente ;'
+  - 'convergente, mais pas absolument convergente (semi-convergente) ;'
+  - 'divergente, car $\sum \frac1n$ diverge.'
+  reponse: 1
+  explication: 'Le critère des séries alternées s''applique ($1/n$ décroît vers $0$) : elle converge, vers $-\ln 2$. Mais $\sum |{(-1)^n}/n| = \sum 1/n$ diverge. La divergence de la série des valeurs absolues n''entraîne pas celle de la série.'
+- type: nombre
+  question: 'On approche $S = \sum_{n \ge 1} \frac{(-1)^{n+1}}{n^2}$ par la somme partielle $S_N$. Quel est le plus petit $N$ pour lequel le critère des séries alternées **garantit** $|S - S_N| < 10^{-4}$ ?'
+  reponse: 100
+  explication: 'Le critère donne $|R_N| \le u_{N+1} = \frac{1}{(N+1)^2}$. Il faut $(N+1)^2 > 10^4$, soit $N + 1 > 100$, donc $N \ge 100$. Avec $N = 99$, la borne vaut exactement $10^{-4}$, non strictement inférieure.'
+- type: vrai-faux
+  question: 'Une série absolument convergente est convergente, et $\big|\sum u_n\big| \le \sum |u_n|$.'
+  reponse: true
+  explication: 'Vrai : par le critère de Cauchy, $|S_q - S_p| \le \sum_{p < n \le q} |u_n|$, petit dès que $\sum |u_n|$ converge. L''inégalité triangulaire passe ensuite à la limite.'
+---
+
+### Le problème
+
+Les théorèmes de comparaison ne s'appliquent qu'aux termes de signe constant.
+Pour une série dont les signes varient, il faut autre chose — et le critère de
+Cauchy des suites le fournit.
+
+### Critère de Cauchy pour les séries
+
+$\sum u_n$ converge si et seulement si $(S_N)$ est de Cauchy, c'est-à-dire
+
+$$
+\forall \varepsilon > 0,\ \exists N,\ \forall q > p \ge N,\quad
+\Big| \sum_{n = p+1}^{q} u_n \Big| < \varepsilon .
+$$
+
+C'est le [critère de Cauchy](/maths/n/suites-reelles/m/cauchy) appliqué à
+$(S_N)$, puisque $S_q - S_p = \sum_{n=p+1}^q u_n$. Il permet de prouver la
+convergence sans connaître la somme ni le signe des termes.
+
+### Convergence absolue
+
+$\sum u_n$ est **absolument convergente** si $\sum |u_n|$ converge.
+
+> **Théorème.** Une série absolument convergente converge, et
+> $\big| \sum_{n=0}^\infty u_n \big| \le \sum_{n=0}^\infty |u_n|$.
+
+*Démonstration.* Par l'inégalité triangulaire,
+$\big|\sum_{n=p+1}^{q} u_n\big| \le \sum_{n=p+1}^{q} |u_n|$. Le membre de droite
+est une tranche de la série convergente $\sum |u_n|$, qui vérifie le critère
+de Cauchy ; le membre de gauche le vérifie donc aussi. L'inégalité finale
+s'obtient en passant à la limite dans $|S_N| \le \sum_{n \le N} |u_n|$. $\square$
+
+L'étape non triviale est l'appel au critère de Cauchy : c'est la complétude de
+$\mathbb{R}$ qui transforme « les tranches de $\sum |u_n|$ sont petites » en
+« $\sum u_n$ a une limite ».
+
+### Séries alternées
+
+> **Critère des séries alternées (Leibniz).** Si $(a_n)$ est positive,
+> **décroissante** et tend vers $0$, alors $\sum (-1)^n a_n$ converge, et le
+> reste vérifie $|R_N| \le a_{N+1}$, avec le signe de son premier terme.
+
+*Démonstration.* Notons $S_N = \sum_{n=0}^N (-1)^n a_n$. Alors
+$S_{2k+2} - S_{2k} = -a_{2k+1} + a_{2k+2} \le 0$ et
+$S_{2k+3} - S_{2k+1} = a_{2k+2} - a_{2k+3} \ge 0$ : $(S_{2k})$ décroît,
+$(S_{2k+1})$ croît, et $S_{2k} - S_{2k+1} = a_{2k+1} \to 0$. Les deux suites
+sont adjacentes et ont une limite commune $S$, encadrée par deux sommes
+partielles consécutives quelconques. Donc $|S - S_N| \le |S_{N+1} - S_N| = a_{N+1}$. $\square$
+
+La borne sur le reste est ce qui rend ce critère utile en calcul : on sait à
+l'avance combien de termes il faut.
+
+### Piège : semi-convergence
+
+$\sum \frac{(-1)^{n+1}}{n}$ converge (vers $\ln 2$, admis ici) et
+$\sum \frac{1}{n}$ diverge : la convergence n'entraîne pas la convergence
+absolue. Une telle série est dite **semi-convergente**.
+
+### Piège : la décroissance est une hypothèse
+
+Soit $a_n = \frac{1}{n}$ pour $n$ pair et $a_n = \frac{1}{n^2}$ pour $n$ impair.
+Alors $a_n \ge 0$ et $a_n \to 0$, mais $(a_n)$ n'est pas décroissante. La série
+$\sum (-1)^n a_n$ contient la série divergente $\sum_{n \text{ pair}} \frac1n$ et
+retranche la série convergente $\sum_{n \text{ impair}} \frac{1}{n^2}$ : elle
+diverge vers $+\infty$. Retirer la décroissance fait tomber le critère.

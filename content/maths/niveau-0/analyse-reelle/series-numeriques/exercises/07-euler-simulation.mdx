@@ -1,0 +1,67 @@
+---
+kind: simulation
+difficulty: 3
+after: riemann
+---
+Soit $H_N = \sum_{n=1}^{N} \frac1n$ et $\gamma_N = H_N - \ln N$.
+
+1. Calculer $\gamma_N$ pour $N = 10, 10^2, \dots, 10^7$. La suite semble-t-elle
+   converger ? Vers quoi ?
+2. Montrer que $(\gamma_N)$ est décroissante et minorée par $0$, en utilisant
+   $\frac{1}{n+1} \le \ln(n+1) - \ln n \le \frac1n$ (admis ici, conséquence de
+   l'inégalité des accroissements finis).
+3. En déduire une estimation du plus petit $N$ tel que $H_N \ge 20$, sans
+   calculer $H_N$ jusque-là.
+
+<!-- indice -->
+Pour 2, $\gamma_{N+1} - \gamma_N = \frac{1}{N+1} - \big(\ln(N+1) - \ln N\big)$.
+Pour la minoration, sommer l'inégalité de droite.
+
+<!-- indice -->
+Pour 3, $H_N \approx \ln N + \gamma$ : résoudre $\ln N + \gamma = 20$.
+
+<!-- solution -->
+1.
+
+```python
+import numpy as np
+from math import log, exp
+
+n = np.arange(1, 10**7 + 1, dtype=np.float64)
+H = np.cumsum(1 / n)
+for k in range(1, 8):
+    N = 10**k
+    print(f"N=10^{k}  gamma_N = {H[N - 1] - log(N):.10f}")
+
+g = H[-1] - log(10**7)
+N20 = exp(20 - g)
+print(f"estimation : H_N >= 20 pour N ~ {N20:.4e}")
+```
+
+Sortie :
+
+```
+N=10^1  gamma_N = 0.6263831610
+N=10^2  gamma_N = 0.5822073317
+N=10^3  gamma_N = 0.5777155816
+N=10^4  gamma_N = 0.5772656641
+N=10^5  gamma_N = 0.5772206649
+N=10^6  gamma_N = 0.5772161649
+N=10^7  gamma_N = 0.5772157149
+estimation : H_N >= 20 pour N ~ 2.7240e+08
+```
+
+   La suite décroît et se stabilise vers $0{,}5772\ldots$, la constante
+   d'Euler-Mascheroni $\gamma$. L'écart $\gamma_N - \gamma$ se comporte comme
+   $\frac{1}{2N}$ : on gagne un chiffre par décade.
+
+2. $\gamma_{N+1} - \gamma_N = \frac{1}{N+1} - \ln\frac{N+1}{N} \le 0$ par
+   l'inégalité de gauche. Et en sommant l'inégalité de droite pour
+   $n = 1, \dots, N-1$ :
+   $\ln N \le \sum_{n=1}^{N-1} \frac1n = H_N - \frac1N$, donc
+   $\gamma_N \ge \frac1N > 0$. Par le théorème de la limite monotone, $(\gamma_N)$
+   converge vers un $\gamma \ge 0$.
+
+3. $\ln N \approx 20 - \gamma$, soit $N \approx \mathrm{e}^{19{,}42} \approx 2{,}7 \cdot 10^8$.
+   Le calcul direct demanderait des centaines de millions d'additions ; le
+   développement $H_N = \ln N + \gamma + o(1)$ le remplace par une formule.

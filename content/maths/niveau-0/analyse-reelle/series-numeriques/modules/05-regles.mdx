@@ -1,0 +1,69 @@
+---
+title: Règles de d'Alembert et de Cauchy — comparer à une géométrique
+minutes: 7
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: qcm
+  question: 'La règle de d''Alembert appliquée à $\sum \frac{n^{10}}{2^n}$ donne :'
+  choix:
+  - '$\frac{u_{n+1}}{u_n} \to 2$ : divergence.'
+  - '$\frac{u_{n+1}}{u_n} \to \frac12$ : convergence.'
+  - '$\frac{u_{n+1}}{u_n} \to 1$ : on ne peut pas conclure.'
+  reponse: 1
+  explication: '$\frac{u_{n+1}}{u_n} = \frac12 \big(1 + \frac1n\big)^{10} \to \frac12 < 1$. Le facteur polynomial $n^{10}$ ne pèse rien face à l''exponentielle : sa contribution au rapport tend vers $1$.'
+- type: vrai-faux
+  question: 'Si $\frac{u_{n+1}}{u_n} \to 1$, la série $\sum u_n$ (à termes strictement positifs) diverge.'
+  reponse: false
+  explication: 'Faux : la règle ne conclut pas. Pour $\sum 1/n$ (divergente) et $\sum 1/n^2$ (convergente), le rapport tend vers $1$ dans les deux cas. Les séries de Riemann sont précisément celles que d''Alembert ne voit pas.'
+---
+
+### Règle de d'Alembert
+
+> **Théorème.** Soit $u_n > 0$ avec $\dfrac{u_{n+1}}{u_n} \to \ell \in [0, +\infty]$.
+>
+> - Si $\ell < 1$, $\sum u_n$ converge.
+> - Si $\ell > 1$, $\sum u_n$ diverge grossièrement.
+> - Si $\ell = 1$, on ne peut pas conclure.
+
+*Démonstration.* Si $\ell < 1$, choisissons $q$ avec $\ell < q < 1$. À partir
+d'un rang $N$, $u_{n+1} \le q\,u_n$, donc par récurrence
+$u_n \le u_N\, q^{n - N}$ pour $n \ge N$. La série géométrique de raison $q$
+converge, et la comparaison conclut. Si $\ell > 1$, à partir d'un rang
+$u_{n+1} \ge u_n$ : la suite est croissante et strictement positive, elle ne
+tend pas vers $0$. $\square$
+
+Le choix d'un $q$ **strictement** entre $\ell$ et $1$ est le point clé : on ne
+peut pas comparer directement à une géométrique de raison $\ell$, car le
+rapport n'est que **proche** de $\ell$.
+
+### Règle de Cauchy (de la racine)
+
+> Si $u_n \ge 0$ et $u_n^{1/n} \to \ell$ : convergence si $\ell < 1$, divergence
+> grossière si $\ell > 1$, rien si $\ell = 1$.
+
+La démonstration est la même : à partir d'un rang, $u_n \le q^n$ avec
+$\ell < q < 1$. La règle de la racine est plus puissante — si le rapport a une
+limite, la racine a la même —, mais moins commode à calculer.
+
+### Où ces règles servent
+
+Elles tranchent toutes les séries où une exponentielle ou une factorielle
+domine. **Exemple fondamental** : pour tout réel $x$, la série
+$\sum \frac{|x|^n}{n!}$ converge, puisque le rapport vaut
+$\frac{|x|}{n+1} \to 0$. C'est ce qui permet de **définir**
+$\exp(x) = \sum_{n \ge 0} x^n / n!$ (capsule 8), et de normaliser la loi de
+Poisson.
+
+### Piège : le cas $\ell = 1$
+
+Pour toute série de Riemann, $\frac{u_{n+1}}{u_n} = \big(\frac{n}{n+1}\big)^\alpha \to 1$
+et $u_n^{1/n} = \mathrm{e}^{-\alpha \ln(n)/n} \to 1$, que la série converge
+($\alpha > 1$) ou non. Les deux règles ne voient que les comparaisons à une
+géométrique ; les décroissances polynomiales leur échappent, et il faut revenir
+à la comparaison, à la condensation, ou aux équivalents.
+
+Autre piège, plus discret : la règle de d'Alembert suppose que le rapport **a
+une limite**. Pour $u_n = 2^{-n}$ si $n$ est pair et $3^{-n}$ si $n$ est impair,
+le rapport oscille entre des valeurs qui tendent vers $0$ et vers $+\infty$ et
+n'a pas de limite, alors que la série converge — elle est majorée par
+$\sum 2^{-n}$.

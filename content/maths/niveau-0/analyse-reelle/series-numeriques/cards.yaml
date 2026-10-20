@@ -1,0 +1,90 @@
+# Cartes de révision du nœud. L'état FSRS vit en base ; `ref` pointe vers la
+# capsule d'origine (décisions D1 et D25).
+
+cards:
+  - id: definition-serie
+    ref: definition
+    front: "Que signifie « $\\sum u_n$ converge » ?"
+    back: |
+      La suite des sommes partielles $S_N = \sum_{n=0}^N u_n$ converge. Le
+      symbole $\sum_{n=0}^\infty u_n$ désigne sa limite, et n'a de sens
+      qu'après avoir prouvé qu'elle existe.
+
+  - id: terme-general
+    ref: definition
+    front: "$u_n \\to 0$ est-il nécessaire, suffisant, ou les deux, pour que $\\sum u_n$ converge ?"
+    back: |
+      Nécessaire ($u_n = S_n - S_{n-1}$), pas suffisant : $\sum 1/n$ diverge.
+
+  - id: harmonique
+    ref: definition
+    front: "Pourquoi $\\sum 1/n$ diverge-t-elle ? (preuve d'Oresme)"
+    back: |
+      Paquets de longueurs $1, 2, 4, \dots$ : le paquet $\{2^{j-1}+1, \dots, 2^j\}$
+      vaut au moins $2^{j-1} \cdot 2^{-j} = 1/2$. Donc $S_{2^k} \ge 1 + k/2$.
+
+  - id: geometrique
+    ref: definition
+    front: "Série géométrique $\\sum_{n \\ge 0} q^n$ : nature et somme."
+    back: |
+      Converge ssi $|q| < 1$, vers $\frac{1}{1-q}$. Sinon divergence grossière.
+
+  - id: positives-majorees
+    ref: positives
+    front: "Pourquoi peut-on prouver qu'une série à termes positifs converge sans connaître sa somme ?"
+    back: |
+      Ses sommes partielles sont croissantes : elle converge ssi elles sont
+      majorées (limite monotone, donc axiome de la borne supérieure).
+
+  - id: equivalents-signe
+    ref: positives
+    front: "Critère des équivalents : quelle hypothèse est indispensable ?"
+    back: |
+      Le signe constant. $v_n = (-1)^n/\sqrt n$ et $u_n = v_n + 1/n$ sont
+      équivalents, $\sum v_n$ converge, $\sum u_n$ diverge.
+
+  - id: riemann
+    ref: riemann
+    front: "Nature de $\\sum 1/n^\\alpha$, et la preuve en une ligne."
+    back: |
+      Converge ssi $\alpha > 1$. Condensation : $2^k \cdot 2^{-k\alpha} = (2^{1-\alpha})^k$,
+      géométrique de raison $2^{1-\alpha}$.
+
+  - id: dalembert
+    ref: regles
+    front: "Règle de d'Alembert : énoncé et cas où elle ne dit rien."
+    back: |
+      $u_{n+1}/u_n \to \ell$ : convergence si $\ell < 1$, divergence si
+      $\ell > 1$. Rien si $\ell = 1$ — c'est le cas de toutes les séries de
+      Riemann.
+
+  - id: absolue
+    ref: absolue
+    front: "Pourquoi la convergence absolue entraîne-t-elle la convergence ?"
+    back: |
+      Critère de Cauchy : $|\sum_{p<n\le q} u_n| \le \sum_{p<n\le q}|u_n|$, et
+      les tranches de $\sum|u_n|$ sont petites. C'est la complétude de
+      $\mathbb{R}$ qui conclut.
+
+  - id: leibniz
+    ref: absolue
+    front: "Critère des séries alternées : hypothèses, et borne sur le reste."
+    back: |
+      $a_n \ge 0$, **décroissante**, $a_n \to 0$ ⇒ $\sum (-1)^n a_n$ converge,
+      et $|R_N| \le a_{N+1}$.
+
+  - id: reordonnement
+    ref: reordonnement
+    front: "Réordonner les termes d'une série : quand est-ce sans danger ?"
+    back: |
+      Pour une série absolument convergente (ou à termes positifs) : même
+      somme. Semi-convergente : n'importe quelle limite est atteignable
+      (Riemann). D'où l'exigence $\sum |x_k|\,p_k < \infty$ pour une espérance.
+
+  - id: mertens
+    ref: exponentielle
+    front: "Produit de Cauchy : définition, et hypothèse qui garantit $\\sum c_n = AB$."
+    back: |
+      $c_n = \sum_{k=0}^n a_k b_{n-k}$. Si les deux séries sont absolument
+      convergentes, $\sum c_n$ converge absolument vers $AB$. Il donne
+      $\exp(x)\exp(y) = \exp(x+y)$ avec le binôme.

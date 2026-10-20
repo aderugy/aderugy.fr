@@ -1,0 +1,30 @@
+---
+kind: preuve
+difficulty: 3
+after: positives
+---
+1. Soit $u_n \ge 0$ avec $\sum u_n$ convergente. Montrer que $\sum u_n^2$
+   converge.
+2. Soient $(a_n)$, $(b_n)$ réelles avec $\sum a_n^2$ et $\sum b_n^2$
+   convergentes. Montrer que $\sum a_n b_n$ est absolument convergente.
+3. En déduire que si $\sum u_n^2$ converge, alors $\sum \frac{u_n}{n}$ converge
+   absolument.
+
+<!-- indice -->
+1 : $u_n \to 0$, donc $u_n \le 1$ à partir d'un rang. 2 : l'inégalité
+$|ab| \le \frac12(a^2 + b^2)$.
+
+<!-- indice -->
+3 : appliquer 2 avec $a_n = u_n$ et $b_n = 1/n$.
+
+<!-- solution -->
+1. Comme $u_n \to 0$, il existe $N$ tel que $0 \le u_n \le 1$ pour $n \ge N$,
+   donc $u_n^2 \le u_n$. Par comparaison, $\sum u_n^2$ converge. Sans le signe,
+   c'est faux : $u_n = (-1)^n/\sqrt n$.
+2. $(|a_n| - |b_n|)^2 \ge 0$ donne $|a_n b_n| \le \frac12(a_n^2 + b_n^2)$, terme
+   général d'une série convergente. Par comparaison, $\sum |a_n b_n|$ converge.
+3. $\sum 1/n^2$ converge (Riemann, $\alpha = 2$) : la question 2 s'applique.
+
+L'inégalité de 2 est la forme élémentaire de l'inégalité de Cauchy-Schwarz :
+l'espace des suites de carré sommable, $\ell^2$, sera au niveau 3 le premier
+espace de Hilbert du parcours.

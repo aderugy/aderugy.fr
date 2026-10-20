@@ -1,0 +1,55 @@
+---
+kind: contre-exemple
+difficulty: 4
+after: exponentielle
+---
+Soit $a_n = \dfrac{(-1)^n}{\sqrt{n+1}}$ pour $n \ge 0$.
+
+1. Montrer que $\sum a_n$ converge, mais pas absolument.
+2. Soit $c_n = \sum_{k=0}^{n} a_k a_{n-k}$ le terme général du produit de
+   Cauchy de $\sum a_n$ par elle-même. Montrer que $|c_n| \ge \dfrac{2(n+1)}{n+2}$.
+3. Conclure, et dire quelle hypothèse du théorème de Mertens fait défaut.
+
+<!-- indice -->
+$a_k a_{n-k} = \frac{(-1)^n}{\sqrt{(k+1)(n-k+1)}}$ : tous les termes de $c_n$
+ont le même signe.
+
+<!-- indice -->
+Majorer $(k+1)(n-k+1)$ par l'inégalité arithmético-géométrique :
+$\sqrt{xy} \le \frac{x+y}{2}$.
+
+<!-- solution -->
+1. $\frac{1}{\sqrt{n+1}}$ décroît vers $0$ : critère des séries alternées.
+   $\sum \frac{1}{\sqrt{n+1}}$ diverge (Riemann, $\alpha = 1/2$).
+2. Tous les termes de $c_n$ valent $(-1)^n$ fois un nombre positif, donc
+   $|c_n| = \sum_{k=0}^{n} \frac{1}{\sqrt{(k+1)(n-k+1)}}$. Par l'inégalité
+   arithmético-géométrique,
+   $\sqrt{(k+1)(n-k+1)} \le \frac{(k+1) + (n-k+1)}{2} = \frac{n+2}{2}$. Chacun
+   des $n + 1$ termes est donc $\ge \frac{2}{n+2}$, et
+   $|c_n| \ge \frac{2(n+1)}{n+2}$.
+3. $|c_n| \ge 1$ pour tout $n \ge 0$ : $c_n \not\to 0$, la série
+   produit **diverge grossièrement**, alors que les deux facteurs convergent.
+   Le théorème de Mertens demande qu'au moins une des deux séries soit
+   absolument convergente — et ici aucune ne l'est.
+
+```python
+from math import sqrt
+
+N = 2000
+a = [(-1)**n / sqrt(n + 1) for n in range(N)]
+c = [sum(a[k] * a[n - k] for k in range(n + 1)) for n in range(N)]
+for n in (10, 100, 1000, 1999):
+    print(f"c_{n} = {c[n]:+.4f}   borne 2(n+1)/(n+2) = {2 * (n + 1) / (n + 2):.4f}")
+```
+
+Sortie :
+
+```
+c_10 = +2.2934   borne 2(n+1)/(n+2) = 1.8333
+c_100 = +2.8522   borne 2(n+1)/(n+2) = 1.9804
+c_1000 = +3.0493   borne 2(n+1)/(n+2) = 1.9980
+c_1999 = -3.0763   borne 2(n+1)/(n+2) = 1.9990
+```
+
+   $|c_n|$ se rapproche de $\pi$, au-dessus de la borne $2$ : la borne de
+   l'inégalité arithmético-géométrique n'est pas optimale, mais elle suffit.

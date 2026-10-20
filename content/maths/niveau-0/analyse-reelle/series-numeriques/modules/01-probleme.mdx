@@ -1,0 +1,50 @@
+---
+title: Le problème — additionner une infinité de nombres
+minutes: 6
+rubrique: [position, probleme]
+checkpoint:
+- type: nombre
+  question: 'On lance une pièce équilibrée jusqu''au premier pile. La probabilité que cela prenne exactement $k$ lancers est $2^{-k}$. Que vaut $\sum_{k=1}^{\infty} 2^{-k}$ ?'
+  reponse: 1
+  explication: 'C''est une série géométrique de raison $1/2$ : $\sum_{k \ge 1} 2^{-k} = \frac{1/2}{1 - 1/2} = 1$. Les probabilités de toutes les durées possibles somment à $1$ : la pièce finit presque sûrement par tomber sur pile.'
+- type: vrai-faux
+  question: 'Une somme infinie de termes qui tendent vers $0$ est toujours finie.'
+  reponse: false
+  explication: 'Faux : $1 + \frac12 + \frac13 + \cdots$ est infinie, alors que $1/n \to 0$. C''est le contre-exemple central du nœud, démontré à la capsule suivante.'
+---
+
+### Position dans le graphe
+
+Ce nœud ne demande que [les suites réelles](/maths/n/suites-reelles) : une
+série n'est rien d'autre que la suite de ses sommes partielles. En
+probabilités, il est partout : la $\sigma$-additivité de
+[l'espace probabilisé](/maths/n/espace-probabilise) est une égalité entre une
+probabilité et une série ; l'espérance d'une variable discrète est une série ;
+les lois géométrique et de Poisson n'ont de sens que si certaines séries
+convergent.
+
+### Le problème
+
+Une variable aléatoire $X$ prend les valeurs $1, 2, 3, \dots$ avec les
+probabilités $p_1, p_2, p_3, \dots$ Que veut dire « la somme des $p_k$ vaut
+$1$ » ? Et que veut dire « l'espérance de $X$ est $\sum_k k\,p_k$ » ? Ce sont
+des sommes d'une infinité de termes, et une addition ne porte que sur un nombre
+fini de termes. Il faut une **définition**.
+
+Trois exemples montrent que ce n'est pas une formalité.
+
+- Pour la loi de Poisson, $\mathbb{P}(X = k) = \mathrm{e}^{-\lambda} \lambda^k / k!$.
+  Que la somme vaille $1$, c'est l'égalité
+  $\sum_{k \ge 0} \lambda^k / k! = \mathrm{e}^{\lambda}$ — qui est en fait la
+  définition de l'exponentielle.
+- Les termes $1/n$ tendent vers $0$, et pourtant leur somme est infinie. Une
+  loi avec $p_k \propto 1/k$ n'existe donc pas : on ne peut pas normaliser.
+- La somme $1 - \frac12 + \frac13 - \frac14 + \cdots$ vaut $\ln 2$ dans cet ordre,
+  et **on peut obtenir n'importe quelle autre valeur en réordonnant les
+  termes**. Or une espérance ne doit pas dépendre de l'ordre dans lequel on
+  énumère les valeurs de $X$.
+
+Le nœud répond à trois questions : quand une somme infinie a-t-elle un sens,
+comment le savoir sans calculer la somme, et quand l'ordre des termes est-il
+sans importance. La troisième réponse — la convergence absolue — est
+exactement l'hypothèse sous laquelle une espérance est définie.

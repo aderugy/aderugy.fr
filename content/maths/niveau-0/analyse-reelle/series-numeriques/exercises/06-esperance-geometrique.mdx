@@ -1,0 +1,35 @@
+---
+kind: preuve
+difficulty: 3
+after: regles
+---
+Soit $q \in\, ]-1, 1[$.
+
+1. Montrer que $\sum_{n \ge 1} n\, q^{n-1}$ converge.
+2. En notant $T_N = \sum_{n=1}^{N} n q^{n-1}$, calculer $(1 - q) T_N$ et en
+   déduire $\displaystyle\sum_{n \ge 1} n\,q^{n-1} = \frac{1}{(1 - q)^2}$.
+3. Application : $X$ est le nombre de lancers d'une pièce jusqu'au premier
+   pile, qui sort avec probabilité $p \in\, ]0, 1]$ :
+   $\mathbb{P}(X = n) = (1-p)^{n-1} p$. Calculer $\mathbb{E}[X]$.
+
+<!-- indice -->
+1 : règle de d'Alembert sur $|n q^{n-1}|$. 2 : $(1 - q)T_N$ télescope en une
+somme géométrique, moins un terme.
+
+<!-- indice -->
+$(1 - q) T_N = \sum_{n=1}^{N} q^{n-1} - N q^N$. Il reste à montrer
+$N q^N \to 0$, ce que donne la question 1 (terme général d'une série
+convergente).
+
+<!-- solution -->
+1. Pour $q \ne 0$, $\frac{(n+1)|q|^n}{n|q|^{n-1}} = \frac{n+1}{n}|q| \to |q| < 1$ :
+   la série converge absolument.
+2. $(1 - q)T_N = \sum_{n=1}^{N} n q^{n-1} - \sum_{n=1}^{N} n q^n
+   = \sum_{n=1}^{N} n q^{n-1} - \sum_{m=2}^{N+1} (m-1) q^{m-1}
+   = \sum_{n=1}^{N} q^{n-1} - N q^N$.
+   Par 1, le terme $(N+1)q^N$ tend vers $0$, donc $Nq^N \to 0$ aussi. D'où
+   $(1 - q)\,T_N \to \frac{1}{1 - q}$, et $T_N \to \frac{1}{(1 - q)^2}$.
+3. La série $\sum n\,\mathbb{P}(X = n)$ est à termes positifs ; avec
+   $q = 1 - p$,
+   $\mathbb{E}[X] = p \sum_{n \ge 1} n (1-p)^{n-1} = \frac{p}{p^2} = \frac1p$.
+   Une pièce équilibrée demande en moyenne deux lancers.

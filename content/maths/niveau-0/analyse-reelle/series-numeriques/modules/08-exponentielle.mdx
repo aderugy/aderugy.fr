@@ -1,0 +1,121 @@
+---
+title: L'exponentielle comme série, et le produit de Cauchy
+minutes: 8
+rubrique: [construction, demonstrations, simulation]
+checkpoint:
+- type: nombre
+  question: 'Pour $X \sim \mathcal{P}(\lambda)$, $\mathbb{E}[X] = \sum_{k \ge 0} k\,\mathrm{e}^{-\lambda}\lambda^k/k!$. Que vaut cette somme pour $\lambda = 3$ ?'
+  reponse: 3
+  explication: 'Pour $k \ge 1$, $k \lambda^k / k! = \lambda \cdot \lambda^{k-1}/(k-1)!$. Donc $\mathbb{E}[X] = \lambda\,\mathrm{e}^{-\lambda} \sum_{j \ge 0} \lambda^j / j! = \lambda$. La série est à termes positifs : aucune question d''ordre ne se pose.'
+- type: qcm
+  question: 'Pourquoi peut-on écrire $\exp(x)\exp(y) = \exp(x + y)$ à partir de la définition par la série ?'
+  choix:
+  - 'Parce que le produit de deux séries convergentes est la série des produits terme à terme.'
+  - 'Parce que les deux séries sont absolument convergentes, ce qui autorise leur produit de Cauchy, et que le binôme de Newton regroupe les termes en $(x + y)^n / n!$.'
+  - 'Par définition de l''exponentielle.'
+  reponse: 1
+  explication: 'Le produit de Cauchy $c_n = \sum_{k=0}^n a_k b_{n-k}$ de deux séries absolument convergentes converge vers le produit des sommes (Mertens). Avec $a_k = x^k/k!$, $b_j = y^j/j!$, on obtient $c_n = (x + y)^n / n!$ par le binôme.'
+---
+
+### Définition
+
+Pour tout réel $x$, la série $\sum_{n \ge 0} \frac{x^n}{n!}$ est absolument
+convergente : la règle de d'Alembert donne le rapport
+$\frac{|x|}{n+1} \to 0$. On **définit**
+
+$$
+\exp(x) = \sum_{n=0}^{\infty} \frac{x^n}{n!}, \qquad \mathrm{e} = \exp(1) .
+$$
+
+Toutes les propriétés de l'exponentielle découlent de cette définition. La
+plus importante est la suivante.
+
+### Le produit de Cauchy
+
+Le produit de deux sommes finies $\big(\sum_{i \le N} a_i\big)\big(\sum_{j \le N} b_j\big)$
+est la somme des $a_i b_j$ sur le carré $\{0, \dots, N\}^2$. Pour deux séries, on
+regroupe ces produits par **diagonales** $i + j = n$ :
+
+$$
+c_n = \sum_{k=0}^{n} a_k\, b_{n-k} .
+$$
+
+> **Théorème (Mertens, cas absolument convergent).** Si $\sum a_n$ et $\sum b_n$
+> sont absolument convergentes, alors $\sum c_n$ est absolument convergente et
+> $$
+> \sum_{n=0}^{\infty} c_n = \Big(\sum_{n=0}^{\infty} a_n\Big)\Big(\sum_{n=0}^{\infty} b_n\Big) .
+> $$
+
+*Démonstration.* Notons $A$, $B$ les sommes et $A_N$, $B_N$, $C_N$ les sommes
+partielles. $A_N B_N$ est la somme des $a_i b_j$ sur le carré
+$\{0,\dots,N\}^2$, et $C_N$ la somme sur le triangle $i + j \le N$, contenu dans
+le carré. Donc $A_N B_N - C_N$ est la somme des $a_i b_j$ sur les couples du
+carré avec $i + j > N$ ; chacun de ces couples a $i > N/2$ ou $j > N/2$. Ainsi
+
+$$
+|A_N B_N - C_N| \le \Big(\sum_{i > N/2} |a_i|\Big)\Big(\sum_{j} |b_j|\Big)
++ \Big(\sum_{i} |a_i|\Big)\Big(\sum_{j > N/2} |b_j|\Big) \xrightarrow[N \to \infty]{} 0 ,
+$$
+
+car les restes de séries convergentes tendent vers $0$. Comme
+$A_N B_N \to AB$, on obtient $C_N \to AB$. Le même calcul avec $|a_i|$ et
+$|b_j|$ montre que $\sum |c_n| \le \sum_n \sum_{k \le n} |a_k| |b_{n-k}|$ est
+majorée par $\big(\sum |a_n|\big)\big(\sum |b_n|\big)$. $\square$
+
+L'hypothèse d'absolue convergence sert à majorer la partie hors triangle ; sans
+elle, le produit de Cauchy de $\sum \frac{(-1)^n}{\sqrt{n+1}}$ par elle-même
+diverge (exercice 10).
+
+### $\exp(x + y) = \exp(x) \exp(y)$
+
+Avec $a_k = x^k / k!$ et $b_j = y^j / j!$,
+
+$$
+c_n = \sum_{k=0}^{n} \frac{x^k}{k!} \frac{y^{n-k}}{(n-k)!}
+= \frac{1}{n!} \sum_{k=0}^{n} \binom{n}{k} x^k y^{n-k} = \frac{(x + y)^n}{n!} ,
+$$
+
+par le [binôme de Newton](/maths/n/denombrement-base/m/binome). Le théorème de
+Mertens donne $\exp(x)\exp(y) = \exp(x + y)$. En particulier
+$\exp(x)\exp(-x) = 1$, donc $\exp(x) > 0$ : la loi de Poisson,
+$\mathbb{P}(X = k) = \mathrm{e}^{-\lambda}\lambda^k / k!$, est une vraie loi de
+probabilité, de somme $\mathrm{e}^{-\lambda}\mathrm{e}^{\lambda} = 1$.
+
+### Vérification numérique
+
+```python
+from math import exp, factorial
+
+def exp_serie(x, N):
+    return sum(x**n / factorial(n) for n in range(N + 1))
+
+for x in (1.0, 5.0, -5.0):
+    for N in (5, 10, 20, 40):
+        approx = exp_serie(x, N)
+        print(f"x={x:+.0f} N={N:>2}  serie={approx:+.12e}  erreur relative={abs(approx - exp(x)) / exp(x):.1e}")
+```
+
+Sortie obtenue :
+
+```
+x=+1 N= 5  serie=+2.716666666667e+00  erreur relative=5.9e-04
+x=+1 N=10  serie=+2.718281801146e+00  erreur relative=1.0e-08
+x=+1 N=20  serie=+2.718281828459e+00  erreur relative=0.0e+00
+x=+1 N=40  serie=+2.718281828459e+00  erreur relative=0.0e+00
+x=+5 N= 5  serie=+9.141666666667e+01  erreur relative=3.8e-01
+x=+5 N=10  serie=+1.463806010251e+02  erreur relative=1.4e-02
+x=+5 N=20  serie=+1.484131470674e+02  erreur relative=8.1e-08
+x=+5 N=40  serie=+1.484131591026e+02  erreur relative=0.0e+00
+x=-5 N= 5  serie=-1.233333333333e+01  erreur relative=1.8e+03
+x=-5 N=10  serie=+8.640390762787e-01  erreur relative=1.3e+02
+x=-5 N=20  serie=+6.745540097712e-03  erreur relative=1.1e-03
+x=-5 N=40  serie=+6.737946999087e-03  erreur relative=2.1e-13
+```
+
+La série converge vite — le reste est dominé par le premier terme négligé,
+$|x|^{N+1}/(N+1)!$ —, mais pour $x = -5$ l'erreur relative stagne au-dessus de
+celle de $x = +5$. Les termes alternent et atteignent $5^5/5! \approx 26$ avant
+de décroître, pour une somme de $\mathrm{e}^{-5} \approx 0{,}0067$ : les
+annulations perdent des chiffres significatifs. En pratique on calcule
+$\mathrm{e}^{-5} = 1/\mathrm{e}^{5}$. Une série convergente peut être un très
+mauvais algorithme.
