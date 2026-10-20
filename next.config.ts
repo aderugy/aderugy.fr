@@ -4,10 +4,12 @@ const nextConfig: NextConfig = {
   // /maths lit son contenu (graphe, cours MDX, exercices, cartes) sur le
   // disque à l'exécution. Le traçage de fichiers ne voit pas ces lectures
   // dynamiques : sans cette ligne, le déploiement Vercel n'embarque pas
-  // content/maths et chaque page du parcours échoue.
+  // content/maths et chaque page du parcours échoue. Le connecteur Claude
+  // (/api/mcp) lit le même contenu.
   outputFileTracingIncludes: {
     "/maths": ["./content/maths/**/*"],
     "/maths/**": ["./content/maths/**/*"],
+    "/api/mcp": ["./content/maths/**/*"],
   },
   // The service worker must be revalidated on every load, or browsers keep an
   // old one for up to a day after a deploy.
