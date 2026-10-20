@@ -513,3 +513,84 @@ Python de la section 7 est coupé en trois extraits, chacun dans la capsule
 qu'il illustre, et leurs sorties ont été régénérées en exécutant le code (la
 sortie publiée omettait des lignes). Les liens internes `/n/…`, cassés depuis
 l'intégration au site, pointent désormais vers `/maths/n/…`.
+
+## D26 — Gamification : jouer sans tricher avec la progression — **demandée le 2026-10-20**
+
+Suite de D25, livrée dans la même branche. Le §13 excluait la gamification ;
+Arthur l'a demandée explicitement. Ce qui la rend acceptable ici tient en une
+règle : **l'XP mesure l'effort, jamais la maîtrise.** Les états `learned` et
+`mastered` restent calculés par `progression/rules.ts` à partir des preuves,
+et aucune ligne de la couche de jeu n'y touche. Sinon on finirait par
+optimiser l'XP au lieu d'apprendre.
+
+**Checkpoint.** Chaque capsule se termine par 2 à 4 questions — qcm,
+vrai/faux, nombre — à réussir toutes pour terminer la capsule. La correction
+se fait côté serveur : le navigateur ne reçoit ni les réponses ni les
+explications avant d'avoir répondu juste, et terminer recorrige tout. Une
+réponse fausse ne dévoile pas la bonne : on réessaie. L'ordre des choix est
+mélangé de façon déterministe par question, parce qu'en rédigeant on met la
+bonne réponse toujours au même endroit sans s'en rendre compte. Le nombre
+d'essais est gardé (`checkpoint_tries`) pour un seul usage : le bonus du
+premier coup. Ce chiffre vient du navigateur et n'est pas vérifiable ; il ne
+pèse que 5 XP et rien d'autre, ce qui est le bon ordre de confiance.
+
+Une capsule déjà lue garde son checkpoint en entraînement libre, sans rien
+enregistrer. Le connecteur peut lire un checkpoint pour interroger Arthur en
+conversation, réponses comprises sur demande, mais ne peut pas terminer une
+capsule (0029, lecture seule).
+
+**Test de sortie.** Les exercices de difficulté ≥ 4 sortent du fil des
+capsules et forment le test de sortie en fin de parcours. C'est exactement la
+condition « exercice difficile réussi » de `mastered`, et le test du §2 qui
+permet de valider un nœud sans le parcourir : on ne fait que le nommer.
+
+**XP.** Barème dans `lib/maths/jeu` :
+
+| geste | XP |
+|---|---|
+| capsule terminée | 10, +5 si le checkpoint passe du premier coup |
+| exercice | valeur de la meilleure issue × difficulté : seul 10, avec indice 5, échec 2, abandon 1 |
+| test de sortie | +50, une fois par nœud |
+| carte révisée | 1, une fois par carte et par jour |
+
+Deux choix délibérés. Un exercice **ne rapporte que ses progrès** : le
+refaire après l'avoir réussi ne rapporte rien, sinon refaire les faciles
+serait la meilleure stratégie. Et **un échec ne retire jamais rien** — il
+rapporte même un peu, parce que le journal des tentatives n'a de valeur que
+si les échecs y sont déclarés (§12) ; un barème qui les punit apprendrait à
+les taire. Les révisions sont plafonnées à une par carte et par jour, pour la
+même raison que le plafond de cartes neuves (D17).
+
+Niveau n à 100·n(n−1)/2 XP. Un nœud complet rapporte de l'ordre de 500 XP :
+les premiers niveaux tombent en une semaine, les suivants au rythme des nœuds.
+
+**Rien n'est stocké.** XP, niveau, série et badges sont recalculés à chaque
+lecture à partir des capsules terminées, des tentatives, du journal des
+révisions et du journal de session — comme les états de progression. Changer
+un barème réécrit donc tout l'historique de façon cohérente, sans migration.
+La seule aide côté base est `maths_reviews_per_day()`, qui agrège le journal
+des révisions par jour de Paris plutôt que de le paginer à chaque page.
+
+**Série.** Un jour compte dès une capsule, un exercice, une carte ou une
+séance au journal : le seuil est bas exprès, la série récompense la
+régularité et l'objectif du jour porte le volume. Un joker par semaine (lundi
+à dimanche) couvre un jour manqué isolé ; deux jours d'affilée cassent la
+série. Le choix d'une série quotidienne plutôt qu'un objectif d'heures
+hebdomadaire était ouvert ; la série a été retenue, et le joker est là pour
+qu'un jour de repos — ou une course le dimanche — ne coûte pas trois semaines.
+
+**Objectif du jour.** Deux gestes : avancer (une capsule ou un exercice) et
+entretenir (vider la file de révision). Il ne rapporte pas d'XP, parce que
+« file vide » est un état présent qu'on ne sait pas reconstituer après coup.
+
+**Badges.** Neuf, chacun lié à un jalon réel — premier pas, cours lu, cinq
+checkpoints sans faute, test de sortie, dix exercices difficiles résolus seul,
+cent cartes, première maîtrise, sept et trente jours de série. Aucun badge ne
+s'obtient en cliquant. Un badge acquis le reste, même si la maîtrise qui l'a
+valu retombe.
+
+**Interface.** Fidèle au §9 : aucune couleur nouvelle. La série et le niveau
+tiennent en une ligne de chrome dans l'en-tête ; tout le reste est sur
+`/maths/rythme`, tracé à l'encre comme le tableau de bord (D21), chaque
+graphique doublé de ses chiffres. Après une capsule, le gain s'affiche une
+fois, en une ligne, dans la règle de la page suivante.

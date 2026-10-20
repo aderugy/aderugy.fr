@@ -18,6 +18,7 @@ import {
   chargerDonneesDe,
   deleteEntryAvec,
   minutesByNode,
+  revisionsParJourDe,
   reviewLogAvec,
   setCourseReadAvec,
   setManualAvec,
@@ -29,6 +30,8 @@ import {
   type SessionLogRow,
 } from "@/server/maths/data";
 import { callerOf } from "./auth";
+import { bilan } from "@/server/maths/jeu";
+import { BAREME } from "@/lib/maths/jeu";
 
 /**
  * /maths as MCP tools, on the same connector as the backlog (migration 0028).
@@ -45,7 +48,8 @@ export const MATHS_INSTRUCTIONS = `Arthur's probability & statistics parcours (a
 
 How the data works:
 - The graph has domains (levels, e.g. "niveau-0"), topics and concepts, all with stable slug ids. Only concepts carry content and progress. "requires" edges are real prerequisites; "unlocks" is their inverse.
-- Content lives in the site's repository, not in the database: it is read-only here. A concept's content is empty (not written yet), draft or published. Courses are in French, Markdown with KaTeX. A course follows a nine-part rubric (position, probleme, construction, intuition, demonstrations, pieges, simulation, liens, references). Written courses are cut into capsules: one notion each, 5–10 minutes, read in order, each covering some parts of the rubric; liens and references close the node. Arthur finishes capsules in the app (you can see which, not mark them); finishing them all marks the course read.
+- Content lives in the site's repository, not in the database: it is read-only here. A concept's content is empty (not written yet), draft or published. Courses are in French, Markdown with KaTeX. A course follows a nine-part rubric (position, probleme, construction, intuition, demonstrations, pieges, simulation, liens, references). Written courses are cut into capsules: one notion each, 5–10 minutes, read in order, each covering some parts of the rubric; liens and references close the node. Each capsule ends with a checkpoint (2–3 auto-graded questions) he must pass in the app to finish it; you can read a checkpoint to quiz him in conversation, but not finish capsules. Finishing them all marks the course read. Exercises of difficulty 4–5 form the node's exit test.
+- A game layer sits on top (get_maths_rhythm): XP, level, daily streak with one joker per week, a daily goal (advance: a capsule or an exercise; maintain: empty the review queue), badges. It is derived from the same evidence and never changes the states above — XP measures effort, not mastery. Don't push him to farm XP; use it to encourage regularity.
 - State per concept, computed from evidence, never stored: locked (a prerequisite is not learned yet), available, in-progress, learned, mastered. learned = course read + ≥70% of difficulty ≤3 exercises solved, half of those without a hint (or Arthur marked it learned). mastered = learned + a difficulty 4–5 exercise solved + every card's FSRS stability > 21 days (or marked mastered). Mastery is lost by itself when cards decay.
 - Evidence you may record: the manual status (none, in-progress, learned, mastered — for a node he tested out of, or to override), whether the course was read, study sessions (minutes + note), and exercise attempts (outcome + minutes + note). Outcomes: resolu-seul (solved alone), resolu-avec-indice (solved with a hint), echec (failed), abandonne (gave up). The best attempt per exercise counts. The note of an attempt — what blocked him — is the most valuable field: write it precisely.
 - Entries you record are marked as yours; you can edit or delete only those.
@@ -406,6 +410,106 @@ export function registerMathsTools(server: McpServer) {
         sessions.length ? sessions.slice(0, 30).map((x) => sessionLine(x)).join("\n") : "None.",
       ];
       return ok(out.join("\n"));
+    },
+  );
+
+  /* ------------------------------------------------------------- game */
+
+  server.registerTool(
+    "get_maths_rhythm",
+    {
+      title: "Maths rhythm: XP, streak, goal, badges",
+      description:
+        "Arthur's game layer on the maths parcours: total XP and level, current and record streak (with the weekly joker), today's goal and whether it is done, XP over the last 14 days, recent gains and badges (earned and progress). Derived from his activity; it never changes the concepts' states.",
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async (_input, ctx) => {
+      const { db, userId } = callerOf(ctx.http?.authInfo);
+      const graph = loadGraph();
+      const [donnees, revisions] = await Promise.all([
+        chargerDonneesDe(db, userId, { auteur: true }),
+        revisionsParJourDe(db),
+      ]);
+      const b = bilan(graph, donnees, revisions, new Date());
+      const titre = (id: string) => graph.byId.get(id)?.title ?? id;
+      const s = b.serie;
+      const out = [
+        `# Maths rhythm — ${b.aujourdhui}`,
+        `Level ${b.niveau.niveau} · ${b.xp} XP · ${b.niveau.jusqua - b.xp} XP to level ${b.niveau.niveau + 1}.`,
+        `Streak: ${s.longueur} day${s.longueur === 1 ? "" : "s"} (record ${s.record}) · today ${s.aujourdhui ? "already counts" : s.longueur > 0 ? "still to do before midnight" : "not started"} · weekly joker ${s.jokerDisponible ? "available" : "used"}${s.jokers.length ? ` · jokers covered ${s.jokers.join(", ")}` : ""}.`,
+        "",
+        "## Today's goal",
+        ...b.objectif.map((o) => `- [${o.fait ? "x" : " "}] ${o.libelle} — ${o.detail}`),
+        "",
+        "## XP, last 14 days",
+        b.recents.map((r) => `${r.jour.slice(5)} ${r.xp}`).join(" · "),
+        "",
+        "## Recent gains",
+        b.journal.length
+          ? b.journal.slice(0, 15).map((e) => `- ${e.jour} · +${e.xp} · ${e.type} · ${e.type === "revision" ? `${e.detail} cards` : e.detail} · ${titre(e.nodeId)}`).join("\n")
+          : "None yet.",
+        "",
+        "## Badges",
+        ...b.badges.map((x) => `- [${x.obtenu ? "x" : " "}] ${x.nom}: ${x.description}${x.obtenu && x.jour ? ` (${x.jour})` : ""}${!x.obtenu && x.progres ? ` (${x.progres.fait}/${x.progres.but})` : ""}`),
+        "",
+        `Scoring: capsule ${BAREME.capsule} (+${BAREME.premierEssai} if its checkpoint passed first try); exercise = issue value × difficulty, only improvements count (solved alone ${BAREME.exercice["resolu-seul"]}, with hint ${BAREME.exercice["resolu-avec-indice"]}, failed ${BAREME.exercice.echec}, gave up ${BAREME.exercice.abandonne}); exit test +${BAREME.testDeSortie} once per node; ${BAREME.revision} per card reviewed per day. Level n at 100·n(n−1)/2 XP.`,
+      ];
+      return ok(out.join("\n"));
+    },
+  );
+
+  server.registerTool(
+    "get_maths_checkpoint",
+    {
+      title: "Get a capsule's checkpoint",
+      description:
+        'The checkpoint questions that close a capsule, to quiz Arthur in conversation. Answers and explanations are returned only with reveal "answers": ask first, reveal after he answers. Passing it here does not finish the capsule — that happens in the app.',
+      inputSchema: z.object({
+        concept: conceptRef,
+        capsule: z.string().min(1).max(120).describe("Capsule id or number, from get_maths_node."),
+        reveal: z.enum(["questions", "answers"]).optional().describe('Default "questions".'),
+      }),
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ concept, capsule, reveal }, ctx) => {
+      const { db, userId } = callerOf(ctx.http?.authInfo);
+      const r = findConcept(loadGraph(), concept);
+      if (!r.ok) return failure(r.error);
+      const capsules = loadModules(r.node);
+      const want = capsule.trim().toLowerCase();
+      const c =
+        capsules.find((x) => x.id === want) ??
+        (/^\d+$/.test(want) ? capsules.find((x) => x.numero === Number(want)) : undefined);
+      if (!c)
+        return failure(`No capsule "${capsule}" in ${r.node.id}. Capsules: ${capsules.map((x) => `${x.numero}. ${x.id}`).join(", ") || "none (this concept is not cut into capsules)"}.`);
+      const donnees = await chargerDonneesDe(db, userId, { auteur: true });
+      const fait = donnees.capsules.find((x) => x.nodeId === r.node.id && x.moduleId === c.id);
+      const answers = reveal === "answers";
+      const out = [
+        `# ${r.node.title} — capsule ${c.numero}. ${c.title}`,
+        fait
+          ? `Finished ${when(fait.completedAt)}${fait.checkpointTries ? `, checkpoint passed in ${`${fait.checkpointTries} ${fait.checkpointTries === 1 ? "try" : "tries"}`}` : ""}.`
+          : "Not finished yet.",
+        "",
+        ...c.checkpoint.flatMap((q, i) => {
+          const lignes = [`## Question ${i + 1} (${q.type})`, q.question];
+          if (q.type === "qcm") lignes.push(...q.choix.map((x, k) => `${String.fromCharCode(97 + k)}) ${x}`));
+          if (q.type === "vrai-faux") lignes.push("True or false?");
+          if (answers) {
+            const rep =
+              q.type === "qcm"
+                ? `${String.fromCharCode(97 + q.reponse)}) ${q.choix[q.reponse]}`
+                : q.type === "vrai-faux"
+                  ? q.reponse ? "true" : "false"
+                  : `${q.reponse}${q.tolerance ? ` (± ${q.tolerance})` : ""}`;
+            lignes.push(`Answer: ${rep}`, `Why: ${q.explication}`);
+          }
+          return [...lignes, ""];
+        }),
+      ];
+      if (c.checkpoint.length === 0) out.push("This capsule has no checkpoint.");
+      return ok(out.join("\n").trim());
     },
   );
 

@@ -171,7 +171,10 @@ Quatre choses ont été retirées d'une première version :
 2. **Le grand pourcentage d'avancement en haut de l'accueil**, avec les heures de
    la semaine. C'est de la gamification déguisée (§13) et cela vole la place du
    graphe, qui doit être le héros. Il reste une ligne de chiffres de 13 px dans
-   la règle haute, sans emphase.
+   la règle haute, sans emphase. *Depuis D26, la gamification est assumée, mais
+   la règle tient : la série et le niveau tiennent en une ligne de chrome à
+   droite de l'en-tête, sans couleur, et le détail vit sur sa propre page
+   (`/maths/rythme`), pas sur l'accueil.*
 
 3. **Les cartes d'exercice arrondies avec ombre.** Figurait explicitement dans la
    liste des défauts par défaut du brief, et j'y allais quand même. Remplacées
