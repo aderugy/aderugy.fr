@@ -7,7 +7,8 @@ import { SignOutButton } from "@/components/agenda/SignOutButton";
 import { MathsNav } from "@/components/maths/MathsNav";
 import { loadGraph } from "@/lib/maths/graph/load";
 import { compteursRevision } from "@/lib/maths/revision/queue";
-import { chargerDonnees } from "@/server/maths/data";
+import { chargerDonnees, revisionsParJour } from "@/server/maths/data";
+import { bilan } from "@/server/maths/jeu";
 import "katex/dist/katex.min.css";
 import "./maths.css";
 
@@ -37,6 +38,34 @@ async function CompteurRevision() {
   );
 }
 
+/**
+ * Série et niveau, en une ligne de chrome à droite de l'en-tête (D26). Sans
+ * couleur : ce n'est pas un état de maîtrise. Isolé derrière un Suspense,
+ * comme le compteur.
+ */
+async function Rythme() {
+  const graph = loadGraph();
+  const [donnees, revisions] = await Promise.all([chargerDonnees(), revisionsParJour()]);
+  const b = bilan(graph, donnees, revisions, new Date());
+  const enAttente = b.serie.longueur > 0 && !b.serie.aujourdhui;
+  return (
+    <Link
+      href="/maths/rythme"
+      className="tabular-nums hover:text-foreground"
+      title={
+        enAttente
+          ? "série en cours : aujourd'hui reste à faire"
+          : `${b.xp} XP · record de série ${b.serie.record} j`
+      }
+    >
+      <span className={enAttente ? "underline decoration-dotted underline-offset-4" : undefined}>
+        série {b.serie.longueur}
+      </span>
+      <span className="mx-1.5">·</span>niv. {b.niveau.niveau}
+    </Link>
+  );
+}
+
 export default async function MathsLayout({ children }: LayoutProps<"/maths">) {
   const supabase = await createClient();
   const user = await userFromClaims(supabase);
@@ -60,6 +89,9 @@ export default async function MathsLayout({ children }: LayoutProps<"/maths">) {
           }
         />
         <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-muted">
+          <Suspense fallback={null}>
+            <Rythme />
+          </Suspense>
           <span className="hidden lg:inline">{user.email}</span>
           <SignOutButton />
         </div>

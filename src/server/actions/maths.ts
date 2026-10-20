@@ -16,6 +16,7 @@ import { loadGraph } from "@/lib/maths/graph/load";
 import { cardKey, exerciseKey, loadExercises, loadModules } from "@/lib/maths/content";
 import { coursTermine, voisine } from "@/lib/maths/progression/capsules";
 import { corriger, graineQuestion, versFichier } from "@/lib/maths/checkpoint";
+import { BAREME } from "@/lib/maths/jeu";
 import { compiler } from "@/lib/maths/mdx";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import {
@@ -125,8 +126,15 @@ async function finir(
   revalidatePath(`/maths/n/${nodeId}`);
   revalidatePath(`/maths/n/${nodeId}/m/${moduleId}`);
   revalidatePath("/maths");
+  // Le gain est annoncé sur la page suivante (`?gagne=`), à titre
+  // d'information seulement : l'XP réelle est toujours recalculée.
+  const gagne = BAREME.capsule + (essais === 1 ? BAREME.premierEssai : 0);
   const suivante = voisine(capsules, moduleId, 1);
-  redirect(suivante ? `/maths/n/${nodeId}/m/${suivante}` : `/maths/n/${nodeId}`);
+  redirect(
+    suivante
+      ? `/maths/n/${nodeId}/m/${suivante}?gagne=${gagne}`
+      : `/maths/n/${nodeId}?gagne=${gagne}`,
+  );
 }
 
 /** Rouvre une capsule terminée, pour la relire comme neuve. */

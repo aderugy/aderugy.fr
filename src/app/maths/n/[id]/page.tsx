@@ -30,6 +30,7 @@ import { Mdx } from "@/lib/maths/mdx";
 import { JournalSession, MarquageEtat } from "@/components/maths/NodeActions";
 import ListeExercices from "@/components/maths/ListeExercices";
 import Parcours, { jauge } from "@/components/maths/Parcours";
+import Gain, { lireGain } from "@/components/maths/Gain";
 import {
   avancementCapsules,
   exercicesParCapsule,
@@ -48,8 +49,12 @@ import {
 const RAIL =
   "chrome shrink-0 border-line p-4 lg:sticky lg:top-[5.25rem] lg:h-[calc(100dvh-5.25rem)] lg:overflow-y-auto";
 
-export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
+export default async function NodePage({
+  params,
+  searchParams,
+}: PageProps<"/maths/n/[id]">) {
   const { id } = await params;
+  const gain = lireGain(await searchParams);
   const graph = loadGraph();
   const node = graph.byId.get(id);
   if (!node || node.kind !== "concept") notFound();
@@ -102,6 +107,7 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
         <span className="hidden text-muted sm:inline">/</span>
         <span className="hidden truncate sm:inline">{topic.title}</span>
         <div className="grow" />
+        {gain && <Gain xp={gain} texte="cours terminé" />}
         <span style={{ color: ETAT[state].border }}>{marqueur(state)}</span>
         <span>{ETAT[state].label}</span>
       </div>

@@ -24,6 +24,7 @@ import { SEUILS } from "@/lib/maths/progression/rules";
 import ListeExercices from "@/components/maths/ListeExercices";
 import Checkpoint, { type QuestionVue } from "@/components/maths/Checkpoint";
 import { jauge } from "@/components/maths/Parcours";
+import Gain, { lireGain } from "@/components/maths/Gain";
 
 const LIBELLE_RUBRIQUE = new Map<string, string>(
   RUBRIQUE.map((r) => [r.id, r.label]),
@@ -39,8 +40,10 @@ const LIBELLE_RUBRIQUE = new Map<string, string>(
  */
 export default async function CapsulePage({
   params,
+  searchParams,
 }: PageProps<"/maths/n/[id]/m/[module]">) {
   const { id, module } = await params;
+  const gain = lireGain(await searchParams);
   const graph = loadGraph();
   const node = graph.byId.get(id);
   if (!node || node.kind !== "concept") notFound();
@@ -93,6 +96,7 @@ export default async function CapsulePage({
           ← {node.title}
         </Link>
         <div className="grow" />
+        {gain && <Gain xp={gain} texte="capsule précédente terminée" />}
         <span className="hidden font-mono text-[12px] sm:inline" aria-hidden>
           {jauge(avancement.terminees, avancement.total)}
         </span>
