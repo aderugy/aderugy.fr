@@ -1,0 +1,29 @@
+---
+kind: calcul
+difficulty: 2
+after: combinaisons
+---
+Un club compte $7$ femmes et $5$ hommes. On forme un comité de $4$ personnes.
+
+1. Combien de comités possibles ?
+2. Combien de comités comptent exactement $2$ femmes ?
+3. Combien comptent au moins une femme et au moins un homme ?
+4. Alice et Bruno refusent de siéger ensemble. Combien de comités respectent
+   cette contrainte ?
+
+<!-- indice -->
+Pour 3, le complémentaire est formé de deux cas disjoints. Pour 4, compter
+les comités qui contiennent à la fois Alice et Bruno.
+
+<!-- indice -->
+Un comité contenant Alice et Bruno est déterminé par ses deux autres membres,
+choisis parmi les $10$ restants.
+
+<!-- solution -->
+1. $\binom{12}{4} = 495$.
+2. Deux femmes parmi $7$, deux hommes parmi $5$ :
+   $\binom{7}{2}\binom{5}{2} = 21 \times 10 = 210$.
+3. Comités non mixtes : $\binom{7}{4} + \binom{5}{4} = 35 + 5 = 40$. D'où
+   $495 - 40 = 455$.
+4. Comités contenant Alice et Bruno : $\binom{10}{2} = 45$. D'où
+   $495 - 45 = 450$.

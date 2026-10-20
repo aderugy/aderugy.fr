@@ -1,0 +1,82 @@
+---
+title: Somme, produit, bijection — les trois règles qui suffisent
+minutes: 8
+rubrique: [construction, intuition, demonstrations]
+checkpoint:
+- type: nombre
+  question: Combien la partie $E = \{1, 2, 3, 4, 5, 6\}$ a-t-elle de parties (vide et $E$ compris) ?
+  reponse: 64
+  explication: '$\operatorname{card}\,\mathcal{P}(E) = 2^{\operatorname{card} E} = 2^6 = 64$ : chaque élément est dedans ou dehors, six choix binaires indépendants. Oublier la partie vide ou $E$ lui-même donne $62$.'
+- type: qcm
+  question: 'Un menu propose 3 entrées, 4 plats et 2 desserts. On prend **soit** une entrée et un plat, **soit** un plat et un dessert. Combien de repas possibles ?'
+  choix:
+  - $3 \times 4 \times 2 = 24$
+  - $3 \times 4 + 4 \times 2 = 20$
+  - $3 + 4 + 2 = 9$
+  reponse: 1
+  explication: 'Les deux formules sont disjointes (un repas de la première n''a pas de dessert, un de la seconde n''a pas d''entrée) : on **additionne** leurs effectifs. Chacun se compte par un **produit** : $12 + 8 = 20$. Le $24$ compte les repas complets à trois services, qui ne sont pas proposés.'
+- type: vrai-faux
+  question: 'Si $f : A \to B$ est surjective et $A$ fini, alors $\operatorname{card} A = \operatorname{card} B$.'
+  reponse: false
+  explication: 'Faux : une surjection donne seulement $\operatorname{card} A \ge \operatorname{card} B$. L''égalité demande une bijection. Exemple : $\{1, 2\} \to \{0\}$ est surjective.'
+---
+
+### Cardinal
+
+Un ensemble $E$ est fini s'il est en bijection avec $\{1, \dots, n\}$ pour un
+entier $n$ ; cet entier est unique, c'est le **cardinal** de $E$, noté
+$\operatorname{card}(E)$ ou $|E|$. L'unicité est admise ici : elle revient au
+principe des tiroirs (il n'existe pas d'injection de $\{1, \dots, n+1\}$ dans
+$\{1, \dots, n\}$), qui se démontre par récurrence sur $n$ — voir Tao,
+*Analysis I*, chapitre 3.
+
+### Les trois règles
+
+> **Règle de la bijection.** S'il existe une bijection $A \to B$, alors
+> $\operatorname{card} A = \operatorname{card} B$.
+>
+> **Règle de la somme.** Si $A$ et $B$ sont finis et **disjoints**,
+> $\operatorname{card}(A \cup B) = \operatorname{card} A + \operatorname{card} B$.
+>
+> **Règle du produit.**
+> $\operatorname{card}(A \times B) = \operatorname{card} A \times \operatorname{card} B$.
+
+La première est la définition même du cardinal. La deuxième se démontre en
+recollant une bijection $\{1, \dots, a\} \to A$ et une bijection
+$\{a+1, \dots, a+b\} \to B$. La troisième s'obtient en écrivant
+$A \times B = \bigcup_{x \in A} \{x\} \times B$, réunion disjointe de
+$\operatorname{card} A$ ensembles ayant chacun $\operatorname{card} B$
+éléments, et en appliquant la règle de la somme.
+
+### Intuition : un arbre de choix
+
+En pratique, la règle du produit s'emploie sous une forme plus souple. On
+fabrique l'objet par $k$ choix successifs ; si le premier choix offre $n_1$
+possibilités, et si, **quel qu'ait été le premier choix**, le deuxième en
+offre $n_2$, et ainsi de suite, alors il y a $n_1 n_2 \cdots n_k$ objets —
+pourvu que deux suites de choix différentes donnent deux objets différents.
+C'est un arbre dont chaque niveau a le même nombre de branches ; on compte ses
+feuilles.
+
+Les ensembles de choix peuvent dépendre des choix précédents (on ne peut pas
+reprendre une carte déjà tirée) ; seul leur **nombre** doit être constant. Si
+même le nombre varie, on revient à la règle de la somme : on découpe selon le
+premier choix.
+
+### Le cardinal de l'ensemble des parties
+
+> **Proposition.** Si $\operatorname{card} E = n$, alors
+> $\operatorname{card}\,\mathcal{P}(E) = 2^n$.
+
+*Démonstration.* Numérotons $E = \{e_1, \dots, e_n\}$. L'application qui
+associe à une partie $A$ le mot $(\mathbf{1}_A(e_1), \dots, \mathbf{1}_A(e_n))$
+de $\{0, 1\}^n$ est une bijection : sa réciproque envoie un mot
+$(b_1, \dots, b_n)$ sur la partie $\{e_i : b_i = 1\}$, et les deux
+compositions redonnent l'identité. La règle de la bijection, puis celle du
+produit appliquée $n$ fois, donnent
+$\operatorname{card}\,\mathcal{P}(E) = \operatorname{card}\{0,1\}^n = 2^n$. $\square$
+
+C'est le schéma de presque toute démonstration du nœud : **trouver une
+bijection vers un ensemble qu'on sait compter**. La vérification que c'est bien
+une bijection — exhiber la réciproque — n'est pas une formalité : c'est là que
+se cachent les objets comptés deux fois.

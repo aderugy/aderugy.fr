@@ -1,0 +1,76 @@
+---
+title: La formule de Pascal, ou couper selon un élément
+minutes: 7
+rubrique: [construction, demonstrations, intuition]
+checkpoint:
+- type: qcm
+  question: 'Dans la preuve combinatoire de $\binom{n}{k} = \binom{n-1}{k-1} + \binom{n-1}{k}$, que compte le terme $\binom{n-1}{k-1}$ ?'
+  choix:
+  - Les parties à $k$ éléments qui ne contiennent pas l'élément distingué $a$.
+  - Les parties à $k$ éléments qui contiennent $a$ — il reste $k-1$ éléments à choisir parmi les $n-1$ autres.
+  - Les parties à $k-1$ éléments de $E$.
+  reponse: 1
+  explication: 'On découpe selon que $a$ est dans la partie ou non. Si oui, la partie est $\{a\} \cup B$ avec $B$ à $k - 1$ éléments parmi les $n - 1$ autres ; si non, c''est une partie à $k$ éléments des $n - 1$ autres. Les deux cas sont disjoints : règle de la somme.'
+- type: nombre
+  question: 'Calculer $\displaystyle\sum_{j=3}^{9} \binom{j}{3}$ à l''aide de l''identité de la crosse de hockey.'
+  reponse: 210
+  explication: '$\sum_{j=k}^{n} \binom{j}{k} = \binom{n+1}{k+1}$, donc la somme vaut $\binom{10}{4} = 210$. L''identité découle de la formule de Pascal appliquée en cascade, ou d''un découpage selon le plus grand élément de la partie à $4$ éléments.'
+---
+
+### L'énoncé
+
+> **Formule de Pascal.** Pour $n \ge 1$ et tout entier $k$,
+> $$
+> \binom{n}{k} = \binom{n-1}{k-1} + \binom{n-1}{k} .
+> $$
+
+Avec $\binom{0}{0} = 1$, elle calcule tous les coefficients ligne par ligne : c'est
+le triangle de Pascal, et le moyen le plus sûr de les obtenir en machine, sans
+aucune division.
+
+### Démonstration combinatoire
+
+Soit $E$ un ensemble à $n \ge 1$ éléments, et $a \in E$ un élément fixé. Les
+parties à $k$ éléments de $E$ se répartissent en deux familles disjointes :
+
+- celles qui **contiennent** $a$ : elles s'écrivent $\{a\} \cup B$ avec $B$ une
+  partie à $k - 1$ éléments de $E \setminus \{a\}$, et l'application
+  $B \mapsto \{a\} \cup B$ est une bijection (de réciproque
+  $A \mapsto A \setminus \{a\}$) ; il y en a $\binom{n-1}{k-1}$ ;
+- celles qui **ne contiennent pas** $a$ : ce sont exactement les parties à $k$
+  éléments de $E \setminus \{a\}$ ; il y en a $\binom{n-1}{k}$.
+
+La règle de la somme conclut. $\square$
+
+La démonstration par les factorielles existe — réduire au même dénominateur —
+et n'apprend rien. Celle-ci donne la **méthode** : distinguer un élément et
+découper selon son sort. Elle resservira pour les partitions, pour les nombres
+de Stirling, et, en probabilités, chaque fois qu'on conditionne par le premier
+pas d'une marche aléatoire.
+
+### Intuition : un chemin sur une grille
+
+$\binom{n}{k}$ compte aussi les chemins sur une grille qui font $n$ pas,
+chacun vers la droite ou vers le haut, dont exactement $k$ vers le haut : un
+tel chemin est déterminé par l'ensemble des numéros de ses pas vers le haut.
+La formule de Pascal dit qu'un chemin qui arrive au point $(n - k, k)$ vient
+soit d'en dessous, soit de la gauche. Cette lecture en chemins est celle de la
+marche aléatoire simple, au niveau 1 : la probabilité qu'une pièce équilibrée
+donne $k$ piles en $n$ lancers est $\binom{n}{k} / 2^n$.
+
+### Deux identités qui s'en déduisent
+
+**La crosse de hockey.** Pour $0 \le k \le n$,
+$\displaystyle\sum_{j=k}^{n} \binom{j}{k} = \binom{n+1}{k+1}$.
+
+*Démonstration.* On découpe les parties à $k + 1$ éléments de
+$\{1, \dots, n + 1\}$ selon leur **plus grand élément** $m$. Si $m = j + 1$, les
+$k$ autres éléments forment une partie quelconque de $\{1, \dots, j\}$ : il y en
+a $\binom{j}{k}$. Le plus grand élément varie de $k + 1$ à $n + 1$, c'est-à-dire
+$j$ de $k$ à $n$. $\square$
+
+**Vandermonde.** $\displaystyle\binom{m+n}{k} = \sum_{i=0}^{k} \binom{m}{i}\binom{n}{k-i}$.
+On choisit $k$ personnes dans un groupe de $m$ femmes et $n$ hommes, en
+découpant selon le nombre $i$ de femmes choisies. Cette identité est, mot pour
+mot, la raison pour laquelle les probabilités de la loi hypergéométrique
+somment à $1$.

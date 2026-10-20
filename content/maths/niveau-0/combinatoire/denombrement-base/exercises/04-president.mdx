@@ -1,0 +1,42 @@
+---
+kind: preuve
+difficulty: 2
+after: pascal
+---
+1. Démontrer par double comptage que, pour $1 \le k \le n$,
+   $$
+   k \binom{n}{k} = n \binom{n-1}{k-1} .
+   $$
+2. En déduire $\displaystyle\sum_{k=0}^{n} k \binom{n}{k} = n \, 2^{n-1}$
+   pour $n \ge 1$.
+
+<!-- indice -->
+Compter les couples (comité de $k$ personnes parmi $n$, président choisi dans
+le comité) de deux façons : en choisissant d'abord le comité, ou d'abord le
+président.
+
+<!-- indice -->
+Pour 2, sommer l'identité de 1 sur $k$ et reconnaître
+$\sum_j \binom{n-1}{j}$.
+
+<!-- solution -->
+1. Soit $E$ un ensemble à $n$ éléments. On compte les couples $(A, p)$ où $A$
+   est une partie à $k$ éléments de $E$ et $p \in A$.
+
+   *Comité d'abord.* $\binom{n}{k}$ choix de $A$, puis $k$ choix de $p$ dans
+   $A$ : $k \binom{n}{k}$ couples.
+
+   *Président d'abord.* $n$ choix de $p$, puis les $k - 1$ autres membres
+   parmi les $n - 1$ éléments restants : $n \binom{n-1}{k-1}$ couples.
+
+   Les deux nombres comptent le même ensemble, ils sont égaux.
+
+2. Le terme $k = 0$ est nul. Pour $k \ge 1$, on remplace par 1 :
+   $$
+   \sum_{k=1}^{n} k \binom{n}{k} = n \sum_{k=1}^{n} \binom{n-1}{k-1}
+   = n \sum_{j=0}^{n-1} \binom{n-1}{j} = n \, 2^{n-1} .
+   $$
+   Combinatoirement : c'est le nombre de couples (comité de taille quelconque,
+   président), et il se compte directement — $n$ présidents, puis une partie
+   quelconque des $n - 1$ autres.
+   Au niveau 1, cette identité donne l'espérance de la loi binomiale.

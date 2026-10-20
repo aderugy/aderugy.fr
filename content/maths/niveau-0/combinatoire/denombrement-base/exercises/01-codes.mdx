@@ -1,0 +1,30 @@
+---
+kind: calcul
+difficulty: 1
+after: arrangements
+---
+Un code d'accès est formé de $4$ caractères pris parmi les $26$ lettres
+majuscules et les $10$ chiffres.
+
+1. Combien de codes en tout ?
+2. Combien de codes dont les $4$ caractères sont distincts ?
+3. Combien de codes contenant au moins un chiffre ?
+
+<!-- indice -->
+Les trois questions se ramènent à des listes de longueur $4$ sur un alphabet
+à $36$ symboles. Pour la troisième, « au moins un » appelle le
+complémentaire.
+
+<!-- indice -->
+Le complémentaire de « au moins un chiffre » est « que des lettres ».
+
+<!-- solution -->
+1. Listes avec répétition sur $36$ symboles : $36^4 = 1\,679\,616$.
+2. Arrangements : $36 \times 35 \times 34 \times 33 = 1\,413\,720$.
+3. Codes sans chiffre : $26^4 = 456\,976$. D'où
+   $36^4 - 26^4 = 1\,222\,640$ codes avec au moins un chiffre.
+
+   Le raisonnement « une position pour le chiffre ($4$), un chiffre ($10$),
+   puis trois caractères quelconques ($36^3$) » donne $1\,866\,240$, plus que le
+   nombre total de codes : il compte plusieurs fois les codes à plusieurs
+   chiffres.

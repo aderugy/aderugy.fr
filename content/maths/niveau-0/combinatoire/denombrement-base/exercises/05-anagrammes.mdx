@@ -1,0 +1,32 @@
+---
+kind: calcul
+difficulty: 2
+after: combinaisons
+---
+1. Combien d'anagrammes (mots de 11 lettres, avec ou sans sens) le mot
+   `MISSISSIPPI` possède-t-il ?
+2. Combien d'entre elles ont leurs quatre `S` consécutifs ?
+
+<!-- indice -->
+Plutôt que de diviser $11!$ par quelque chose, placer les lettres une sorte à
+la fois : d'abord les positions des `S`, puis celles des `I` parmi les
+positions restantes, et ainsi de suite.
+
+<!-- indice -->
+Pour 2, coller les quatre `S` en un seul bloc : on a alors $8$ objets à
+placer.
+
+<!-- solution -->
+1. Le mot a $1$ `M`, $4$ `I`, $4$ `S` et $2$ `P`. On choisit les positions des
+   `S` ($\binom{11}{4} = 330$), puis celles des `I` parmi les $7$ restantes
+   ($\binom{7}{4} = 35$), puis celles des `P` parmi les $3$ restantes
+   ($\binom{3}{2} = 3$) ; le `M` prend la dernière. Total :
+   $330 \times 35 \times 3 = 34\,650$.
+
+   On retrouve $\dfrac{11!}{1!\,4!\,4!\,2!}$ : ce coefficient, dit
+   multinomial, est l'objet du nœud
+   [denombrement-avance](/maths/n/denombrement-avance).
+
+2. Le bloc `SSSS` et les $7$ autres lettres font $8$ objets. Positions du bloc
+   parmi $8$ : $8$ ; puis les `I` parmi les $7$ positions restantes
+   ($\binom{7}{4} = 35$), les `P` parmi $3$ ($3$) : $8 \times 35 \times 3 = 840$.

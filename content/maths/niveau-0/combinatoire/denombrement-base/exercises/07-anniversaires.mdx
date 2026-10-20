@@ -1,0 +1,73 @@
+---
+kind: simulation
+difficulty: 3
+after: repetition
+---
+Dans un groupe de $n$ personnes, on suppose que les dates d'anniversaire sont
+des listes de $n$ jours tirés uniformément et indépendamment parmi $365$
+(on oublie le 29 février).
+
+1. Compter les listes où les $n$ dates sont deux à deux distinctes, et en
+   déduire la proportion $q_n$ de telles listes.
+2. Calculer $q_n$ exactement en Python pour $n = 10, 23, 50$, et trouver le
+   plus petit $n$ tel que $q_n < 1/2$.
+3. Vérifier par simulation la valeur pour $n = 23$.
+4. Pourquoi compte-t-on des **listes** de dates, et non des multi-ensembles ?
+
+<!-- indice -->
+Des dates deux à deux distinctes forment un arrangement de $n$ éléments parmi
+$365$. La proportion est un quotient de deux cardinaux.
+
+<!-- indice -->
+Pour la simulation : `rng.integers(0, 365, size=(R, n))`, puis comparer, pour
+chaque ligne, le nombre de valeurs distinctes à $n$. Trier chaque ligne et
+chercher deux voisins égaux le fait sans boucle.
+
+<!-- solution -->
+1. Il y a $365^n$ listes, dont $A_{365}^n = 365 \times 364 \times \cdots \times (366 - n)$
+   à valeurs distinctes. Donc
+   $q_n = \dfrac{A_{365}^n}{365^n} = \displaystyle\prod_{i=0}^{n-1}\Big(1 - \frac{i}{365}\Big)$.
+
+2. et 3.
+
+```python
+import numpy as np
+from fractions import Fraction
+from math import perm
+
+def q(n):
+    return Fraction(perm(365, n), 365**n)   # exact
+
+for n in (10, 23, 50):
+    print(f"q_{n} = {float(q(n)):.4f}")
+n = 1
+while q(n) >= Fraction(1, 2):
+    n += 1
+print("plus petit n tel que q_n < 1/2 :", n)
+
+rng = np.random.default_rng(0)
+R = 200_000
+d = np.sort(rng.integers(0, 365, size=(R, 23)), axis=1)
+distinctes = (np.diff(d, axis=1) != 0).all(axis=1)
+print(f"simulation n=23 : {distinctes.mean():.4f}")
+```
+
+Sortie :
+
+```
+q_10 = 0.8831
+q_23 = 0.4927
+q_50 = 0.0296
+plus petit n tel que q_n < 1/2 : 23
+simulation n=23 : 0.4924
+```
+
+   Avec $23$ personnes, il y a déjà plus d'une chance sur deux que deux
+   d'entre elles partagent leur anniversaire. L'intuition se trompe parce
+   qu'elle compte les personnes ($23$) au lieu des **paires** de personnes,
+   au nombre de $\binom{23}{2} = 253$.
+
+4. Les personnes sont distinctes : l'univers équiprobable est celui des
+   listes, une date par personne, dans l'ordre des personnes. Les
+   multi-ensembles de dates ne sont pas équiprobables — exactement le piège
+   des deux dés de la capsule 7.

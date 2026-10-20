@@ -1,0 +1,100 @@
+---
+title: Listes et arrangements — quand l'ordre compte
+minutes: 8
+rubrique: [construction, pieges, simulation]
+checkpoint:
+- type: nombre
+  question: 'Un podium de 3 places est attribué parmi 8 coureurs. Combien de podiums différents (or, argent, bronze) ?'
+  reponse: 336
+  explication: 'C''est un arrangement de 3 éléments parmi 8 : $8 \times 7 \times 6 = 336$. L''ordre compte (or et argent ne sont pas interchangeables) et un coureur ne monte qu''une fois. $8^3 = 512$ autoriserait un même coureur sur deux marches.'
+- type: qcm
+  question: 'Combien d''applications de $\{1, \dots, k\}$ dans $\{1, \dots, n\}$ sont **injectives** ?'
+  choix:
+  - $n^k$
+  - $\dfrac{n!}{(n-k)!}$ si $k \le n$, et $0$ sinon
+  - $\dfrac{n!}{k!\,(n-k)!}$
+  reponse: 1
+  explication: 'Une injection, c''est une liste de $k$ valeurs distinctes : un arrangement. $n^k$ compte toutes les applications, et la troisième formule compte des parties, sans ordre. Si $k > n$, il n''y a pas assez de valeurs : aucune injection (principe des tiroirs).'
+- type: vrai-faux
+  question: 'Le nombre de codes à 4 chiffres (de 0000 à 9999) **dont tous les chiffres sont distincts** est $10^4 / 4!$.'
+  reponse: false
+  explication: 'Faux : c''est $10 \times 9 \times 8 \times 7 = 5040$, un arrangement. Diviser par $4!$ supprimerait l''ordre et compterait les ensembles de 4 chiffres ($210$) ; et $10^4 / 4!$ n''est même pas entier.'
+---
+
+### Listes avec répétition
+
+Une **liste** (ou $k$-uplet) d'éléments de $E$ est un élément de $E^k$ : $k$
+positions ordonnées, répétitions permises. Par la règle du produit,
+
+$$
+\operatorname{card}(E^k) = n^k \qquad (n = \operatorname{card} E).
+$$
+
+Il revient au même de compter les **applications** de $\{1, \dots, k\}$ dans
+$E$ : une application est la liste de ses valeurs. Le nombre d'applications
+d'un ensemble à $k$ éléments dans un ensemble à $n$ éléments est donc $n^k$ —
+c'est la raison de la notation $E^F$ pour l'ensemble des applications de $F$
+dans $E$.
+
+### Arrangements
+
+Un **arrangement** de $k$ éléments de $E$ est une liste de $k$ éléments
+**distincts** de $E$ — autrement dit une injection de $\{1, \dots, k\}$ dans
+$E$. Le premier élément se choisit parmi $n$, le deuxième parmi les $n - 1$
+restants quel qu'ait été le premier, et ainsi de suite :
+
+$$
+A_n^k = n (n-1) \cdots (n-k+1) = \frac{n!}{(n-k)!} \qquad (0 \le k \le n),
+$$
+
+et $A_n^k = 0$ si $k > n$. Le cas $k = n$ compte les **permutations** de $E$,
+les bijections de $E$ dans lui-même : il y en a $n!$, avec la convention
+$0! = 1$ — il existe exactement une bijection de l'ensemble vide dans
+lui-même, l'application vide.
+
+Le produit $n(n-1)\cdots(n-k+1)$ est la forme à utiliser en calcul : la forme
+$n!/(n-k)!$ fait passer par des nombres gigantesques pour rien, et c'est elle
+qui déborde en flottants.
+
+### Piège : la règle du produit exige un nombre de choix constant
+
+Combien de nombres à trois chiffres distincts, sans zéro en tête ? Choisir
+d'abord le chiffre des unités ($10$ choix), puis celui des dizaines ($9$), puis
+celui des centaines — mais leur nombre dépend de ce qui précède : $7$ si le
+zéro a déjà été utilisé, $8$ sinon. La règle du produit ne s'applique pas dans
+cet ordre. Dans l'autre ordre, elle s'applique : centaines ($9$ choix, tout
+sauf zéro), puis dizaines ($9$ : le zéro redevient permis, le chiffre des
+centaines non), puis unités ($8$) — soit $648$. **L'ordre dans lequel on
+construit l'objet est libre ; il faut choisir celui où le nombre de choix ne
+dépend pas des choix précédents.**
+
+### Vérification par énumération
+
+Sur de petites valeurs, l'énumération est possible et valide les formules.
+
+```python
+from itertools import permutations, product
+from math import factorial, perm
+
+n, k = 6, 3
+E = range(n)
+print("listes      :", sum(1 for _ in product(E, repeat=k)), "=", n**k)
+print("arrangements:", sum(1 for _ in permutations(E, k)), "=",
+      factorial(n) // factorial(n - k), "=", perm(n, k))
+
+# Nombres a trois chiffres distincts, sans zero en tete
+ok = [x for x in range(100, 1000) if len(set(str(x))) == 3]
+print("trois chiffres distincts:", len(ok), "= 9*9*8 =", 9 * 9 * 8)
+```
+
+Sortie obtenue :
+
+```
+listes      : 216 = 216
+arrangements: 120 = 120 = 120
+trois chiffres distincts: 648 = 9*9*8 = 648
+```
+
+Le module standard `math` fournit `perm(n, k)` et `comb(n, k)`, en entiers
+exacts : on les préférera toujours à une formule écrite avec des factorielles
+flottantes.

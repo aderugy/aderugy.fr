@@ -1,0 +1,34 @@
+---
+kind: qcm
+difficulty: 1
+after: combinaisons
+---
+Vrai ou faux ? Justifier en une ligne.
+
+1. $\binom{n}{k} = \binom{n}{n-k}$ pour $0 \le k \le n$.
+2. Le nombre de parties à $k$ éléments d'un ensemble à $n$ éléments est $n^k / k!$.
+3. $\binom{n}{1} = n$ et $\binom{n}{0} = 1$, y compris pour $n = 0$ dans le second cas.
+4. Il y a autant de façons de ranger $5$ livres distincts sur une étagère que de façons d'en choisir $5$ parmi $5$.
+5. $\binom{2n}{n}$ est pair pour tout $n \ge 1$.
+
+<!-- indice -->
+Pour 2, essayer $n = 3$, $k = 2$. Pour 5, penser à la symétrie
+$A \mapsto E \setminus A$ et chercher si elle a des points fixes.
+
+<!-- indice -->
+Pour 5 : les parties à $n$ éléments d'un ensemble à $2n$ éléments vont par
+paires $\{A, E \setminus A\}$, et $A \ne E \setminus A$.
+
+<!-- solution -->
+1. **Vrai.** Passage au complémentaire, bijection des parties à $k$ éléments
+   sur les parties à $n - k$ éléments.
+2. **Faux.** Pour $n = 3$, $k = 2$ : $9/2$ n'est même pas entier ; la bonne
+   valeur est $3$. Diviser $n^k$ par $k!$ supposerait que chaque partie
+   correspond à $k!$ listes, or les listes avec répétition n'en sont pas.
+3. **Vrai.** Une partie à un élément est un singleton ; la seule partie à zéro
+   élément est $\varnothing$, y compris dans $\varnothing$.
+4. **Faux.** Ranger : $5! = 120$ façons. Choisir $5$ parmi $5$ : une seule.
+5. **Vrai.** L'application $A \mapsto E \setminus A$ envoie les parties à $n$
+   éléments de $E$ ($\operatorname{card} E = 2n$) sur elles-mêmes, est sa
+   propre réciproque et n'a aucun point fixe, puisque $A \ne E \setminus A$.
+   Elle regroupe donc ces parties en paires disjointes : leur nombre est pair.

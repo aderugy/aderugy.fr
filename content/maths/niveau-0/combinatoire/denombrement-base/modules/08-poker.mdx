@@ -1,0 +1,106 @@
+---
+title: Retour au poker — compter, puis vérifier
+minutes: 9
+rubrique: [simulation, pieges, intuition]
+checkpoint:
+- type: nombre
+  question: 'Combien de mains de 5 cartes sont une **double paire** (deux hauteurs présentes deux fois, une cinquième carte d''une troisième hauteur) ?'
+  reponse: 123552
+  explication: 'Les deux hauteurs des paires forment une **partie** : $\binom{13}{2} = 78$. Couleurs de chaque paire : $\binom{4}{2}^2 = 36$. Cinquième carte : $52 - 8 = 44$. Total $78 \times 36 \times 44 = 123\,552$. Choisir « la première paire, puis la seconde » ($13 \times 12$) compte chaque main deux fois.'
+- type: qcm
+  question: 'Une simulation de $10^6$ mains donne $1\,958$ couleurs, alors que le calcul prévoit $\approx 1\,981$. Que conclure ?'
+  choix:
+  - Le calcul est faux, puisque la simulation ne retrouve pas la valeur.
+  - 'Rien d''alarmant : l''écart est de l''ordre de $\sqrt{1981} \approx 45$, la fluctuation attendue pour un comptage de cette taille.'
+  - Le générateur aléatoire est biaisé.
+  reponse: 1
+  explication: 'Un nombre d''occurrences d''un événement de probabilité $p$ sur $N$ essais fluctue d''environ $\sqrt{Np}$ — résultat du niveau 1. Un écart de $23$ pour une fluctuation typique de $45$ est banal. Une simulation valide un calcul à sa précision près, jamais au chiffre près.'
+---
+
+### Trois mains, trois calculs
+
+L'univers est l'ensemble des parties à $5$ éléments d'un jeu de $52$ cartes :
+$\binom{52}{5} = 2\,598\,960$ mains, toutes équiprobables si le jeu est bien
+mélangé. On compte chaque main en décrivant comment la fabriquer.
+
+**Couleur** (cinq cartes de la même enseigne, quinte flush comprise) : on
+choisit l'enseigne ($4$), puis cinq hauteurs parmi $13$ :
+$4 \binom{13}{5} = 5\,148$.
+
+**Full** (trois cartes d'une hauteur, deux d'une autre) : la hauteur du brelan
+($13$), ses trois couleurs ($\binom{4}{3} = 4$), la hauteur de la paire, **qui
+doit différer** ($12$), ses deux couleurs ($\binom{4}{2} = 6$) :
+$13 \times 4 \times 12 \times 6 = 3\,744$. Ici l'ordre « brelan puis paire »
+n'introduit pas de double comptage : le brelan et la paire ne jouent pas le même
+rôle, on ne peut pas les échanger.
+
+**Double paire** : les deux hauteurs des paires jouent le **même** rôle. On les
+choisit ensemble, comme une partie : $\binom{13}{2} = 78$ ; puis les couleurs de
+chaque paire ($6 \times 6$) ; puis la cinquième carte, d'une hauteur différente
+des deux ($52 - 8 = 44$). Total : $123\,552$.
+
+### Piège : deux rôles identiques, une seule partie
+
+Pour la double paire, le raisonnement « je choisis la hauteur de la première
+paire ($13$), puis celle de la seconde ($12$) » produit $247\,104$, le double
+du bon résultat : la main à paires de rois et de sept est fabriquée une fois
+avec « rois puis sept », une fois avec « sept puis rois ». La différence avec
+le full est exactement là. **Quand deux choix successifs jouent le même rôle
+dans l'objet final, il faut les faire en une seule fois, comme une
+combinaison.**
+
+### Vérification par simulation
+
+Un comptage se vérifie en tirant des mains au hasard et en comparant les
+fréquences aux probabilités calculées.
+
+```python
+import numpy as np
+from math import comb
+
+rng = np.random.default_rng(1)
+N, PAQUET = 10**6, 10**5
+obs = {"couleur": 0, "full": 0, "double paire": 0}
+for _ in range(N // PAQUET):
+    # Une carte = un entier 0..51 ; hauteur = c % 13, enseigne = c // 13.
+    # PAQUET mains de 5 cartes distinctes : argsort de bruits uniformes.
+    mains = np.argsort(rng.random((PAQUET, 52)), axis=1)[:, :5]
+    h, e = mains % 13, mains // 13
+    # comptes[i, j] = nombre de cartes de hauteur j dans la main i, trie
+    comptes = np.sort((h[:, :, None] == np.arange(13)).sum(axis=1), axis=1)
+    obs["couleur"] += (e == e[:, :1]).all(axis=1).sum()
+    obs["full"] += ((comptes[:, -1] == 3) & (comptes[:, -2] == 2)).sum()
+    obs["double paire"] += ((comptes[:, -1] == 2) & (comptes[:, -2] == 2)).sum()
+
+total = comb(52, 5)
+exact = {"couleur": 4 * comb(13, 5), "full": 13 * 4 * 12 * 6,
+         "double paire": comb(13, 2) * 36 * 44}
+for nom in obs:
+    attendu = N * exact[nom] / total
+    print(f"{nom:>12} : observe {obs[nom]:>6}  attendu {attendu:8.1f}"
+          f"  ecart/sqrt(attendu) = {(obs[nom] - attendu) / attendu**0.5:+.2f}")
+```
+
+Sortie obtenue :
+
+```
+     couleur : observe   1976  attendu   1980.8  ecart/sqrt(attendu) = -0.11
+        full : observe   1461  attendu   1440.6  ecart/sqrt(attendu) = +0.54
+double paire : observe  47551  attendu  47539.0  ecart/sqrt(attendu) = +0.05
+```
+
+La dernière colonne mesure l'écart en unités de fluctuation typique : des
+valeurs de l'ordre de $\pm 1$ ou $\pm 2$ sont normales, une valeur de $20$
+signalerait une erreur de comptage. Une version fausse du calcul de la double
+paire, à $247\,104$, prévoirait $\approx 95\,000$ mains au lieu de
+$\approx 47\,500$ : l'écart serait de plus de deux cents unités, impossible à
+manquer.
+
+### Ce que la simulation ne fait pas
+
+Elle **valide** un comptage, elle ne le **remplace** pas. Avec $10^6$ mains, la
+quinte flush royale — $4$ mains sur $2\,598\,960$ — sort en moyenne une fois et
+demie : sa fréquence observée est inutilisable. Les événements rares sont
+exactement ceux où le dénombrement est irremplaçable ; c'est aussi le point de
+départ de la [réduction de variance](/maths/n/reduction-variance), au niveau
+transverse.
