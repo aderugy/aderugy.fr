@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/maths", label: "Parcours" },
   { href: "/maths/revision", label: "Révision" },
   { href: "/maths/recherche", label: "Recherche" },
+  { href: "/maths/rythme", label: "Rythme" },
   { href: "/maths/tableau-de-bord", label: "Tableau de bord" },
   { href: "/maths/corpus", label: "Corpus" },
   { href: "/maths/notation", label: "Notation" },

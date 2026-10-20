@@ -63,6 +63,10 @@ export type AttemptRow = {
 
 export type DonneesMaths = {
   progress: Map<string, NodeProgressRow>;
+  /** Capsules terminées (migration 0029), par nœud : nodeId → ids. */
+  modules: Map<string, Set<string>>;
+  /** Les mêmes, avec leur date et les essais du checkpoint, par date croissante. */
+  capsules: CapsuleRow[];
   /** Du plus récent au plus ancien. */
   sessions: SessionLogRow[];
   reviewStates: Map<string, ReviewStateRow>;
@@ -110,6 +114,16 @@ type RawProgress = {
   mastered_at: string | null;
   updated_at: string;
 };
+type RawModule = { node_id: string; module_id: string; completed_at: string; checkpoint_tries: number | null };
+
+/** Une capsule terminée (migration 0029, décisions D25 et D26). */
+export type CapsuleRow = {
+  nodeId: string;
+  moduleId: string;
+  completedAt: string;
+  /** Essais qu'il a fallu pour réussir le checkpoint ; null sans checkpoint. */
+  checkpointTries: number | null;
+};
 type RawSession = { id: number; node_id: string; minutes: number; note: string; created_at: string; created_by?: Author };
 type RawReview = {
   card_key: string;
@@ -148,7 +162,7 @@ export async function chargerDonneesDe(
   { auteur = false }: { auteur?: boolean } = {},
 ): Promise<DonneesMaths> {
   const qui = auteur ? ", created_by" : "";
-  const [p, s, r, a] = await Promise.all([
+  const [p, s, r, a, m] = await Promise.all([
     toutes<RawProgress>(
       supabase,
       "maths_node_progress",
@@ -177,6 +191,7 @@ export async function chargerDonneesDe(
       userId,
       { column: "id", ascending: false },
     ),
+    capsulesTerminees(supabase, userId),
   ]);
 
   return {
@@ -200,6 +215,13 @@ export async function chargerDonneesDe(
       createdAt: x.created_at,
       ...(x.created_by ? { createdBy: x.created_by } : {}),
     })),
+    modules: parNoeud(m),
+    capsules: m.map((x) => ({
+      nodeId: x.node_id,
+      moduleId: x.module_id,
+      completedAt: x.completed_at,
+      checkpointTries: x.checkpoint_tries,
+    })),
     reviewStates: new Map(r.map((x) => [x.card_key, reviewRow(x)])),
     attempts: a.map((x) => ({
       id: x.id,
@@ -213,6 +235,41 @@ export async function chargerDonneesDe(
       ...(x.created_by ? { createdBy: x.created_by } : {}),
     })),
   };
+}
+
+/**
+ * Capsules terminées. Lues de façon tolérante : tant que la migration 0029
+ * n'est pas appliquée, la table n'existe pas et toutes les pages du parcours
+ * planteraient pour une information secondaire. Une table absente vaut donc
+ * « aucune capsule terminée » ; toute autre erreur remonte.
+ */
+async function capsulesTerminees(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<RawModule[]> {
+  try {
+    return await toutes<RawModule>(
+      supabase,
+      "maths_module_progress",
+      "node_id, module_id, completed_at, checkpoint_tries",
+      userId,
+      { column: "completed_at", ascending: true },
+    );
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "42P01" || code === "PGRST205") return [];
+    throw e;
+  }
+}
+
+function parNoeud(rows: RawModule[]): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const x of rows) {
+    const set = out.get(x.node_id) ?? new Set<string>();
+    set.add(x.module_id);
+    out.set(x.node_id, set);
+  }
+  return out;
 }
 
 function reviewRow(x: RawReview): ReviewStateRow {
@@ -255,6 +312,11 @@ export function marquagesManuels(
 
 export function progressOf(d: DonneesMaths, nodeId: string): NodeProgressRow | null {
   return d.progress.get(nodeId) ?? null;
+}
+
+/** Ids des capsules terminées d'un nœud. */
+export function capsulesTermineesDe(d: DonneesMaths, nodeId: string): Set<string> {
+  return d.modules.get(nodeId) ?? new Set();
 }
 
 export function sessionsOf(d: DonneesMaths, nodeId: string): SessionLogRow[] {
@@ -321,6 +383,93 @@ export async function setCourseRead(nodeId: string, read: boolean) {
   const { supabase, user } = await userClient();
   await setCourseReadAvec(supabase, user.id, nodeId, read);
 }
+
+/**
+ * Marque une capsule terminée, ou la rouvre. Idempotent dans les deux sens :
+ * terminer deux fois garde la première date, rouvrir une capsule non
+ * terminée ne fait rien.
+ */
+export async function setModuleDoneAvec(
+  supabase: SupabaseClient,
+  userId: string,
+  nodeId: string,
+  moduleId: string,
+  done: boolean,
+  checkpointTries: number | null = null,
+) {
+  const { error } = done
+    ? await supabase
+        .from("maths_module_progress")
+        .upsert(
+          {
+            user_id: userId,
+            node_id: nodeId,
+            module_id: moduleId,
+            checkpoint_tries: checkpointTries,
+          },
+          { onConflict: "user_id,node_id,module_id", ignoreDuplicates: true },
+        )
+    : await supabase
+        .from("maths_module_progress")
+        .delete()
+        .eq("user_id", userId)
+        .eq("node_id", nodeId)
+        .eq("module_id", moduleId);
+  if (error) throw error;
+}
+
+/** Capsules terminées d'un nœud, relues juste après une écriture. */
+export async function modulesDoneOf(nodeId: string): Promise<Set<string>> {
+  const { supabase, user } = await userClient();
+  const { data, error } = await supabase
+    .from("maths_module_progress")
+    .select("module_id")
+    .eq("user_id", user.id)
+    .eq("node_id", nodeId);
+  if (error) throw error;
+  return new Set((data ?? []).map((x: { module_id: string }) => x.module_id));
+}
+
+export async function setModuleDone(
+  nodeId: string,
+  moduleId: string,
+  done: boolean,
+  checkpointTries: number | null = null,
+) {
+  const { supabase, user } = await userClient();
+  await setModuleDoneAvec(supabase, user.id, nodeId, moduleId, done, checkpointTries);
+}
+
+/** Révisions d'un jour sur un nœud (heure de Paris), agrégées en base. */
+export type RevisionsJour = {
+  jour: string;
+  nodeId: string;
+  revisions: number;
+  /** Cartes distinctes révisées ce jour-là sur ce nœud. */
+  cartes: number;
+};
+
+/**
+ * Révisions par jour et par nœud (fonction maths_reviews_per_day, 0029) :
+ * de quoi compter l'XP et la série sans relire tout le journal. Tolérant tant
+ * que la migration n'est pas appliquée, comme les capsules.
+ */
+export async function revisionsParJourDe(supabase: SupabaseClient): Promise<RevisionsJour[]> {
+  const { data, error } = await supabase.rpc("maths_reviews_per_day");
+  if (error) {
+    if (["42883", "PGRST202", "42P01", "PGRST205"].includes(error.code)) return [];
+    throw error;
+  }
+  return ((data ?? []) as { day: string; node_id: string; reviews: number; cards: number }[]).map(
+    (x) => ({ jour: x.day, nodeId: x.node_id, revisions: x.reviews, cartes: x.cards }),
+  );
+}
+
+/** Révisions par jour de l'utilisateur courant, lues une fois par requête. */
+export const revisionsParJour = cache(async (): Promise<RevisionsJour[]> => {
+  const { supabase } = await userClient();
+  return revisionsParJourDe(supabase);
+});
 
 /** Ajoute une ligne au journal de session ; renvoie son id. */
 export async function addSessionAvec(

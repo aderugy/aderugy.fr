@@ -17,6 +17,8 @@
 | 2026-09-10 | 4 | `ReviewCard` porte un champ `ref` : l'ancre de la section d'origine. | décision D1, appliquée |
 | 2026-09-10 | 7 | V1 livrée : FSRS, tentatives, déblocage automatique, recherche, Pyodide. | demandée |
 | 2026-09-10 | 7, 9 | V2 livrée. Graphiques à l'encre, jamais de palette catégorielle ; un seul widget, celui qui a du contenu ; l'export PDF est une feuille de style d'impression. | décisions D21 à D24, demandée |
+| 2026-10-20 | 4, 6, 8 | Le cours d'un concept est découpé en capsules (une notion, 5 à 10 min) dans `modules/NN-<id>.mdx` ; la rubrique reste obligatoire au niveau du nœud, chaque capsule déclarant les sections qu'elle couvre. `ReviewCard.ref` désigne une capsule ; un exercice porte `after`. Capsules terminées en base ; terminer la dernière vaut « cours lu ». | décision D25, demandée |
+| 2026-10-20 | 6, 7, 13 | Gamification : checkpoint de 2 à 4 questions corrigées côté serveur en fin de chaque capsule ; exercices de difficulté ≥ 4 regroupés en test de sortie ; XP, niveaux, série avec un joker par semaine, objectif du jour et badges, tous dérivés et sans effet sur les règles du §4. Retirés du hors-périmètre (§13). | décision D26, demandée |
 
 ---
 
@@ -189,9 +191,20 @@ Les arêtes `requires` traversent les niveaux et ne relient que des `concept`.
 
 ## 6. Rubrique de contenu (obligatoire pour chaque nœud `concept`)
 
-Un cours suit toujours cette structure. Elle n'est pas indicative. Chaque section
-porte une **ancre stable** (`## 6. Pièges {#pieges}`) pour que les cartes de
-révision puissent pointer vers leur source.
+Un cours suit toujours cette structure. Elle n'est pas indicative.
+
+**Le cours est découpé en capsules** (décision D25) : une notion par capsule,
+lisible en 5 à 10 minutes, dans `modules/NN-<id>.mdx`. Chaque capsule reprend
+l'arc de la rubrique pour sa notion et déclare en frontmatter les sections
+qu'elle couvre ; l'ensemble des capsules couvre les sections 1 à 7, et
+`course.mdx` porte les sections 8 et 9. Les cartes de révision pointent vers
+leur capsule (`ref: <id>`), les exercices vers la capsule après laquelle ils
+deviennent faisables (`after: <id>`).
+
+Chaque capsule se termine par un **checkpoint** de 2 à 4 questions (qcm,
+vrai/faux, nombre), à réussir pour terminer la capsule (décision D26). Elles
+vérifient la notion — le bon ordre des quantificateurs, le contre-exemple, le
+rang exact —, jamais la mémoire du texte. Gabarit : `docs/maths/gabarit-capsule.mdx`.
 
 1. **Position dans le graphe** `{#position}` — d'où l'on vient, à quoi cela sert
    plus loin, en trois phrases maximum.
@@ -245,6 +258,14 @@ conclusions et de leurs limites.
   Les trois autres viendront avec les nœuds qu'ils illustrent.
 - Export du corpus en PDF : `/corpus` plus une feuille de style d'impression.
 
+**V3 — gamification, livrée** (décisions D25, D26)
+
+- Cours en capsules d'une notion, lecteur de capsule, parcours de nœud.
+- Checkpoint en fin de capsule, test de sortie en fin de parcours.
+- XP, niveaux, série avec joker hebdomadaire, objectif du jour, badges :
+  page `/maths/rythme` et ligne dans l'en-tête. Tout est dérivé des preuves
+  déjà enregistrées ; l'XP ne modifie jamais les états du §4.
+
 Toute fonctionnalité hors de ces listes doit être justifiée par un nœud en cours.
 
 ## 8. Stack technique
@@ -264,7 +285,8 @@ Toute fonctionnalité hors de ces listes doit être justifiée par un nœud en c
 
 ```
 /content/{domain}/{topic}/{concept}/
-    course.mdx
+    course.mdx             ← statut, liens, références
+    modules/NN-<id>.mdx    ← les capsules, dans l'ordre (D25)
     exercises/*.mdx
     cards.yaml
 /content/projects/*.mdx
@@ -314,7 +336,8 @@ médians ; flèche « → » ajoutée aux libellés de boutons.
 ## 11. Boucle de travail (à chaque session)
 
 1. Demander quel nœud est visé, ou le proposer d'après l'état du graphe.
-2. Rédiger le contenu du nœud selon la rubrique de la section 6.
+2. Rédiger le contenu du nœud selon la rubrique de la section 6, découpé en
+   capsules avec leur checkpoint (gabarit `docs/maths/gabarit-capsule.mdx`).
 3. N'ajouter du code que si ce nœud exige une capacité qui manque.
 4. Vérifier : build vert, rendu KaTeX correct, code Python des simulations
    réellement exécuté et non seulement écrit, tests de progression au vert.
@@ -335,10 +358,12 @@ L'application est réussie si, un an après le démarrage :
 
 ## 13. Hors périmètre
 
-Multi-utilisateur, comptes, partage social, gamification (badges, séries,
-points), génération automatique de cours par appel LLM à l'exécution,
+Multi-utilisateur, comptes, partage social, classements ou toute
+comparaison avec d'autres, génération automatique de cours par appel LLM à l'exécution,
 application mobile native, déploiement public. Si l'une de ces idées paraît utile
-en cours de route, la proposer d'abord — ne pas l'implémenter.
+en cours de route, la proposer d'abord — ne pas l'implémenter. La
+gamification, longtemps ici, est sortie de cette liste à la demande
+(décision D26) avec une borne : elle ne décide jamais de l'état d'un nœud.
 
 ## 14. Première session — fait
 

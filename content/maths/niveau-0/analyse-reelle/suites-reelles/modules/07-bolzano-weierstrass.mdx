@@ -1,0 +1,67 @@
+---
+title: Bolzano-Weierstrass, ou l'argument des pics
+minutes: 8
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: qcm
+  question: Que garantit le théorème de Bolzano-Weierstrass pour une suite bornée ?
+  choix:
+  - qu'elle converge
+  - qu'elle admet une suite extraite convergente
+  - qu'elle est monotone à partir d'un rang
+  - qu'elle a une seule valeur d'adhérence
+  reponse: 1
+  explication: 'Une suite extraite convergente, jamais la convergence de la suite entière : $(-1)^n$ est bornée, a deux valeurs d''adhérence et diverge.'
+- type: qcm
+  question: Dans la preuve par les pics, s'il y a une infinité de pics, la suite extraite des pics est…
+  choix:
+  - croissante
+  - décroissante
+  - constante
+  - pas forcément monotone
+  reponse: 1
+  explication: Un pic $n$ vérifie $u_m \le u_n$ pour tout $m > n$ ; deux pics successifs $n_k < n_{k+1}$ donnent donc $u_{n_{k+1}} \le u_{n_k}$.
+- type: vrai-faux
+  question: Toute suite réelle, même non bornée, admet une suite extraite monotone.
+  reponse: true
+  explication: Vrai. L'argument des pics n'utilise jamais que la suite est bornée ; l'hypothèse ne sert qu'à la fin, pour passer de « monotone » à « convergente » par la limite monotone.
+---
+
+### L'énoncé
+
+> **Théorème de Bolzano-Weierstrass.** De toute suite bornée on peut extraire
+> une suite convergente.
+
+Ce qu'il ne dit **pas** : que la suite converge. Il ne promet qu'une suite
+extraite convergente, jamais la convergence de la suite — $(-1)^n$ en est le
+contre-exemple, vu à la capsule précédente.
+
+### Démonstration
+
+Soit $(u_n)$ bornée. On construit une suite extraite monotone, puis on applique
+le théorème de la limite monotone.
+
+Appelons $n$ un *pic* si $u_m \le u_n$ pour tout $m > n$ : aucun terme
+ultérieur ne dépasse $u_n$. Deux cas, et ils sont exhaustifs.
+
+*Cas 1 : il y a une infinité de pics.* Notons-les
+$n_0 < n_1 < n_2 < \cdots$. Par définition d'un pic, $u_{n_{k+1}} \le u_{n_k}$ :
+la suite extraite $(u_{n_k})$ est décroissante.
+
+*Cas 2 : il n'y a qu'un nombre fini de pics.* Soit $N$ un rang strictement plus
+grand que tous les pics. Posons $n_0 = N$. Comme $n_0$ n'est pas un pic, il
+existe $n_1 > n_0$ avec $u_{n_1} > u_{n_0}$. Comme $n_1$ n'est pas un pic non
+plus, il existe $n_2 > n_1$ avec $u_{n_2} > u_{n_1}$, et ainsi de suite. La
+suite extraite obtenue est strictement croissante.
+
+Dans les deux cas on dispose d'une suite extraite monotone ; elle est bornée
+comme extraite d'une suite bornée, donc elle converge par le théorème de la
+limite monotone. $\square$
+
+### Ce que la preuve montre en passant
+
+Le résultat intermédiaire est plus fort que l'énoncé : **toute suite réelle,
+bornée ou non, admet une suite extraite monotone**. L'hypothèse « bornée » ne
+sert qu'à la dernière ligne, pour passer de monotone à convergente. C'est
+l'axiome de la borne supérieure, par la limite monotone, qui fait tout le
+travail.

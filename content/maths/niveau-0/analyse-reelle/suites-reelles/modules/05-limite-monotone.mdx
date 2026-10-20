@@ -1,0 +1,56 @@
+---
+title: La limite monotone, là où l'axiome entre en scène
+minutes: 6
+rubrique: [construction, demonstrations]
+checkpoint:
+- type: qcm
+  question: Une suite croissante et majorée converge vers…
+  choix:
+  - son premier terme
+  - la borne supérieure de l'ensemble de ses termes
+  - n'importe lequel de ses majorants
+  - $0$
+  reponse: 1
+  explication: 'Vers $s = \sup_n u_n$ : pour $\varepsilon > 0$, $s - \varepsilon$ ne majore pas la suite, donc un terme $u_N$ le dépasse, et la croissance garde tous les termes suivants dans $]s - \varepsilon, s]$.'
+- type: vrai-faux
+  question: Une suite croissante non majorée tend vers $+\infty$.
+  reponse: true
+  explication: Vrai. Pour tout $A$, comme $A$ ne majore pas la suite, il existe $N$ avec $u_N > A$, et la croissance donne $u_n \ge u_N > A$ pour tout $n \ge N$.
+- type: vrai-faux
+  question: Dans ce nœud, l'axiome de la borne supérieure intervient directement dans la démonstration de Bolzano-Weierstrass.
+  reponse: false
+  explication: Faux. Il n'est utilisé directement qu'une fois, pour la limite monotone ; Bolzano-Weierstrass passe par la limite monotone, et le critère de Cauchy par Bolzano-Weierstrass.
+---
+
+### L'énoncé
+
+> **Théorème de la limite monotone.** Une suite croissante et majorée converge,
+> vers $\sup_n u_n$.
+
+Symétriquement, une suite décroissante et minorée converge vers sa borne
+inférieure.
+
+### Démonstration
+
+Soit $(u_n)$ croissante et majorée. La partie
+$A = \{u_n : n \in \mathbb{N}\}$ est non vide et majorée, donc $s = \sup A$
+existe par l'axiome de la borne supérieure. Soit $\varepsilon > 0$. Comme
+$s - \varepsilon$ n'est pas un majorant de $A$, il existe $N$ tel que
+$u_N > s - \varepsilon$. La croissance donne, pour tout $n \ge N$,
+
+$$
+s - \varepsilon < u_N \le u_n \le s < s + \varepsilon ,
+$$
+
+donc $|u_n - s| < \varepsilon$. Ainsi $u_n \to s$. $\square$
+
+### Pourquoi c'est la pièce maîtresse
+
+C'est ici que l'axiome entre en scène, et c'est le seul point du nœud où il est
+utilisé directement : Bolzano-Weierstrass et le critère de Cauchy, dans les
+capsules suivantes, s'en déduisent.
+
+L'étape « $s - \varepsilon$ n'est pas un majorant » est exactement la
+caractérisation de la borne supérieure vue plus tôt. Sans l'axiome, $s$
+n'existerait pas : la suite de Héron est décroissante à partir du rang $1$,
+minorée par $1$, faite de rationnels, et n'a pas de limite dans $\mathbb{Q}$.

@@ -1,0 +1,93 @@
+---
+title: Cauchy — converger sans connaître la limite
+minutes: 10
+rubrique: [construction, intuition, demonstrations, pieges]
+checkpoint:
+- type: vrai-faux
+  question: Si $u_{n+1} - u_n \to 0$, alors $(u_n)$ converge.
+  reponse: false
+  explication: 'Faux : $u_n = \sqrt{n}$ a des pas $\frac{1}{\sqrt{n+1} + \sqrt{n}} \to 0$ et tend vers $+\infty$. La condition de Cauchy contrôle tous les couples de rangs assez grands, pas seulement les pas consécutifs.'
+- type: vrai-faux
+  question: Une suite de Cauchy de rationnels converge toujours dans $\mathbb{Q}$.
+  reponse: false
+  explication: 'Faux : la suite de Héron est de Cauchy, faite de rationnels, et sa limite $\sqrt{2}$ n''est pas dans $\mathbb{Q}$. Le critère de Cauchy est une propriété de $\mathbb{R}$ — sa complétude.'
+- type: qcm
+  question: Dans la réciproque du critère de Cauchy, quel résultat fournit la limite candidate ?
+  choix:
+  - le théorème de la limite monotone, appliqué à la suite
+  - Bolzano-Weierstrass, appliqué à la suite (bornée)
+  - l'unicité de la limite
+  - le passage à la limite dans les inégalités
+  reponse: 1
+  explication: La suite de Cauchy est bornée ; Bolzano-Weierstrass en extrait une suite convergente vers un $\ell$, puis la condition de Cauchy et $\varphi(k) \ge k$ montrent que la suite entière tend vers ce $\ell$.
+---
+
+### Définition
+
+$(u_n)$ est une suite de Cauchy si
+
+$$
+\forall \varepsilon > 0,\ \exists N,\ \forall p, q \ge N,\quad |u_p - u_q| < \varepsilon .
+$$
+
+La définition ne mentionne aucune limite : elle ne parle que des termes entre
+eux. C'est ce qui la rend vérifiable sans connaître à l'avance vers quoi la
+suite va.
+
+> **Critère de Cauchy.** Une suite réelle converge si et seulement si elle est
+> de Cauchy. (On dit que $\mathbb{R}$ est complet.)
+
+### Intuition
+
+Le critère de Cauchy dit : « les termes se tassent les uns sur les autres ».
+Dans $\mathbb{R}$, se tasser suffit à converger — il y a toujours un point où
+atterrir. Dans $\mathbb{Q}$, la suite peut se tasser autour d'un trou. La
+complétude, c'est l'absence de trous, et c'est une propriété de l'ensemble, pas
+de la suite.
+
+### Démonstration
+
+Le sens direct est facile : si $u_n \to \ell$, pour $\varepsilon > 0$ il existe
+$N$ tel que $|u_n - \ell| < \varepsilon/2$ pour $n \ge N$, et alors
+$|u_p - u_q| \le |u_p - \ell| + |\ell - u_q| < \varepsilon$ pour $p, q \ge N$.
+
+Réciproque. Soit $(u_n)$ de Cauchy. Elle est d'abord bornée : en prenant
+$\varepsilon = 1$, il existe $N$ tel que $|u_p - u_N| < 1$ pour $p \ge N$, et on
+conclut comme pour une suite convergente avec les rangs $0, \dots, N-1$. Par
+Bolzano-Weierstrass, il existe une extraction $\varphi$ et un réel $\ell$ tels
+que $u_{\varphi(k)} \to \ell$. Montrons que la suite entière converge vers
+$\ell$. Soit $\varepsilon > 0$. Il existe $N_1$ tel que
+$|u_p - u_q| < \varepsilon/2$ pour $p, q \ge N_1$, et $K$ tel que
+$|u_{\varphi(k)} - \ell| < \varepsilon/2$ pour $k \ge K$. Choisissons
+$k \ge \max(K, N_1)$ ; comme $\varphi$ est strictement croissante,
+$\varphi(k) \ge k \ge N_1$. Alors, pour tout $n \ge N_1$,
+
+$$
+|u_n - \ell| \le |u_n - u_{\varphi(k)}| + |u_{\varphi(k)} - \ell|
+< \tfrac{\varepsilon}{2} + \tfrac{\varepsilon}{2} = \varepsilon . \qquad\square
+$$
+
+L'inégalité $\varphi(k) \ge k$, démontrée avec les suites extraites, est
+utilisée sans commentaire dans toute la littérature ; c'est elle qui permet ici
+d'appliquer la propriété de Cauchy au couple $(n, \varphi(k))$.
+
+### Piège : des pas qui tendent vers 0 ne suffisent pas
+
+Prenons $u_n = \sqrt{n}$. Alors
+
+$$
+u_{n+1} - u_n = \frac{1}{\sqrt{n+1} + \sqrt{n}} \xrightarrow[n \to \infty]{} 0 ,
+$$
+
+et pourtant $u_n \to +\infty$. Les pas deviennent arbitrairement petits, leur
+somme reste infinie. C'est exactement la différence entre l'hypothèse de Cauchy
+— qui contrôle $|u_p - u_q|$ pour **tous** les couples de rangs assez grands —
+et le seul contrôle des pas consécutifs. Retirer cette hypothèse fait tomber le
+critère de Cauchy, et c'est l'erreur la plus fréquente à ce stade.
+
+### Piège : sans la complétude, tout s'effondre
+
+La suite de Héron $u_{n+1} = \tfrac12(u_n + 2/u_n)$, partant de $u_0 = 1$, est
+une suite de rationnels, elle est de Cauchy, et elle n'a pas de limite dans
+$\mathbb{Q}$. Le critère de Cauchy est donc un énoncé sur $\mathbb{R}$, pas sur
+les suites : retirer l'axiome de la borne supérieure le rend faux.

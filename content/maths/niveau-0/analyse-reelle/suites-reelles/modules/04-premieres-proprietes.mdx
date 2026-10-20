@@ -1,0 +1,77 @@
+---
+title: Premières conséquences — unicité, bornes, inégalités
+minutes: 9
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: vrai-faux
+  question: Si $u_n > 0$ pour tout $n$ et $u_n \to \ell$, alors $\ell > 0$.
+  reponse: false
+  explication: 'Faux : $u_n = 1/n > 0$ tend vers $0$. Les inégalités strictes deviennent larges par passage à la limite ; on peut seulement conclure $\ell \ge 0$.'
+- type: qcm
+  question: Pour démontrer l'unicité de la limite, quelle tolérance choisit-on ?
+  choix:
+  - $\varepsilon = 1$
+  - $\varepsilon = |\ell - \ell'|/2$
+  - $\varepsilon = |\ell - \ell'|$
+  - N'importe laquelle
+  reponse: 1
+  explication: Avec $\varepsilon = |\ell - \ell'|/2$, l'inégalité triangulaire donne $|\ell - \ell'| < 2\varepsilon = |\ell - \ell'|$, absurde. Avec $\varepsilon = |\ell - \ell'|$, on obtiendrait seulement $|\ell - \ell'| < 2|\ell - \ell'|$, qui n'a rien de contradictoire.
+- type: vrai-faux
+  question: Toute suite bornée converge.
+  reponse: false
+  explication: 'Faux : $(-1)^n$ est bornée et diverge. Seul le sens inverse est vrai — une suite convergente est bornée.'
+---
+
+Le brief n'exige des démonstrations complètes qu'à partir du niveau 3. Elles
+sont données ici quand même, parce que ce sont les premières du parcours et
+qu'elles servent de modèle de rédaction.
+
+### Unicité de la limite
+
+Supposons $u_n \to \ell$ et $u_n \to \ell'$ avec $\ell \ne \ell'$. Posons
+$\varepsilon = |\ell - \ell'|/2 > 0$. Il existe $N_1$ tel que
+$|u_n - \ell| < \varepsilon$ pour $n \ge N_1$, et $N_2$ tel que
+$|u_n - \ell'| < \varepsilon$ pour $n \ge N_2$. Pour $n \ge \max(N_1, N_2)$,
+l'inégalité triangulaire donne
+
+$$
+|\ell - \ell'| \le |\ell - u_n| + |u_n - \ell'| < 2\varepsilon = |\ell - \ell'| ,
+$$
+
+soit $|\ell - \ell'| < |\ell - \ell'|$, ce qui est absurde. $\square$
+
+Le choix $\varepsilon = |\ell - \ell'|/2$ n'a rien d'évident a priori : on part
+de la conclusion voulue et on choisit la tolérance qui la rend contradictoire.
+C'est le mouvement le plus fréquent de toute l'analyse.
+
+### Une suite convergente est bornée
+
+Prenons $\varepsilon = 1$ dans la définition : il existe $N$ tel que
+$|u_n - \ell| < 1$ pour $n \ge N$, donc $|u_n| < |\ell| + 1$ pour ces $n$. Les
+rangs $0, \dots, N-1$ sont en nombre fini. Avec
+$M = \max\big(|u_0|, \dots, |u_{N-1}|, |\ell| + 1\big)$, on a $|u_n| \le M$ pour
+tout $n$. $\square$
+
+L'étape qui compte est « en nombre fini » : un maximum sur un ensemble fini
+existe toujours, sur un ensemble infini non. C'est le seul endroit du parcours
+où la finitude d'un paquet de rangs est utilisée aussi crûment.
+
+### Passage à la limite dans les inégalités
+
+> Si $u_n \le v_n$ pour tout $n$ assez grand et si les deux suites convergent,
+> alors $\lim u_n \le \lim v_n$. **Les inégalités strictes ne se conservent pas.**
+
+La démonstration est l'exercice 4 du nœud.
+
+### Piège : les inégalités strictes ne se conservent pas
+
+$u_n = 1/n > 0$ pour tout $n \ge 1$, et $\lim u_n = 0$. De $u_n > 0$ on ne peut
+conclure que $\lim u_n \ge 0$. Cette perte de la stricte inégalité réapparaîtra
+telle quelle en probabilités, où un événement de probabilité strictement
+positive à chaque rang peut avoir une limite de probabilité nulle.
+
+### Piège : bornée n'implique pas convergente
+
+La réciproque de « convergente ⇒ bornée » est fausse : $u_n = (-1)^n$ est
+bornée et n'a pas de limite. On y revient avec les suites extraites, qui disent
+exactement ce qui lui manque.

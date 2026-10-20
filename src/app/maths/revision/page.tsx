@@ -1,4 +1,5 @@
 import { loadGraph } from "@/lib/maths/graph/load";
+import { lienSource, loadModules, type Capsule } from "@/lib/maths/content";
 import { fileDeRevision } from "@/lib/maths/revision/queue";
 import { Mdx } from "@/lib/maths/mdx";
 import Reviseur, { type CarteVue } from "@/components/maths/Reviseur";
@@ -12,12 +13,22 @@ export default async function RevisionPage() {
   const graph = loadGraph();
   const file = fileDeRevision(graph, await chargerDonnees(), new Date());
 
+  // Capsules par nœud, pour qu'une carte ratée ramène à sa capsule (D25).
+  const capsules = new Map<string, Capsule[]>();
+  const capsulesDe = (nodeId: string) => {
+    if (!capsules.has(nodeId))
+      capsules.set(nodeId, loadModules(graph.byId.get(nodeId)!));
+    return capsules.get(nodeId)!;
+  };
+
   const cartes: CarteVue[] = file.map((c) => ({
     cardKey: c.cardKey,
     nodeId: c.nodeId,
     cardId: c.cardId,
     nodeTitle: c.nodeTitle,
     ref: c.ref,
+    source: lienSource(c.nodeId, c.ref, capsulesDe(c.nodeId)),
+    capsule: capsulesDe(c.nodeId).find((k) => k.id === c.ref)?.title ?? null,
     nouvelle: c.nouvelle,
     stability: c.etat.stability,
     reps: c.etat.reps,

@@ -2,14 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadGraph } from "@/lib/maths/graph/load";
 import {
-  exerciseKey,
+  lienSource,
   loadCards,
   loadCourse,
+  loadCourseShell,
   loadExercises,
+  loadModules,
   RUBRIQUE,
 } from "@/lib/maths/content";
 import {
   attemptsOfNode,
+  capsulesTermineesDe,
   chargerDonnees,
   progressOf,
   reviewStatesOfNode,
@@ -25,7 +28,13 @@ import {
 import { dateCourte, ETAT, marqueur, minutes as fmtMinutes } from "@/lib/maths/etat";
 import { Mdx } from "@/lib/maths/mdx";
 import { JournalSession, MarquageEtat } from "@/components/maths/NodeActions";
-import Exercice from "@/components/maths/Exercice";
+import ListeExercices from "@/components/maths/ListeExercices";
+import Parcours, { jauge } from "@/components/maths/Parcours";
+import Gain, { lireGain } from "@/components/maths/Gain";
+import {
+  avancementCapsules,
+  exercicesParCapsule,
+} from "@/lib/maths/progression/capsules";
 
 /**
  * Les deux rails restent en place pendant que le cours défile : ils portent la
@@ -40,8 +49,12 @@ import Exercice from "@/components/maths/Exercice";
 const RAIL =
   "chrome shrink-0 border-line p-4 lg:sticky lg:top-[5.25rem] lg:h-[calc(100dvh-5.25rem)] lg:overflow-y-auto";
 
-export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
+export default async function NodePage({
+  params,
+  searchParams,
+}: PageProps<"/maths/n/[id]">) {
   const { id } = await params;
+  const gain = lireGain(await searchParams);
   const graph = loadGraph();
   const node = graph.byId.get(id);
   if (!node || node.kind !== "concept") notFound();
@@ -53,8 +66,18 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
   const preuves = evidence.get(id);
   const progress = progressOf(donnees, id);
   const sessions = sessionsOf(donnees, id);
-  const course = loadCourse(node);
+  // Un nœud découpé en capsules (D25) affiche son parcours ; un nœud rédigé
+  // d'un bloc garde le cours en continu, le temps d'être converti.
+  const capsules = loadModules(node);
+  const decoupe = capsules.length > 0;
+  const course = decoupe ? loadCourseShell(node) : loadCourse(node);
+  const avancement = avancementCapsules(capsules, capsulesTermineesDe(donnees, id));
+  const restantes = capsules
+    .filter((c) => avancement.etats.get(c.id) !== "terminee")
+    .reduce((a, c) => a + c.minutes, 0);
+  const prochaine = capsules.find((c) => c.id === avancement.prochaine);
   const exercises = loadExercises(node);
+  const numeros = new Map(exercises.map((e, i) => [e.id, i + 1]));
   const cards = loadCards(node);
   const etatsCartes = new Map(reviewStatesOfNode(donnees, id).map((r) => [r.cardId, r]));
   const tentatives = attemptsOfNode(donnees, id);
@@ -84,6 +107,7 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
         <span className="hidden text-muted sm:inline">/</span>
         <span className="hidden truncate sm:inline">{topic.title}</span>
         <div className="grow" />
+        {gain && <Gain xp={gain} texte="cours terminé" />}
         <span style={{ color: ETAT[state].border }}>{marqueur(state)}</span>
         <span>{ETAT[state].label}</span>
       </div>
@@ -91,8 +115,34 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
       {/* `items-start` est indispensable : un enfant de flex étiré sur toute
           la hauteur n'a aucune marge pour coller. */}
       <div className="flex flex-col lg:flex-row lg:items-start">
-        {/* Rail gauche : la rubrique du §6, toujours dans le même ordre. */}
+        {/* Rail gauche : les capsules dans l'ordre, ou, pour un nœud non
+            découpé, la rubrique du §6. */}
         <nav className={RAIL + " hidden w-44 border-r lg:block"}>
+          {decoupe ? (
+            <ol className="flex flex-col gap-1">
+              {capsules.map((c) => {
+                const etat = avancement.etats.get(c.id);
+                return (
+                  <li key={c.id}>
+                    <Link
+                      href={`/maths/n/${node.id}/m/${c.id}`}
+                      className={
+                        "flex gap-2 hover:text-accent " +
+                        (etat === "terminee" ? "text-muted" : "text-foreground")
+                      }
+                    >
+                      <span className="text-muted w-4 shrink-0 text-right tabular-nums">
+                        {etat === "terminee" ? "✓" : c.numero}
+                      </span>
+                      <span className="min-w-0 truncate" title={c.title}>
+                        {c.title.split(/ — |, /)[0]}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
           <ol className="flex flex-col gap-1">
             {RUBRIQUE.map((s, i) => (
               <li key={s.id}>
@@ -112,6 +162,7 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
               </li>
             ))}
           </ol>
+          )}
           <div className="border-line mt-4 border-t pt-2">
             <div className="text-muted">temps passé</div>
             <div>{totalMinutes ? fmtMinutes(totalMinutes) : "—"}</div>
@@ -131,7 +182,63 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
             </p>
           </div>
 
-          {course ? (
+          {decoupe ? (
+            <>
+              <div className="chrome border-line mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-y py-3">
+                <span className="font-mono text-[12px]" aria-hidden>
+                  {jauge(avancement.terminees, avancement.total)}
+                </span>
+                <span>
+                  {avancement.terminees} / {avancement.total} capsules lues
+                </span>
+                {restantes > 0 && (
+                  <span className="text-muted">{fmtMinutes(restantes)} de lecture restante</span>
+                )}
+                <div className="grow" />
+                {prochaine ? (
+                  <Link
+                    href={`/maths/n/${node.id}/m/${prochaine.id}`}
+                    className="rounded bg-accent px-3 py-1 text-white"
+                  >
+                    {avancement.terminees === 0 ? "commencer" : "reprendre"} : {prochaine.numero}.{" "}
+                    {prochaine.title.split(/ — |, /)[0]}
+                  </Link>
+                ) : (
+                  <span className="text-muted">cours lu en entier</span>
+                )}
+              </div>
+              {exercises.length > 0 && (
+                <p className="chrome text-muted mt-2">
+                  {reussisFaciles} / {faciles.length} exercices réussis en
+                  difficulté ≤ 3 ; seuil pour « acquis » :{" "}
+                  {Math.ceil(faciles.length * SEUILS.reussiteFaible)}, dont la
+                  moitié sans indice
+                </p>
+              )}
+              <Parcours
+                nodeId={node.id}
+                capsules={capsules}
+                avancement={avancement}
+                exercicesApres={exercicesParCapsule(
+                  capsules,
+                  exercises.filter((e) => e.difficulty < SEUILS.difficulteHaute),
+                )}
+                boss={exercises.filter((e) => e.difficulty >= SEUILS.difficulteHaute)}
+                bossVaincu={(preuves?.exercises ?? []).some(
+                  (e) =>
+                    e.difficulty >= SEUILS.difficulteHaute &&
+                    (e.outcome === "resolu-seul" || e.outcome === "resolu-avec-indice"),
+                )}
+                numeros={numeros}
+                tentatives={tentatives}
+              />
+              {course && (
+                <div className="prose-cours mt-12">
+                  <Mdx source={course.body} />
+                </div>
+              )}
+            </>
+          ) : course ? (
             <div className="prose-cours mt-8">
               <Mdx source={course.body} />
             </div>
@@ -156,6 +263,7 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
             </div>
           )}
 
+          {!decoupe && (
           <section className="mt-12 max-w-[92ch]">
             <h2 className="border-line border-b pb-1 text-lg font-semibold tracking-tight">
               Exercices
@@ -173,32 +281,18 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
                   {Math.ceil(faciles.length * SEUILS.reussiteFaible)}, dont la
                   moitié sans indice
                 </p>
-                <ul className="mt-3 space-y-2">
-                  {exercises.map((e, i) => {
-                    const key = exerciseKey(node.id, e.id);
-                    return (
-                      <Exercice
-                        key={e.id}
-                        numero={i + 1}
-                        nodeId={node.id}
-                        exerciseId={e.id}
-                        kind={e.kind}
-                        difficulty={e.difficulty}
-                        tentatives={tentatives
-                          .filter((t) => t.exerciseKey === key)
-                          .map((t) => ({
-                            outcome: t.outcome,
-                            minutesSpent: t.minutesSpent,
-                            note: t.note,
-                            createdAt: dateCourte(t.createdAt),
-                          }))}
-                      />
-                    );
-                  })}
-                </ul>
+                <div className="mt-3">
+                  <ListeExercices
+                    nodeId={node.id}
+                    exercices={exercises}
+                    numeros={numeros}
+                    tentatives={tentatives}
+                  />
+                </div>
               </>
             )}
           </section>
+          )}
         </div>
 
         {/* Rail droit : le seul endroit où l'on affiche des chiffres d'état. */}
@@ -245,15 +339,15 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
                       return (
                         <tr key={c.id} className="border-line border-b">
                           <td className="py-0.5 pr-2">
-                            <a
-                              href={`#${c.ref}`}
+                            <Link
+                              href={lienSource(node.id, c.ref, capsules)}
                               className="hover:underline"
                               title={c.id}
                             >
                               {c.id.length > 16
                                 ? c.id.slice(0, 15) + "…"
                                 : c.id}
-                            </a>
+                            </Link>
                           </td>
                           <td className="text-muted py-0.5 text-right tabular-nums">
                             {e ? `${e.stability.toFixed(1)} j` : "—"}

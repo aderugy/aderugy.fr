@@ -1,0 +1,40 @@
+---
+# Gabarit d'une capsule (décisions D25 et D26). À copier dans
+# content/maths/<domain>/<topic>/<concept>/modules/NN-<id>.mdx :
+#   NN  = ordre dans le nœud (01, 02…), modifiable sans rien casser ;
+#   id  = clé stable en base et dans les `ref` des cartes — ne plus y toucher.
+title: Titre de la notion — une promesse en quelques mots
+minutes: 7                 # 5 à 10 ; au-delà, couper en deux capsules
+rubrique: [construction, intuition, pieges]   # sections du §6 couvertes
+checkpoint:                # 2 à 4 questions, corrigées par le serveur
+  - type: qcm              # 2 à 6 choix ; l'ordre affiché est mélangé
+    question: "Énoncé, avec $\\LaTeX$ au besoin."
+    choix:
+      - "un distracteur plausible — l'erreur typique, pas une absurdité"
+      - "la bonne réponse"
+      - "un autre distracteur"
+    reponse: 1             # indice du bon choix dans le fichier, à partir de 0
+    explication: "Pourquoi c'est juste, et ce que trahissent les distracteurs."
+  - type: vrai-faux
+    question: "Un énoncé qu'on croit vrai à tort — le piège de la capsule."
+    reponse: false
+    explication: "Le contre-exemple, en une ligne."
+  - type: nombre
+    question: "Un calcul court dont le résultat se tape au clavier."
+    reponse: 1001
+    tolerance: 0           # absolue ; 0 par défaut
+    explication: "Le calcul, et l'erreur d'une unité qu'il fallait éviter."
+---
+
+### Premier titre interne (niveau 3 au plus)
+
+Le niveau 2 est réservé au titre de la capsule dans le cours composé.
+
+Une capsule = une notion, avec son arc complet : pourquoi on en a besoin,
+la définition ou l'énoncé, l'intuition, la démonstration si elle tient dans
+la capsule, le piège. Les sections 8 et 9 (liens, références) vont dans
+course.mdx, pas ici.
+
+Les questions du checkpoint vérifient la notion, pas la mémoire du texte :
+le bon ordre des quantificateurs, le contre-exemple, le rang exact — jamais
+« quel mot apparaît dans le deuxième paragraphe ».

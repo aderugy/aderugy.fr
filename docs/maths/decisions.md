@@ -445,3 +445,152 @@ contrôles de widget), passe en noir sur blanc, force un saut de page avant
 chaque nœud et interdit de couper un énoncé, une figure, un bloc de code ou une
 formule affichée. Vérifié en émulant le média d'impression : 22 pages A4
 générées pour le seul nœud rédigé, en-tête et boutons absents.
+
+## D25 — Le cours en capsules — **demandée le 2026-10-20**
+
+Arthur a demandé de gamifier /maths, en commençant par découper les longues
+leçons en micro-modules. Cette décision couvre le découpage seul (phase 1) ;
+l'XP, les séries et les badges viendront ensuite et amenderont le §13, qui les
+exclut aujourd'hui.
+
+**Une capsule = une notion, 5 à 10 minutes.** Pas une section de la rubrique :
+la rubrique du §6 classe le texte par *type* (construction, intuition,
+preuves, pièges), si bien qu'une même notion — la borne supérieure, par
+exemple — était éparpillée sur quatre sections, et qu'une section comme
+« démonstrations » pesait à elle seule 40 % du cours. Couper aux sections
+aurait donné des capsules déséquilibrées mêlant cinq notions. Chaque capsule
+reprend donc l'arc de la rubrique en petit, pour sa notion.
+
+**La rubrique reste une obligation, au niveau du nœud.** Chaque capsule
+déclare dans son frontmatter les sections qu'elle couvre (`rubrique:`) ; les
+sections 1 à 7 doivent être couvertes par l'ensemble des capsules, et la
+coquille `course.mdx` porte les sections 8 et 9 (liens, références), qui
+appartiennent au nœud entier. `src/lib/maths/content.test.ts` le vérifie sur
+le contenu réel, avec les `ref` de cartes et les `after` d'exercices : une
+capsule renommée ne laisse rien pointer dans le vide.
+
+**Format.** `content/<domain>/<topic>/<concept>/modules/NN-<id>.mdx`, avec
+`title`, `minutes` et `rubrique` en frontmatter, des titres internes de
+niveau 3 au plus. Le numéro fixe l'ordre ; l'id — le nom sans numéro — est la
+clé en base et dans les `ref` : on peut réordonner sans rien perdre.
+`course.mdx` garde le `status` (D2 inchangée). Un exercice porte `after: <id>`,
+la capsule à partir de laquelle il est faisable ; une carte porte
+`ref: <id de capsule>`, ou `liens` / `references`.
+
+**Le corpus reste un manuel (§12).** `loadCourse` recompose le cours d'un
+seul tenant — chaque capsule sous un titre de niveau 2 ancré sur son id, puis
+la coquille. La recherche, `/corpus` et le connecteur lisent ce cours composé
+et n'ont presque pas changé ; une recherche ou une carte ratée ouvre
+directement la capsule (`lienSource`).
+
+**Les deux formats cohabitent.** Un nœud sans dossier `modules/` garde le cours
+en continu et le rail de la rubrique. Il n'y en a qu'un rédigé aujourd'hui, et
+il est converti ; les suivants s'écrivent directement en capsules.
+
+**État.** Une table, `maths_module_progress` (migration 0029) : une ligne par
+capsule terminée. Terminer la dernière capsule pose `course_read` : c'est
+toujours la seule preuve de lecture que lisent les règles du §4, qui ne
+changent pas. Rouvrir une capsule ne retire pas `course_read` — le cours a
+bien été lu. La lecture de la table est tolérante tant que la migration n'est
+pas appliquée. Le connecteur lit les capsules terminées et ne peut pas en
+terminer : une capsule se termine en la lisant, dans l'application.
+
+**Pas de verrou entre capsules.** Le parcours en propose une — la première non
+terminée — mais toutes restent ouvertes : relire une démonstration ou sauter
+ce qu'on sait déjà (§2, test de sortie) ne doit rien coûter. Les exercices non
+plus ne sont pas verrouillés ; ils sont rangés après leur capsule.
+
+**Interface.** La page de nœud devient le parcours : jauge `▮▯`, capsules dans
+l'ordre avec leurs exercices, une seule action « reprendre ». Le lecteur
+`/maths/n/<id>/m/<capsule>` est une colonne sans rails, pensée aussi pour le
+téléphone, avec une action principale : « terminer et passer à la suivante ».
+Aucune couleur nouvelle : terminer une capsule n'est pas un niveau de
+maîtrise, la rampe reste réservée à l'état du nœud (§9).
+
+**Contenu de `suites-reelles`.** Le cours a été redistribué en neuf capsules
+sans réécriture de fond : seules les transitions sont neuves. Le grand bloc
+Python de la section 7 est coupé en trois extraits, chacun dans la capsule
+qu'il illustre, et leurs sorties ont été régénérées en exécutant le code (la
+sortie publiée omettait des lignes). Les liens internes `/n/…`, cassés depuis
+l'intégration au site, pointent désormais vers `/maths/n/…`.
+
+## D26 — Gamification : jouer sans tricher avec la progression — **demandée le 2026-10-20**
+
+Suite de D25, livrée dans la même branche. Le §13 excluait la gamification ;
+Arthur l'a demandée explicitement. Ce qui la rend acceptable ici tient en une
+règle : **l'XP mesure l'effort, jamais la maîtrise.** Les états `learned` et
+`mastered` restent calculés par `progression/rules.ts` à partir des preuves,
+et aucune ligne de la couche de jeu n'y touche. Sinon on finirait par
+optimiser l'XP au lieu d'apprendre.
+
+**Checkpoint.** Chaque capsule se termine par 2 à 4 questions — qcm,
+vrai/faux, nombre — à réussir toutes pour terminer la capsule. La correction
+se fait côté serveur : le navigateur ne reçoit ni les réponses ni les
+explications avant d'avoir répondu juste, et terminer recorrige tout. Une
+réponse fausse ne dévoile pas la bonne : on réessaie. L'ordre des choix est
+mélangé de façon déterministe par question, parce qu'en rédigeant on met la
+bonne réponse toujours au même endroit sans s'en rendre compte. Le nombre
+d'essais est gardé (`checkpoint_tries`) pour un seul usage : le bonus du
+premier coup. Ce chiffre vient du navigateur et n'est pas vérifiable ; il ne
+pèse que 5 XP et rien d'autre, ce qui est le bon ordre de confiance.
+
+Une capsule déjà lue garde son checkpoint en entraînement libre, sans rien
+enregistrer. Le connecteur peut lire un checkpoint pour interroger Arthur en
+conversation, réponses comprises sur demande, mais ne peut pas terminer une
+capsule (0029, lecture seule).
+
+**Test de sortie.** Les exercices de difficulté ≥ 4 sortent du fil des
+capsules et forment le test de sortie en fin de parcours. C'est exactement la
+condition « exercice difficile réussi » de `mastered`, et le test du §2 qui
+permet de valider un nœud sans le parcourir : on ne fait que le nommer.
+
+**XP.** Barème dans `lib/maths/jeu` :
+
+| geste | XP |
+|---|---|
+| capsule terminée | 10, +5 si le checkpoint passe du premier coup |
+| exercice | valeur de la meilleure issue × difficulté : seul 10, avec indice 5, échec 2, abandon 1 |
+| test de sortie | +50, une fois par nœud |
+| carte révisée | 1, une fois par carte et par jour |
+
+Deux choix délibérés. Un exercice **ne rapporte que ses progrès** : le
+refaire après l'avoir réussi ne rapporte rien, sinon refaire les faciles
+serait la meilleure stratégie. Et **un échec ne retire jamais rien** — il
+rapporte même un peu, parce que le journal des tentatives n'a de valeur que
+si les échecs y sont déclarés (§12) ; un barème qui les punit apprendrait à
+les taire. Les révisions sont plafonnées à une par carte et par jour, pour la
+même raison que le plafond de cartes neuves (D17).
+
+Niveau n à 100·n(n−1)/2 XP. Un nœud complet rapporte de l'ordre de 500 XP :
+les premiers niveaux tombent en une semaine, les suivants au rythme des nœuds.
+
+**Rien n'est stocké.** XP, niveau, série et badges sont recalculés à chaque
+lecture à partir des capsules terminées, des tentatives, du journal des
+révisions et du journal de session — comme les états de progression. Changer
+un barème réécrit donc tout l'historique de façon cohérente, sans migration.
+La seule aide côté base est `maths_reviews_per_day()`, qui agrège le journal
+des révisions par jour de Paris plutôt que de le paginer à chaque page.
+
+**Série.** Un jour compte dès une capsule, un exercice, une carte ou une
+séance au journal : le seuil est bas exprès, la série récompense la
+régularité et l'objectif du jour porte le volume. Un joker par semaine (lundi
+à dimanche) couvre un jour manqué isolé ; deux jours d'affilée cassent la
+série. Le choix d'une série quotidienne plutôt qu'un objectif d'heures
+hebdomadaire était ouvert ; la série a été retenue, et le joker est là pour
+qu'un jour de repos — ou une course le dimanche — ne coûte pas trois semaines.
+
+**Objectif du jour.** Deux gestes : avancer (une capsule ou un exercice) et
+entretenir (vider la file de révision). Il ne rapporte pas d'XP, parce que
+« file vide » est un état présent qu'on ne sait pas reconstituer après coup.
+
+**Badges.** Neuf, chacun lié à un jalon réel — premier pas, cours lu, cinq
+checkpoints sans faute, test de sortie, dix exercices difficiles résolus seul,
+cent cartes, première maîtrise, sept et trente jours de série. Aucun badge ne
+s'obtient en cliquant. Un badge acquis le reste, même si la maîtrise qui l'a
+valu retombe.
+
+**Interface.** Fidèle au §9 : aucune couleur nouvelle. La série et le niveau
+tiennent en une ligne de chrome dans l'en-tête ; tout le reste est sur
+`/maths/rythme`, tracé à l'encre comme le tableau de bord (D21), chaque
+graphique doublé de ses chiffres. Après une capsule, le gain s'affiche une
+fois, en une ligne, dans la règle de la page suivante.

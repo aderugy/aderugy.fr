@@ -10,6 +10,10 @@ export type CarteVue = {
   cardId: string;
   nodeTitle: string;
   ref: string;
+  /** Où relire : la capsule d'origine, ou la section du nœud. */
+  source: string;
+  /** Titre de la capsule d'origine, si la carte en vient d'une. */
+  capsule: string | null;
   nouvelle: boolean;
   stability: number;
   reps: number;
@@ -155,10 +159,12 @@ export default function Reviseur({
               {faces[i].back}
               <p className="chrome text-muted mt-8">
                 <Link
-                  href={`/maths/n/${carte.nodeId}#${carte.ref}`}
+                  href={carte.source}
                   className="text-accent hover:underline"
                 >
-                  relire la section « {carte.ref} » du cours
+                  {carte.capsule
+                    ? `relire la capsule « ${carte.capsule} »`
+                    : `relire la section « ${carte.ref} » du cours`}
                 </Link>
               </p>
             </>
