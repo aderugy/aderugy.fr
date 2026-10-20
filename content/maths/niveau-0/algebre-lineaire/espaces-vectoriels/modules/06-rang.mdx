@@ -1,0 +1,103 @@
+---
+title: Le théorème du rang
+minutes: 10
+rubrique: [construction, demonstrations, pieges, simulation]
+checkpoint:
+- type: nombre
+  question: 'Une application linéaire $f : \mathbb{R}^7 \to \mathbb{R}^4$ est surjective. Quelle est la dimension de son noyau ?'
+  reponse: 3
+  explication: 'Théorème du rang : $\dim \ker f = 7 - \operatorname{rg} f = 7 - 4 = 3$. Une application de $\mathbb{R}^7$ dans $\mathbb{R}^4$ n''est jamais injective : elle écrase au moins un sous-espace de dimension $3$.'
+- type: vrai-faux
+  question: 'Si $\dim E = \dim F$ (finie) et $f : E \to F$ est linéaire et injective, alors $f$ est un isomorphisme.'
+  reponse: true
+  explication: 'Vrai : $\ker f = \{0\}$ donne $\operatorname{rg} f = \dim E = \dim F$, donc $\operatorname{Im} f = F$. En dimension finie égale, injectif, surjectif et bijectif sont équivalents.'
+- type: vrai-faux
+  question: 'Pour l''application $D : P \mapsto P''$ sur $\mathbb{R}[X]$ (dimension infinie), surjective et non injective, le théorème du rang interdit cette situation.'
+  reponse: false
+  explication: 'Faux : le théorème du rang suppose $E$ de dimension finie. Sur $\mathbb{R}[X]$, la dérivation est surjective (tout polynôme a une primitive polynomiale) et de noyau les constantes. Rien de contradictoire en dimension infinie.'
+---
+
+### L'énoncé
+
+Le **rang** de $f$ est $\operatorname{rg} f = \dim \operatorname{Im} f$.
+
+> **Théorème du rang.** Si $E$ est de dimension finie et $f : E \to F$ est
+> linéaire, alors
+> $$
+> \dim E = \dim \ker f + \operatorname{rg} f .
+> $$
+
+« Ce que $f$ écrase plus ce que $f$ atteint égale ce qu'on avait au départ. »
+
+### Démonstration
+
+Soit $(k_1, \dots, k_r)$ une base de $\ker f$ ; par le théorème de la base
+incomplète, complétons-la en une base $(k_1, \dots, k_r, e_1, \dots, e_s)$ de
+$E$, avec $r + s = \dim E$. Montrons que $(f(e_1), \dots, f(e_s))$ est une base
+de $\operatorname{Im} f$ ; on aura $\operatorname{rg} f = s$.
+
+*Génératrice.* Tout $u \in E$ s'écrit $u = \sum \alpha_i k_i + \sum \beta_j e_j$,
+et $f(u) = \sum \alpha_i f(k_i) + \sum \beta_j f(e_j) = \sum \beta_j f(e_j)$
+puisque $f(k_i) = 0$.
+
+*Libre.* Si $\sum \beta_j f(e_j) = 0$, alors $f(\sum \beta_j e_j) = 0$, donc
+$\sum \beta_j e_j \in \ker f$ : il existe des $\alpha_i$ avec
+$\sum \beta_j e_j = \sum \alpha_i k_i$. Cette relation
+$\sum \beta_j e_j - \sum \alpha_i k_i = 0$ porte sur la base de $E$ : tous les
+coefficients sont nuls, en particulier les $\beta_j$. $\square$
+
+L'étape non triviale est la liberté : il faut **remonter** dans $E$ par la
+linéarité, utiliser que le vecteur obtenu est dans le noyau, puis se servir de
+la liberté de la base **complétée** — pas seulement de celle des $e_j$.
+
+### Pour une matrice
+
+Pour $\mathbf{A} \in \mathcal{M}_{n,p}(\mathbb{R})$, l'image de
+$\mathbf{x} \mapsto \mathbf{A}\mathbf{x}$ est engendrée par les colonnes de
+$\mathbf{A}$ : $\operatorname{rg} \mathbf{A}$ est le nombre maximal de colonnes
+linéairement indépendantes. Le théorème du rang dit que l'ensemble des
+solutions de $\mathbf{A}\mathbf{x} = 0$ est un sous-espace de dimension
+$p - \operatorname{rg}\mathbf{A}$. (Le fait que le rang des lignes égale celui
+des colonnes est démontré au nœud [déterminant](/maths/n/determinant).)
+
+### Piège : le rang numérique n'est pas le rang
+
+En machine, une matrice de rang $2$ perturbée par des erreurs d'arrondi de
+l'ordre de $10^{-16}$ a « mathématiquement » rang $3$. Le rang calculé par
+NumPy dépend d'un **seuil** : `np.linalg.matrix_rank` compte les valeurs
+singulières au-dessus d'une tolérance proportionnelle à la précision machine.
+Avec des données réelles bruitées, aucune colonne n'est jamais combinaison
+**exacte** des autres, et la bonne question devient « à quel point » — ce que
+mesure le **conditionnement**.
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+x1, x2 = rng.normal(size=(2, 100))
+A = np.column_stack([x1, x2, x1 + x2])          # rang 2 exactement
+print("rang de [x1, x2, x1+x2]         :", np.linalg.matrix_rank(A))
+
+for bruit in (1e-14, 1e-8, 1e-2):
+    B = A.copy()
+    B[:, 2] += bruit * rng.normal(size=100)      # presque combinaison
+    s = np.linalg.svd(B, compute_uv=False)
+    print(f"bruit {bruit:.0e} : rang {np.linalg.matrix_rank(B)}"
+          f"   plus petite valeur singuliere {s[-1]:.1e}"
+          f"   conditionnement {s[0] / s[-1]:.1e}")
+```
+
+Sortie obtenue :
+
+```
+rang de [x1, x2, x1+x2]         : 2
+bruit 1e-14 : rang 2   plus petite valeur singuliere 6.5e-14   conditionnement 2.6e+14
+bruit 1e-08 : rang 3   plus petite valeur singuliere 5.3e-08   conditionnement 3.2e+08
+bruit 1e-02 : rang 3   plus petite valeur singuliere 6.3e-02   conditionnement 2.7e+02
+```
+
+Avec un bruit de $10^{-14}$, NumPy déclare le rang $2$ : la perturbation est
+sous le seuil. À partir de $10^{-8}$, le rang vaut $3$, mais le conditionnement
+dit la vérité : la troisième colonne est presque redondante, et une régression
+sur ces trois colonnes donnerait des coefficients instables (capsule 8). Le
+rang est un entier ; la redondance, une question de degré.

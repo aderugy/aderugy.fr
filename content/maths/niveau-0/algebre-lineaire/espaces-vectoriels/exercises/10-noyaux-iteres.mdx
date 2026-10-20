@@ -1,0 +1,51 @@
+---
+kind: preuve
+difficulty: 5
+after: lineaires
+---
+Soit $E$ de dimension finie $n$ et $f : E \to E$ linéaire. On note
+$f^k = f \circ \cdots \circ f$ ($k$ fois), $f^0 = \mathrm{id}$, et
+$N_k = \ker f^k$.
+
+1. Montrer que $N_0 \subseteq N_1 \subseteq N_2 \subseteq \cdots$.
+2. Montrer que si $N_k = N_{k+1}$ pour un $k$, alors $N_{k+1} = N_{k+2}$, puis
+   $N_j = N_k$ pour tout $j \ge k$.
+3. En déduire que la suite $(N_k)$ est strictement croissante puis constante,
+   et qu'elle se stabilise au plus tard au rang $n$.
+4. On dit que $f$ est **nilpotente** s'il existe $m$ avec $f^m = 0$. Montrer
+   qu'alors $f^n = 0$.
+5. Donner une matrice $n \times n$ nilpotente avec $f^{n-1} \ne 0$ : la borne
+   est atteinte.
+
+<!-- indice -->
+2 : si $x \in N_{k+2}$, alors $f(x) \in N_{k+1}$. Utiliser l'hypothèse sur
+$f(x)$.
+
+<!-- indice -->
+3 : tant que l'inclusion est stricte, la dimension augmente d'au moins $1$, et
+elle est bornée par $n$.
+
+<!-- indice -->
+5 : le décalage $e_1 \mapsto 0$, $e_{i+1} \mapsto e_i$.
+
+<!-- solution -->
+1. Si $f^k(x) = 0$, alors $f^{k+1}(x) = f(f^k(x)) = f(0) = 0$.
+2. Soit $x \in N_{k+2}$. Alors $f^{k+1}(f(x)) = 0$, donc
+   $f(x) \in N_{k+1} = N_k$, c'est-à-dire $f^k(f(x)) = f^{k+1}(x) = 0$ :
+   $x \in N_{k+1}$. Avec 1, $N_{k+2} = N_{k+1}$. Par récurrence, $N_j = N_k$
+   pour tout $j \ge k$.
+3. Soit $k_0$ le premier indice avec $N_{k_0} = N_{k_0 + 1}$. Avant, les
+   inclusions sont strictes, et chaque inclusion stricte entre sous-espaces de
+   dimension finie augmente la dimension d'au moins $1$ (un sous-espace de
+   même dimension serait égal). Donc $\dim N_k \ge k$ pour $k \le k_0$, et
+   comme $\dim N_k \le n$, on a $k_0 \le n$. Un tel $k_0$ existe bien : sinon
+   la dimension dépasserait $n$. Après $k_0$, la suite est constante par 2.
+4. Si $f^m = 0$, $N_m = E$. La suite stationne à partir de $k_0 \le n$, donc
+   $N_n = N_{\max(m, n)} = N_m = E$ : $f^n = 0$.
+5. $f(e_1) = 0$, $f(e_{i+1}) = e_i$ : matrice avec des $1$ juste au-dessus de la
+   diagonale. Alors $f^{n-1}(e_n) = e_1 \ne 0$ et $f^n = 0$. Ici
+   $N_k = \operatorname{Vect}(e_1, \dots, e_k)$ : la dimension augmente
+   exactement de $1$ à chaque étape, le cas extrême de la question 3.
+
+Ce résultat est la première pierre de la **réduction de Jordan**, qui décrit
+toutes les matrices à changement de base près, au-delà des diagonalisables.

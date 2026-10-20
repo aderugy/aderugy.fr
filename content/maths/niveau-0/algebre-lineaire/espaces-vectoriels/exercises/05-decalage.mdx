@@ -1,0 +1,41 @@
+---
+kind: contre-exemple
+difficulty: 3
+after: rang
+---
+Sur l'espace $E$ des suites réelles, on définit le **décalage à droite**
+$S(u_0, u_1, u_2, \dots) = (0, u_0, u_1, \dots)$ et le **décalage à gauche**
+$T(u_0, u_1, u_2, \dots) = (u_1, u_2, u_3, \dots)$.
+
+1. Montrer que $S$ et $T$ sont linéaires.
+2. Montrer que $S$ est injective et non surjective, et que $T$ est surjective
+   et non injective.
+3. Calculer $T \circ S$ et $S \circ T$.
+4. Expliquer pourquoi aucune de ces situations n'est possible pour une
+   application linéaire d'un espace de **dimension finie** dans lui-même.
+
+<!-- indice -->
+Pour 2, déterminer $\ker S$, $\ker T$, et chercher une suite qui n'est pas
+dans l'image de $S$.
+
+<!-- indice -->
+Pour 4, le théorème du rang avec $\dim E = \dim F$.
+
+<!-- solution -->
+1. Les deux opérations agissent coordonnée par coordonnée, sans mélanger les
+   termes : $S(u + \lambda v) = S(u) + \lambda S(v)$ se lit terme à terme, de
+   même pour $T$.
+2. $S(u) = 0$ force $u_0 = u_1 = \cdots = 0$ : $\ker S = \{0\}$, $S$ injective.
+   La suite $(1, 0, 0, \dots)$ n'est pas dans l'image, dont tous les éléments
+   commencent par $0$. Pour $T$ : toute suite $v$ est l'image de
+   $(0, v_0, v_1, \dots)$, donc $T$ est surjective ; et
+   $T(1, 0, 0, \dots) = 0$, donc $\ker T \ne \{0\}$.
+3. $T \circ S = \mathrm{id}_E$ : décaler à droite puis à gauche ne change rien.
+   $S \circ T(u) = (0, u_1, u_2, \dots)$ : on perd $u_0$. Donc $S \circ T \ne \mathrm{id}$.
+   $T$ est un inverse à gauche de $S$ sans en être un inverse à droite.
+4. En dimension finie, $\dim \ker f + \operatorname{rg} f = \dim E$. Si $f$ est
+   injective, $\operatorname{rg} f = \dim E$ et $\operatorname{Im} f = E$ : elle
+   est surjective. Si $f$ est surjective, $\dim \ker f = 0$ : elle est
+   injective. Pour des matrices carrées, $\mathbf{B}\mathbf{A} = \mathbf{I}$
+   entraîne donc $\mathbf{A}\mathbf{B} = \mathbf{I}$ — ce que l'exemple des
+   décalages rend faux en dimension infinie.

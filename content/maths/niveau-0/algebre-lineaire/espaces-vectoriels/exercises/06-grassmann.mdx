@@ -1,0 +1,44 @@
+---
+kind: preuve
+difficulty: 3
+after: dimension
+---
+Soient $F$ et $G$ deux sous-espaces d'un espace $E$ de dimension finie.
+
+1. Démontrer la **formule de Grassmann** :
+   $\dim(F + G) = \dim F + \dim G - \dim(F \cap G)$.
+2. En déduire que deux plans (sous-espaces de dimension $2$) de $\mathbb{R}^3$
+   ont toujours une droite en commun au moins.
+3. Deux sous-espaces de dimension $3$ de $\mathbb{R}^5$ peuvent-ils n'avoir
+   que $0$ en commun ?
+
+<!-- indice -->
+Partir d'une base $(w_1, \dots, w_k)$ de $F \cap G$, la compléter en une base
+de $F$ par des $f_i$, et en une base de $G$ par des $g_j$. Montrer que la
+réunion de ces trois familles est une base de $F + G$.
+
+<!-- indice -->
+Pour la liberté : si $\sum a_l w_l + \sum b_i f_i + \sum c_j g_j = 0$, le
+vecteur $\sum c_j g_j$ est dans $G$ et égal à un vecteur de $F$.
+
+<!-- solution -->
+1. Soit $(w_1, \dots, w_k)$ une base de $F \cap G$, complétée en
+   $(w_1, \dots, w_k, f_1, \dots, f_r)$ base de $F$ et
+   $(w_1, \dots, w_k, g_1, \dots, g_s)$ base de $G$. Montrons que
+   $\mathcal{B} = (w_l, f_i, g_j)$ est une base de $F + G$.
+
+   *Génératrice* : tout élément de $F + G$ est somme d'un élément de $F$ et
+   d'un élément de $G$, chacun combinaison des vecteurs de $\mathcal{B}$.
+
+   *Libre* : supposons $\sum a_l w_l + \sum b_i f_i + \sum c_j g_j = 0$. Alors
+   $v = \sum c_j g_j = -\sum a_l w_l - \sum b_i f_i$ est dans $G$ (première
+   écriture) et dans $F$ (seconde) : $v \in F \cap G$, donc
+   $v = \sum \alpha_l w_l$. La relation $\sum c_j g_j - \sum \alpha_l w_l = 0$
+   porte sur la base de $G$ : tous les $c_j$ sont nuls. Il reste
+   $\sum a_l w_l + \sum b_i f_i = 0$, relation sur la base de $F$ : tous les
+   coefficients sont nuls.
+
+   Donc $\dim(F + G) = k + r + s = (k + r) + (k + s) - k$. $\square$
+2. $\dim(F \cap G) = 2 + 2 - \dim(F + G) \ge 4 - 3 = 1$.
+3. Non : $\dim(F \cap G) \ge 3 + 3 - 5 = 1$. Deux sous-espaces dont la somme
+   des dimensions dépasse celle de l'espace se coupent toujours.

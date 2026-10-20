@@ -1,0 +1,60 @@
+---
+title: Le problème — combien de nombres décrivent vraiment un objet ?
+minutes: 6
+rubrique: [position, probleme]
+checkpoint:
+- type: qcm
+  question: 'Un jeu de données a trois colonnes : prix hors taxe, TVA (20 % du prix) et prix TTC. Combien de « vraies » variables contient-il ?'
+  choix:
+  - 'Trois, une par colonne.'
+  - 'Une : les deux autres colonnes sont des multiples de la première.'
+  - 'Deux, car la TVA n''est pas le prix.'
+  reponse: 1
+  explication: 'TVA $= 0{,}2 \times$ HT et TTC $= 1{,}2 \times$ HT : les trois vecteurs colonnes sont colinéaires, ils engendrent un espace de dimension $1$. C''est cette dimension, et non le nombre de colonnes, qui compte les informations indépendantes.'
+- type: vrai-faux
+  question: 'L''ensemble des fonctions $f : \mathbb{R} \to \mathbb{R}$ peut être muni d''une structure d''espace vectoriel, bien que ses éléments ne soient pas des « flèches ».'
+  reponse: true
+  explication: 'Vrai : on ajoute deux fonctions et on multiplie une fonction par un réel point par point, et les axiomes sont vérifiés. Un vecteur est un élément d''un espace vectoriel, rien de plus ; la flèche n''est qu''un dessin pour $\mathbb{R}^2$ et $\mathbb{R}^3$.'
+---
+
+### Position dans le graphe
+
+Ce nœud n'a pas de prérequis : c'est la racine de l'algèbre linéaire. Il
+ouvre le [déterminant](/maths/n/determinant), les
+[projections orthogonales](/maths/n/espaces-euclidiens-projections) et le
+[calcul différentiel](/maths/n/gradient-differentielle) ; plus loin, la
+covariance, le vecteur gaussien et la régression linéaire sont des énoncés
+d'algèbre linéaire sur des espaces de variables aléatoires.
+
+### Le problème
+
+Une régression linéaire explique une variable $y$ par $p$ variables
+explicatives $x_1, \dots, x_p$, observées sur $n$ individus. On cherche des
+coefficients $\beta_1, \dots, \beta_p$ tels que
+$y \approx \beta_1 x_1 + \cdots + \beta_p x_p$, où chaque $x_j$ est la colonne
+de ses $n$ observations. Deux questions précèdent tout calcul.
+
+- **Les coefficients sont-ils déterminés ?** Si une colonne est la somme de
+  deux autres, on peut transférer du poids de l'une aux deux autres sans
+  changer la prédiction : une infinité de $\beta$ donnent le même ajustement,
+  et aucun n'a de sens. La bonne question n'est pas « combien de colonnes »
+  mais « combien de colonnes **indépendantes** ».
+- **Que peut-on prédire ?** Toutes les prédictions possibles sont les
+  combinaisons $\beta_1 x_1 + \cdots + \beta_p x_p$. Cet ensemble a une
+  structure — on peut ajouter deux prédictions, en multiplier une par un
+  nombre — et une taille, qu'il faut savoir mesurer.
+
+Le même langage décrit des objets qui ne ressemblent pas à des colonnes de
+nombres : les polynômes de degré au plus $d$, les solutions d'une équation
+différentielle linéaire, les variables aléatoires de variance finie. Dans
+chaque cas on additionne et on multiplie par des réels, et dans chaque cas la
+question « combien de nombres faut-il pour décrire un élément » a une réponse
+précise : la **dimension**.
+
+### Le plan
+
+Les capsules suivantes définissent l'espace vectoriel et ses sous-espaces, les
+familles libres, génératrices et les bases, démontrent que la dimension est
+bien définie, puis passent aux applications linéaires, au théorème du rang,
+aux matrices, et reviennent pour finir à la régression et à ses colonnes
+redondantes.

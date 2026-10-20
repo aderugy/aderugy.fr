@@ -1,0 +1,51 @@
+---
+kind: preuve
+difficulty: 4
+after: rang
+---
+Soient $\mathbf{A} \in \mathcal{M}_{m,n}(\mathbb{R})$ et
+$\mathbf{B} \in \mathcal{M}_{n,p}(\mathbb{R})$.
+
+1. Montrer que $\operatorname{rg}(\mathbf{A}\mathbf{B}) \le \min(\operatorname{rg}\mathbf{A}, \operatorname{rg}\mathbf{B})$.
+2. Montrer l'**inégalité de Sylvester** :
+   $\operatorname{rg}\mathbf{A} + \operatorname{rg}\mathbf{B} - n \le \operatorname{rg}(\mathbf{A}\mathbf{B})$.
+3. Application : en régression, $\mathbf{X}$ est de taille $n \times p$.
+   Montrer que $\operatorname{rg}(\mathbf{X}^\top\mathbf{X}) \le \min(n, p)$, et
+   en déduire que $\mathbf{X}^\top\mathbf{X}$ n'est jamais inversible si $p > n$.
+
+<!-- indice -->
+1 : $\operatorname{Im}(\mathbf{A}\mathbf{B}) \subseteq \operatorname{Im}\mathbf{A}$,
+et $\mathbf{A}\mathbf{B}$ est l'image par $\mathbf{A}$ de
+$\operatorname{Im}\mathbf{B}$.
+
+<!-- indice -->
+2 : appliquer le théorème du rang à la restriction de $\mathbf{A}$ au
+sous-espace $\operatorname{Im}\mathbf{B}$. Son noyau est
+$\ker\mathbf{A} \cap \operatorname{Im}\mathbf{B}$.
+
+<!-- solution -->
+1. $\operatorname{Im}(\mathbf{A}\mathbf{B}) = \{\mathbf{A}(\mathbf{B}\mathbf{x})\} \subseteq \operatorname{Im}\mathbf{A}$,
+   donc $\operatorname{rg}(\mathbf{A}\mathbf{B}) \le \operatorname{rg}\mathbf{A}$.
+   Et $\operatorname{Im}(\mathbf{A}\mathbf{B}) = \mathbf{A}(\operatorname{Im}\mathbf{B})$ :
+   l'image d'un sous-espace de dimension $r$ par une application linéaire est
+   de dimension au plus $r$ (théorème du rang appliqué à la restriction).
+   Donc $\operatorname{rg}(\mathbf{A}\mathbf{B}) \le \operatorname{rg}\mathbf{B}$.
+2. Soit $g$ la restriction de $\mathbf{x} \mapsto \mathbf{A}\mathbf{x}$ au
+   sous-espace $W = \operatorname{Im}\mathbf{B}$, de dimension
+   $\operatorname{rg}\mathbf{B}$. Son image est
+   $\mathbf{A}(W) = \operatorname{Im}(\mathbf{A}\mathbf{B})$ et son noyau
+   $\ker\mathbf{A} \cap W \subseteq \ker\mathbf{A}$. Par le théorème du rang,
+   $$
+   \operatorname{rg}\mathbf{B} = \dim(\ker\mathbf{A} \cap W) + \operatorname{rg}(\mathbf{A}\mathbf{B})
+   \le \dim\ker\mathbf{A} + \operatorname{rg}(\mathbf{A}\mathbf{B})
+   = n - \operatorname{rg}\mathbf{A} + \operatorname{rg}(\mathbf{A}\mathbf{B}) .
+   $$
+   C'est l'inégalité annoncée. $\square$
+3. $\mathbf{X}^\top\mathbf{X}$ est de taille $p \times p$, et par 1
+   $\operatorname{rg}(\mathbf{X}^\top\mathbf{X}) \le \operatorname{rg}\mathbf{X} \le \min(n, p)$.
+   Si $p > n$, ce rang est $< p$ : la matrice n'est pas inversible, et les
+   équations normales $\mathbf{X}^\top\mathbf{X}\boldsymbol\beta = \mathbf{X}^\top\mathbf{y}$
+   ont une infinité de solutions. (On montrera au nœud
+   [projections](/maths/n/espaces-euclidiens-projections) que
+   $\operatorname{rg}(\mathbf{X}^\top\mathbf{X}) = \operatorname{rg}\mathbf{X}$
+   exactement.)

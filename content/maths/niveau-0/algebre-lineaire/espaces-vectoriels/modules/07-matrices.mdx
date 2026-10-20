@@ -1,0 +1,102 @@
+---
+title: Matrices — une application linéaire dans des bases
+minutes: 9
+rubrique: [construction, intuition, pieges]
+checkpoint:
+- type: qcm
+  question: 'Dans la base $(1, X, X^2)$ de $\mathbb{R}_2[X]$, quelle est la matrice de la dérivation $D$ ?'
+  choix:
+  - '$\begin{bmatrix} 0 & 1 & 0 \\ 0 & 0 & 2 \\ 0 & 0 & 0 \end{bmatrix}$'
+  - '$\begin{bmatrix} 0 & 0 & 0 \\ 1 & 0 & 0 \\ 0 & 2 & 0 \end{bmatrix}$'
+  - '$\begin{bmatrix} 1 & 0 & 0 \\ 0 & 2 & 0 \\ 0 & 0 & 3 \end{bmatrix}$'
+  reponse: 0
+  explication: 'La colonne $j$ contient les coordonnées de l''image du $j$-ème vecteur de base : $D(1) = 0$, $D(X) = 1$, $D(X^2) = 2X$. Les colonnes sont donc $(0,0,0)$, $(1,0,0)$, $(0,2,0)$. Mettre les images en lignes donne la transposée, deuxième choix.'
+- type: vrai-faux
+  question: 'Pour deux matrices carrées, $\mathbf{A}\mathbf{B} = \mathbf{0}$ entraîne $\mathbf{A} = \mathbf{0}$ ou $\mathbf{B} = \mathbf{0}$.'
+  reponse: false
+  explication: 'Faux : $\mathbf{A} = \mathbf{B} = \begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}$ vérifie $\mathbf{A}^2 = \mathbf{0}$. Géométriquement, $\operatorname{Im} \mathbf{B} \subseteq \ker \mathbf{A}$ suffit.'
+- type: nombre
+  question: 'Quel est le coefficient $(2,1)$ (ligne 2, colonne 1) du produit $\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}\begin{bmatrix} 5 & 6 \\ 7 & 8 \end{bmatrix}$ ?'
+  reponse: 43
+  explication: 'Ligne 2 de la première par colonne 1 de la seconde : $3 \times 5 + 4 \times 7 = 43$.'
+---
+
+### Définition
+
+Soient $f : E \to F$ linéaire, $\mathcal{B} = (e_1, \dots, e_p)$ une base de
+$E$ et $\mathcal{C} = (c_1, \dots, c_n)$ une base de $F$. La **matrice de $f$
+dans les bases $\mathcal{B}$ et $\mathcal{C}$** est le tableau
+$\mathbf{A} = (a_{ij}) \in \mathcal{M}_{n,p}(\mathbb{R})$ dont la colonne $j$
+contient les coordonnées de $f(e_j)$ dans $\mathcal{C}$ :
+
+$$
+f(e_j) = \sum_{i=1}^{n} a_{ij}\, c_i .
+$$
+
+**On range les images en colonnes.** Si $\mathbf{x}$ est le vecteur colonne des
+coordonnées de $u$ dans $\mathcal{B}$, alors celui de $f(u)$ dans $\mathcal{C}$
+est $\mathbf{A}\mathbf{x}$, avec la règle
+$(\mathbf{A}\mathbf{x})_i = \sum_j a_{ij} x_j$.
+
+### Le produit est la composition
+
+Si $g : F \to G$ a pour matrice $\mathbf{B}$ (dans $\mathcal{C}$ et une base de
+$G$), alors $g \circ f$ a pour matrice le produit $\mathbf{B}\mathbf{A}$, défini
+par
+
+$$
+(\mathbf{B}\mathbf{A})_{ik} = \sum_{j} b_{ij}\, a_{jk} .
+$$
+
+Ce n'est pas une convention arbitraire : c'est la seule définition qui rende
+vraie l'égalité $\text{mat}(g \circ f) = \text{mat}(g)\,\text{mat}(f)$. Pour la
+vérifier, on calcule $g(f(e_k)) = g\big(\sum_j a_{jk} c_j\big) = \sum_j a_{jk} \sum_i b_{ij} d_i$
+et on lit le coefficient de $d_i$. Les propriétés du produit — associativité,
+distributivité — s'en déduisent sans calcul, parce que la composition les a.
+
+### Intuition : lire une matrice
+
+- Les **colonnes** de $\mathbf{A}$ sont les images des vecteurs de base ; leur
+  $\operatorname{Vect}$ est l'image de $f$.
+- $\mathbf{A}\mathbf{x}$ est la combinaison des colonnes de coefficients
+  $x_1, \dots, x_p$. C'est la lecture qui sert en régression : $\mathbf{X}\boldsymbol\beta$
+  est la combinaison des colonnes de variables, de poids $\boldsymbol\beta$.
+- Une matrice $2 \times 2$ se dessine : on trace l'image du carré unité, dont
+  les côtés deviennent les deux colonnes.
+
+### Changement de base
+
+Une même application a des matrices différentes dans des bases différentes. Si
+$\mathbf{P}$ est la matrice dont les colonnes sont les coordonnées d'une
+nouvelle base $\mathcal{B}'$ dans l'ancienne $\mathcal{B}$ (matrice de passage,
+inversible), et si $f : E \to E$ a pour matrice $\mathbf{A}$ dans $\mathcal{B}$,
+alors sa matrice dans $\mathcal{B}'$ est
+
+$$
+\mathbf{A}' = \mathbf{P}^{-1}\mathbf{A}\mathbf{P} .
+$$
+
+En effet, $\mathbf{P}$ convertit des coordonnées dans $\mathcal{B}'$ en
+coordonnées dans $\mathcal{B}$ ; on applique $\mathbf{A}$ ; $\mathbf{P}^{-1}$
+reconvertit. Trouver une base où $\mathbf{A}'$ est **diagonale** est l'objet de
+la [réduction](/maths/n/diagonalisation), et c'est ce que fait l'analyse en
+composantes principales.
+
+### Piège : le produit n'est pas commutatif
+
+$\mathbf{A} = \begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}$ et
+$\mathbf{B} = \begin{bmatrix} 0 & 0 \\ 1 & 0 \end{bmatrix}$ donnent
+$\mathbf{A}\mathbf{B} = \begin{bmatrix} 1 & 0 \\ 0 & 0 \end{bmatrix} \ne
+\begin{bmatrix} 0 & 0 \\ 0 & 1 \end{bmatrix} = \mathbf{B}\mathbf{A}$. Composer
+n'est pas commutatif — dériver puis multiplier par $X$ n'est pas multiplier par
+$X$ puis dériver —, le produit matriciel non plus. Toutes les identités
+algébriques qui utilisent $ab = ba$ tombent : le binôme de Newton, et
+$(\mathbf{A} + \mathbf{B})(\mathbf{A} - \mathbf{B}) = \mathbf{A}^2 - \mathbf{B}^2$.
+
+### Piège : diviseurs de zéro
+
+$\mathbf{A}^2 = \mathbf{0}$ avec $\mathbf{A} \ne \mathbf{0}$ pour la matrice
+ci-dessus : l'image de $\mathbf{A}$, la droite engendrée par $e_1$, est
+contenue dans son noyau. On ne peut donc pas « simplifier » une égalité
+matricielle $\mathbf{A}\mathbf{B} = \mathbf{A}\mathbf{C}$ en $\mathbf{B} = \mathbf{C}$
+sans savoir que $\mathbf{A}$ est inversible.
