@@ -1,0 +1,33 @@
+---
+kind: qcm
+difficulty: 1
+after: graines
+---
+Vrai ou faux ? Justifier en une ligne.
+
+1. Deux exécutions de `np.random.default_rng(7).normal(size=5)` sur la même
+   machine, avec le même environnement, donnent le même vecteur.
+2. `np.random.default_rng()` sans argument utilise la graine $0$.
+3. Un générateur pseudo-aléatoire produit une suite déterministe.
+4. Si un script n'utilise que `rng = np.random.default_rng(0)`, l'ajout d'un
+   `import scipy` en tête ne peut pas changer ses résultats.
+5. `pip freeze` liste aussi les dépendances indirectes installées.
+
+<!-- indice -->
+Pour 4, se demander qui peut toucher à l'état de `rng`. Pour 2, revoir ce que
+fait NumPy sans graine.
+
+<!-- indice -->
+Un seul de ces énoncés est faux.
+
+<!-- solution -->
+1. **Vrai** : même graine, même algorithme, même suite.
+2. **Faux** : sans graine, l'état initial est tiré de l'entropie du système
+   d'exploitation, différente à chaque exécution.
+3. **Vrai** : c'est une récurrence sur un état interne ; c'est ce qui la rend
+   reproductible.
+4. **Vrai** : `rng` est un objet local, que seul le script manipule. (Avec
+   l'état global `np.random.seed`, ce serait faux en principe : un module
+   importé pourrait le consommer.)
+5. **Vrai** : il liste tout ce qui est installé dans l'environnement, avec les
+   versions exactes.

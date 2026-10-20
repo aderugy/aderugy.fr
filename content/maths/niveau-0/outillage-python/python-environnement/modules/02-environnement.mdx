@@ -1,0 +1,98 @@
+---
+title: Interpréteur, environnement virtuel, versions épinglées
+minutes: 8
+rubrique: [construction, intuition, pieges, simulation]
+checkpoint:
+- type: qcm
+  question: 'Que garantit un fichier `requirements.txt` contenant la ligne `numpy>=1.20` ?'
+  choix:
+  - 'Que tout le monde utilisera la même version de NumPy.'
+  - 'Seulement une version minimale : deux installations à un an d''écart peuvent obtenir deux versions différentes.'
+  - 'Que NumPy sera installé dans un environnement isolé.'
+  reponse: 1
+  explication: 'Une contrainte `>=` laisse pip choisir la version la plus récente disponible au moment de l''installation. Pour reproduire, on **épingle** : `numpy==2.5.3`, idéalement pour toutes les dépendances, y compris indirectes (`pip freeze`).'
+- type: vrai-faux
+  question: 'Deux projets qui exigent des versions incompatibles de NumPy peuvent coexister sur la même machine si chacun a son environnement virtuel.'
+  reponse: true
+  explication: 'Vrai : un environnement virtuel est un dossier avec son propre interpréteur (un lien vers celui du système) et son propre répertoire de paquets. `import numpy` y charge la version installée dans ce dossier, et rien d''autre.'
+---
+
+### Ce qui s'exécute quand on tape `python`
+
+Un programme Python est exécuté par un **interpréteur**, qui charge les
+modules importés depuis une liste de dossiers, `sys.path`. Les paquets tiers
+— NumPy, SciPy — sont installés dans l'un de ces dossiers par **pip**, à partir
+du dépôt public PyPI. Deux questions déterminent donc le résultat d'un
+`import numpy` : quel interpréteur est lancé, et quelle version du paquet se
+trouve dans ses dossiers.
+
+### Environnement virtuel
+
+Un **environnement virtuel** est un dossier qui contient un interpréteur et son
+propre répertoire de paquets, isolé de celui du système :
+
+```bash
+python3 -m venv .venv            # crée l'environnement dans .venv/
+source .venv/bin/activate        # « python » et « pip » désignent désormais ceux de .venv
+pip install numpy==2.5.3         # installé dans .venv, nulle part ailleurs
+pip freeze > requirements.txt    # liste exacte de ce qui est installé
+```
+
+Un autre poste recrée le même environnement par
+`pip install -r requirements.txt`. Le dossier `.venv/` ne se versionne pas : on
+versionne la **liste** des paquets, pas les paquets.
+
+Des outils plus récents (`uv`, `poetry`, `conda`) font la même chose en
+résolvant aussi les dépendances indirectes dans un fichier de verrouillage. Le
+principe ne change pas : **une liste de versions exactes, versionnée avec le
+code.**
+
+### Intuition : la recette et le placard
+
+Le code est une recette ; l'environnement est le placard où l'on prend les
+ingrédients. « Ajouter de la farine » ne donne pas le même gâteau avec deux
+farines différentes. Un `requirements.txt` épinglé est l'étiquette exacte de
+chaque ingrédient. Sans lui, la recette est correcte et le gâteau,
+imprévisible.
+
+### Vérification : noter les versions avec les résultats
+
+Le réflexe minimal est d'imprimer les versions à côté de tout résultat publié.
+
+```python
+import sys, platform
+import numpy as np
+
+print("Python", sys.version.split()[0], "sur", platform.system() or "inconnu")
+print("NumPy ", np.__version__)
+```
+
+Sortie obtenue :
+
+```
+Python 3.13.16 sur Linux
+NumPy  2.5.3
+```
+
+C'est l'environnement qui a produit **toutes les sorties publiées de ce
+corpus**. Exécuté dans le navigateur, le même bloc affichera une autre version
+de Python et de NumPy — celles de Pyodide, la distribution de Python compilée
+pour le navigateur — et, sur certains tirages aléatoires, des chiffres
+différents. Ce n'est pas une erreur du corpus : c'est exactement le phénomène
+de cette capsule.
+
+### Piège : installer « globalement »
+
+`pip install` sans environnement activé installe dans l'interpréteur du
+système, partagé par tous les projets. Mettre à jour NumPy pour un projet le
+met à jour pour tous les autres, et un résultat d'il y a six mois cesse d'être
+reproductible sans que rien n'ait changé dans son dossier. Sur beaucoup de
+systèmes récents, pip refuse d'ailleurs de le faire sans option explicite —
+c'est le garde-fou de la PEP 668.
+
+### Piège : épingler le premier niveau seulement
+
+`numpy==2.5.3` dans `requirements.txt` ne fixe pas les dépendances de vos
+dépendances. Si vous installez `pandas==2.2.0`, la version de `python-dateutil`
+qu'il tire reste libre. `pip freeze` liste **tout** ce qui est installé, et
+c'est cette liste complète qu'il faut garder pour reproduire à l'identique.

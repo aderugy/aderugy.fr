@@ -1,0 +1,56 @@
+---
+kind: simulation
+difficulty: 3
+after: protocole
+---
+On lance une pièce équilibrée $N = 400$ fois et on teste si la proportion de
+piles s'écarte « significativement » de $1/2$, en déclarant suspect tout écart
+supérieur à $2$ écarts-types, soit $|\hat p - 1/2| > 2 \cdot \frac{0{,}5}{\sqrt{400}} = 0{,}05$.
+
+1. Simuler l'expérience pour les graines $0, 1, \dots, 999$ (une expérience par
+   graine). Quelle proportion de graines donne une pièce « suspecte » ?
+2. Un expérimentateur essaie des graines jusqu'à trouver une pièce suspecte et
+   publie ce résultat. Combien de graines doit-il essayer, en moyenne ?
+3. Qu'aurait-il dû publier ?
+
+<!-- indice -->
+La proportion attendue de résultats au-delà de deux écarts-types, pour une
+loi proche de la normale, est d'environ $5\,\%$.
+
+<!-- indice -->
+Pour 2, le nombre d'essais jusqu'au premier succès, de probabilité $p$, suit
+une loi géométrique, d'espérance $1/p$.
+
+<!-- solution -->
+```python
+import numpy as np
+
+N = 400
+suspectes = []
+for g in range(1000):
+    p = np.random.default_rng(g).integers(0, 2, size=N).mean()
+    suspectes.append(abs(p - 0.5) > 0.05)
+s = np.array(suspectes)
+print(f"proportion de graines 'suspectes' : {s.mean():.3f}")
+print("premiere graine suspecte :", int(np.argmax(s)))
+```
+
+Sortie :
+
+```
+proportion de graines 'suspectes' : 0.051
+premiere graine suspecte : 0
+```
+
+1. Environ $5\,\%$ des graines donnent une pièce « suspecte », alors que la
+   pièce est parfaitement équilibrée : c'est le taux de fausses alarmes du
+   critère, que l'on retrouvera comme **niveau** d'un test au niveau 2.
+2. Une fausse alarme a une probabilité d'environ $0{,}05$ par graine : il faut
+   en moyenne une vingtaine d'essais (loi géométrique, espérance $1/p$). Ici,
+   la graine $0$ est déjà « suspecte » : vingt essais est une moyenne, et un
+   expérimentateur peut tomber sur une fausse alarme du premier coup.
+3. La graine choisie **avant** l'expérience, ou la totalité des essais : $1000$
+   graines, environ $50$ fausses alarmes, aucune preuve que la pièce est
+   biaisée. Choisir la graine après coup est le même mécanisme que le
+   « $p$-hacking » des tests multiples, objet du nœud
+   [comparaisons multiples](/maths/n/comparaisons-multiples).

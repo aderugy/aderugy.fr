@@ -1,0 +1,68 @@
+---
+title: Notebooks — l'état caché
+minutes: 7
+rubrique: [construction, intuition, pieges]
+checkpoint:
+- type: qcm
+  question: 'Un notebook affiche un résultat correct. On le rouvre le lendemain, « Restart & Run All », et une cellule lève `NameError: name ''data'' is not defined`. Que s''est-il passé ?'
+  choix:
+  - 'Le fichier a été corrompu.'
+  - 'La cellule qui définissait `data` a été supprimée ou modifiée après avoir été exécutée : la variable vivait encore dans le noyau, pas dans le notebook.'
+  - 'Python a changé de version pendant la nuit.'
+  reponse: 1
+  explication: 'Le noyau garde toutes les variables créées pendant la session, même celles dont la cellule n''existe plus. Le notebook sur disque ne contient pas cet état : relancé de zéro, il révèle qu''il ne s''exécutait pas tel quel.'
+- type: vrai-faux
+  question: 'Les numéros `In [7]`, `In [3]` affichés à gauche des cellules garantissent que le notebook a été exécuté de haut en bas.'
+  reponse: false
+  explication: 'Faux : ils donnent l''ordre **réel** d''exécution, qui peut être quelconque. Un notebook dont les numéros ne sont pas croissants de haut en bas a été exécuté dans le désordre, et ses sorties peuvent ne correspondre à aucune exécution linéaire du fichier.'
+---
+
+### Le modèle d'exécution
+
+Un notebook Jupyter est un document fait de cellules de code et de texte,
+relié à un **noyau** : un processus Python qui reste en vie pendant toute la
+session. Exécuter une cellule envoie son code au noyau, qui l'exécute **dans
+l'état laissé par toutes les exécutions précédentes**, quel que soit leur
+ordre et que les cellules correspondantes existent encore ou non.
+
+Le fichier `.ipynb` enregistre le code des cellules **et leurs dernières
+sorties**, mais pas l'état du noyau. Il peut donc contenir des sorties qu'aucune
+exécution du fichier, de haut en bas, ne reproduirait.
+
+### Intuition : un tableau noir qu'on n'efface jamais
+
+Le noyau est un tableau noir où chaque cellule écrit. On peut gommer une cellule
+dans le document : ce qu'elle a écrit au tableau reste. Le notebook ressemble à
+un cours rédigé, mais il se comporte comme une session interactive dont on
+aurait perdu l'historique.
+
+### Trois pièges, une seule règle
+
+- **L'exécution dans le désordre.** On modifie la cellule 3, on la relance,
+  et la cellule 5 affiche encore le résultat calculé avec l'ancienne version.
+- **La variable fantôme.** Une variable définie par une cellule supprimée
+  continue d'exister ; le notebook « marche » jusqu'au redémarrage.
+- **La réutilisation d'un nom.** `x = x + 1` dans une cellule donne un résultat
+  différent à chaque exécution.
+
+La règle qui les neutralise tous : **avant de croire ou de partager un
+résultat, redémarrer le noyau et tout exécuter de haut en bas** (« Restart &
+Run All »). Un notebook qui passe ce test est un script ; un notebook qui
+échoue est un brouillon.
+
+### Ce que le notebook fait bien, et ce qui va ailleurs
+
+Le notebook est l'outil de l'**exploration** : on regarde des données, on
+essaie une idée, on trace un graphique. Dès qu'une fonction est stable, elle a
+sa place dans un module `.py`, importé par le notebook, versionné et testé
+comme du code ordinaire. Le notebook final, celui qu'on garde, ne fait plus
+qu'appeler ces fonctions et afficher leurs résultats.
+
+### Les blocs de ce site, l'inverse d'un notebook
+
+Chaque bloc « exécuter » de ce corpus lance **son propre** interpréteur
+Pyodide : une variable définie dans un bloc n'est pas visible depuis un autre,
+et relancer un bloc réutilise l'interpréteur de sa première exécution, qui
+ne garde que ce que ce bloc a lui-même calculé. C'est pourquoi chaque bloc importe ce dont il
+a besoin et fixe sa graine : il est écrit pour s'exécuter seul, dans un
+interpréteur vierge, exactement comme les sorties publiées ont été produites.

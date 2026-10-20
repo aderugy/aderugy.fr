@@ -1,0 +1,73 @@
+---
+kind: preuve
+difficulty: 4
+after: flottants
+---
+La série harmonique diverge. Pourtant, la boucle `s = s + 1/n` exécutée en
+simple précision (`float32`, mantisse de $24$ bits, unité d'arrondi
+$u = 2^{-24}$) finit par ne plus changer $s$.
+
+1. Montrer que si $s \in [2^e, 2^{e+1}[$ est un flottant et $0 < y < 2^{e} u$,
+   alors $s \oplus y = s$.
+2. En déduire que la boucle stagne dès que $\frac1n < 2^e u$, où
+   $2^e \le s_n < 2^{e+1}$, et estimer, avec $s_n \approx \ln n + 0{,}577$, le
+   rang à partir duquel cela se produit.
+3. Vérifier en simulant la boucle en `float32`.
+4. Estimer le même rang en double précision ($u = 2^{-53}$). Peut-on l'atteindre
+   en pratique ?
+
+<!-- indice -->
+1 : dans $[2^e, 2^{e+1}[$, deux flottants consécutifs sont espacés de
+$2^{e} \cdot 2u = 2^{e+1}u$. Le réel $s + y$ est à moins d'un demi-écart de $s$.
+
+<!-- indice -->
+2 : $s_n$ vaut environ $15$ quand la boucle s'arrête, donc $2^e = 8$ ; résoudre
+$\frac1n < 8 \cdot 2^{-24}$.
+
+<!-- solution -->
+1. Dans $[2^e, 2^{e+1}[$, les flottants sont $2^e(1 + k \cdot 2^{-23})$ pour
+   $k = 0, \dots, 2^{23} - 1$ : l'écart entre deux voisins est
+   $2^{e-23} = 2^{e+1}u$. Si $0 < y < 2^e u$, alors $s < s + y < s + 2^e u$ :
+   le réel $s + y$ est à distance strictement inférieure à un demi-écart de
+   $s$, et strictement plus proche de $s$ que du flottant suivant. L'arrondi au
+   plus proche donne $s$. (Si $s$ est le plus grand flottant de l'intervalle,
+   le suivant est $2^{e+1}$, à la même distance : la conclusion tient.)
+2. Tant que $s_n < 16$, on a $2^e \le 8$. La boucle stagne dès que
+   $\frac1n < 2^e u$ ; avec $2^e = 8$ et $u = 2^{-24}$, il faut
+   $n > 2^{21} \approx 2{,}1 \cdot 10^6$. À ce rang,
+   $\ln(2{,}1 \cdot 10^6) + 0{,}577 \approx 15{,}2$, bien dans $[8, 16[$ :
+   l'estimation est cohérente.
+3.
+
+```python
+import numpy as np
+
+s, n = np.float32(0.0), 0
+while True:
+    n += 1
+    t = s + np.float32(1.0) / np.float32(n)
+    if t == s:
+        break
+    s = t
+print(f"stagnation au rang n = {n}, s = {s}")
+print(f"prediction 2^21 = {2**21}")
+```
+
+Sortie :
+
+```
+stagnation au rang n = 2097152, s = 15.403682708740234
+prediction 2^21 = 2097152
+```
+
+   La boucle s'arrête exactement au rang $2^{21}$, sur la valeur $15{,}40368\ldots$ :
+   à ce rang, $\frac1n = 2^{-21} = 8u$ tombe pile au milieu de deux flottants
+   voisins, et l'arrondi au pair renvoie $s$. La « somme » d'une série
+   divergente est un nombre fini en machine.
+4. En double précision, on cherche $2^e$ tel que la stagnation, au rang
+   $n \approx 1/(2^e u) = 2^{53 - e}$, se produise avec $s_n \in [2^e, 2^{e+1}[$.
+   Essayons $2^e = 32$ : $n \approx 2^{48} \approx 2{,}8 \cdot 10^{14}$, et
+   $\ln(2^{48}) + 0{,}577 \approx 33{,}8$, bien dans $[32, 64[$ : c'est cohérent.
+   À un milliard d'additions par seconde, il faudrait trois jours de calcul.
+   Atteignable, et inutile : mais c'est le même phénomène, à une échelle
+   moindre, qui dégrade les très longues sommes de Monte-Carlo.

@@ -1,0 +1,100 @@
+---
+title: Un protocole de simulation reproductible
+minutes: 9
+rubrique: [construction, intuition, simulation, pieges]
+checkpoint:
+- type: qcm
+  question: 'Une simulation de Monte-Carlo estime une probabilité $p \approx 0{,}05$ avec $N = 10^4$ tirages. Que faut-il publier avec l''estimation ?'
+  choix:
+  - 'Rien d''autre : le nombre suffit.'
+  - 'La graine, les versions, et une incertitude, par exemple l''écart-type estimé $\sqrt{\hat p(1 - \hat p)/N} \approx 0{,}002$.'
+  - 'Le temps de calcul.'
+  reponse: 1
+  explication: 'La graine et les versions permettent de refaire le calcul ; l''incertitude dit ce que vaut le chiffre. Sans elle, $0{,}0517$ et $0{,}0498$ semblent contradictoires alors qu''ils sont à un écart-type l''un de l''autre.'
+- type: vrai-faux
+  question: 'Pour vérifier qu''un résultat ne dépend pas d''une graine « chanceuse », on relance la simulation avec plusieurs graines et on regarde la dispersion des résultats.'
+  reponse: true
+  explication: 'Vrai : la graine fixe une réalisation, pas la vérité. Relancer avec d''autres graines (ou des flux issus de `SeedSequence.spawn`) mesure la variabilité de Monte-Carlo, et confirme que le résultat ne tient pas à un tirage particulier.'
+---
+
+### Ce qu'un résultat numérique doit emporter
+
+Un résultat de simulation n'est publiable qu'accompagné de quatre choses :
+
+1. **Le code**, versionné, à une révision précise.
+2. **L'environnement** : versions de Python et des paquets, épinglées.
+3. **La graine**, et la façon dont elle a été dérivée pour chaque flux.
+4. **Une incertitude** : un résultat de Monte-Carlo est une variable aléatoire.
+   Son écart-type estimé, ou la dispersion sur plusieurs graines, dit combien
+   de chiffres signifient quelque chose.
+
+Les trois premiers rendent le calcul **refaisable** ; le quatrième le rend
+**interprétable**. La reproductibilité exacte au chiffre près est un outil de
+débogage ; la reproductibilité qui compte scientifiquement est celle **à
+l'incertitude près** : avec une autre graine, on doit retrouver le même résultat
+dans la barre d'erreur.
+
+### Intuition : refaire et retrouver
+
+« Refaire » : même code, même environnement, même graine, mêmes chiffres. Cela
+prouve qu'on n'a rien oublié. « Retrouver » : autre graine, ou autre
+implémentation, et un résultat compatible. Cela prouve que le résultat ne tient
+pas à un accident. Une vérification par simulation, dans ce parcours, vise
+toujours le second ; le premier n'en est que la condition.
+
+### Un gabarit
+
+```python
+import sys, json
+import numpy as np
+
+def experience(rng, N):
+    """Estime P(max de 5 des > 5) et son ecart-type estime."""
+    d = rng.integers(1, 7, size=(N, 5))
+    succes = (d.max(axis=1) == 6)
+    p = succes.mean()
+    return p, np.sqrt(p * (1 - p) / N)
+
+GRAINE, N, K = 2026, 10_000, 5
+flux = [np.random.default_rng(s) for s in np.random.SeedSequence(GRAINE).spawn(K)]
+resultats = [experience(rng, N) for rng in flux]
+
+exact = 1 - (5 / 6) ** 5
+for k, (p, et) in enumerate(resultats):
+    print(f"flux {k} : p = {p:.4f} +- {et:.4f}   ecart a l'exact = {(p - exact) / et:+.2f} ecart-types")
+print(f"exact    : {exact:.4f}")
+print(json.dumps({"graine": GRAINE, "N": N, "flux": K,
+                  "python": sys.version.split()[0], "numpy": np.__version__}))
+```
+
+Sortie obtenue :
+
+```
+flux 0 : p = 0.5992 +- 0.0049   ecart a l'exact = +0.22 ecart-types
+flux 1 : p = 0.6042 +- 0.0049   ecart a l'exact = +1.24 ecart-types
+flux 2 : p = 0.5898 +- 0.0049   ecart a l'exact = -1.69 ecart-types
+flux 3 : p = 0.6016 +- 0.0049   ecart a l'exact = +0.71 ecart-types
+flux 4 : p = 0.5977 +- 0.0049   ecart a l'exact = -0.09 ecart-types
+exact    : 0.5981
+{"graine": 2026, "N": 10000, "flux": 5, "python": "3.13.16", "numpy": "2.5.3"}
+```
+
+Les cinq flux donnent cinq estimations différentes, toutes à moins de deux
+écarts-types de la valeur exacte $1 - (5/6)^5$ : c'est ce qu'on attend de
+fluctuations de Monte-Carlo. La dernière ligne est la carte d'identité du
+résultat, à enregistrer avec lui. La dispersion de quelques flux en dit plus
+que n'importe quelle précision affichée sur un seul.
+
+### Piège : choisir la graine après coup
+
+Essayer plusieurs graines et publier celle qui donne le « bon » résultat
+transforme une simulation en argument truqué, même sans intention de tromper.
+La graine se fixe **avant** de regarder le résultat, et elle est publiée ; si
+l'on a essayé plusieurs graines, on publie la dispersion de toutes.
+
+### Piège : afficher plus de chiffres qu'on n'en a
+
+$p = 0{,}598\,437$ avec un écart-type de $0{,}005$ n'a que deux chiffres
+significatifs. Les quatre derniers sont du bruit, et les afficher suggère une
+précision qui n'existe pas. On arrondit au premier chiffre de l'incertitude :
+$p = 0{,}598 \pm 0{,}005$.

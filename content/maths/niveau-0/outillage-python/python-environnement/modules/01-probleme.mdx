@@ -1,0 +1,57 @@
+---
+title: Le problème — un résultat qu'on ne retrouve pas
+minutes: 6
+rubrique: [position, probleme]
+checkpoint:
+- type: qcm
+  question: 'Un script de simulation donne $0{,}0517$ lundi et $0{,}0498$ mardi, sans modification du code. Quelle est l''explication la plus probable ?'
+  choix:
+  - 'Un bug dans NumPy.'
+  - 'Le générateur aléatoire n''a pas été initialisé avec une graine fixe : chaque exécution tire d''autres nombres.'
+  - 'L''ordinateur a chauffé.'
+  reponse: 1
+  explication: 'Sans graine, le générateur est initialisé à partir d''une source d''entropie du système, différente à chaque exécution. Les deux résultats sont des réalisations différentes d''une même quantité aléatoire — l''écart est de l''ordre de la fluctuation de Monte-Carlo, pas une erreur.'
+- type: vrai-faux
+  question: 'Fixer la graine du générateur suffit à garantir qu''un calcul donnera le même résultat sur n''importe quelle machine, pour toujours.'
+  reponse: false
+  explication: 'Faux : il faut aussi la même version du code et des bibliothèques (NumPy ne garantit pas que les méthodes de tirage produisent les mêmes nombres d''une version à l''autre), et parfois le même ordre des opérations en flottants. La graine n''est qu''une des trois conditions.'
+---
+
+### Position dans le graphe
+
+Ce nœud n'a pas de prérequis. Il ouvre la branche d'outillage —
+[NumPy](/maths/n/python-numpy), puis la
+[visualisation](/maths/n/python-visualisation) — dont dépendent toutes les
+sections « Vérification par simulation » du parcours, et il prépare le nœud
+transverse [vérifier un résultat par simulation](/maths/n/verification-numerique).
+
+### Le problème
+
+Ce corpus contient des dizaines de blocs Python, chacun suivi de « Sortie
+obtenue ». Ces sorties ont une prétention précise : **quiconque exécute ce
+code doit obtenir ce texte**. Or trois choses s'y opposent, et aucune ne se
+voit dans le code.
+
+- **Le hasard.** Une simulation tire des nombres pseudo-aléatoires. Sans
+  précaution, chaque exécution en tire d'autres, et le résultat change.
+- **L'environnement.** Le même code, avec une autre version de Python ou de
+  NumPy, peut donner un autre résultat — ou ne plus s'exécuter. Le bouton
+  « exécuter » de ce site fait tourner Python **dans le navigateur**, avec une
+  version de NumPy qui n'est pas celle qui a produit les sorties publiées.
+- **L'arithmétique.** Les nombres réels de la machine sont des flottants. Le
+  même calcul, fait dans un autre ordre, ne donne pas exactement le même
+  résultat — et une bibliothèque peut changer l'ordre sans prévenir.
+
+À cela s'ajoute un piège propre aux notebooks : l'état caché laissé par les
+cellules exécutées dans le désordre.
+
+Ce nœud ne contient presque pas de mathématiques, à une exception près — la
+borne d'erreur d'une somme en flottants. Il contient en revanche ce qui rend les
+vérifications numériques du parcours dignes de confiance. Une simulation qu'on
+ne peut pas refaire ne vérifie rien.
+
+### Le plan
+
+Les capsules suivantes traitent l'environnement (interpréteur, paquets,
+versions), les générateurs aléatoires et leurs graines, l'arithmétique
+flottante, les notebooks, et terminent par un protocole qui réunit le tout.
