@@ -1,0 +1,57 @@
+---
+title: Le problème — compter sans énumérer
+minutes: 6
+rubrique: [position, probleme]
+checkpoint:
+- type: nombre
+  question: Combien y a-t-il de mains de départ distinctes au Texas hold'em, c'est-à-dire de paires de cartes non ordonnées tirées d'un jeu de 52 ?
+  reponse: 1326
+  explication: 'Il y a $52 \times 51 = 2652$ façons de recevoir deux cartes **dans l''ordre**, et chaque main est comptée deux fois (as de pique puis roi de cœur, ou l''inverse). D''où $2652 / 2 = 1326$. Répondre $2652$, c''est compter des listes au lieu de compter des mains.'
+- type: qcm
+  question: Pourquoi le dénombrement est-il le prérequis de l'espace probabilisé, dans ce parcours ?
+  choix:
+  - Parce que toute probabilité est un quotient de deux cardinaux.
+  - Parce que sur un univers fini muni de l'équiprobabilité, une probabilité est un quotient de deux cardinaux, et c'est le premier modèle étudié.
+  - Parce que les axiomes de Kolmogorov sont des énoncés de dénombrement.
+  reponse: 1
+  explication: 'Seulement sous équiprobabilité sur un univers fini : $\mathbb{P}(A) = \operatorname{card}(A) / \operatorname{card}(\Omega)$. Dès que l''univers est infini (une durée, une mesure physique) ou que les issues ne sont pas équiprobables, le quotient de cardinaux n''a plus de sens, et les axiomes de Kolmogorov prennent le relais.'
+---
+
+### Position dans le graphe
+
+Ce nœud n'a aucun prérequis. Il sert directement à
+[l'espace probabilisé](/maths/n/espace-probabilise), où la première famille de
+modèles — un univers fini dont toutes les issues ont la même probabilité —
+ramène tout calcul de probabilité à un quotient de deux cardinaux. On le
+retrouve ensuite dans les lois binomiale et hypergéométrique, et, beaucoup
+plus loin, dans la dimension de Vapnik-Chervonenkis.
+
+### Le problème
+
+Une main de poker à cinq cartes est tirée d'un jeu de 52. Quelle est la
+proportion de mains qui contiennent une couleur ? Pour répondre, il faut deux
+nombres : combien de mains en tout, combien de couleurs. On pourrait les
+énumérer — un ordinateur le fait —, mais le premier vaut déjà
+$2\,598\,960$, et il suffit de passer à sept cartes pour atteindre
+$133\,784\,560$. Énumérer ne passe pas à l'échelle, et surtout n'explique
+rien : on obtient un nombre sans savoir pourquoi c'est celui-là.
+
+Le dénombrement remplace l'énumération par une **construction**. On décrit
+comment fabriquer un objet par une suite de choix — d'abord la couleur, puis les
+cinq hauteurs —, on compte les choix à chaque étape, et on multiplie. Toute la
+difficulté est de s'assurer que chaque objet est fabriqué **exactement une
+fois** : ni oublié, ni compté deux fois. Les deux erreurs typiques du chapitre
+sont là, et pas ailleurs :
+
+- compter des listes quand on veut des ensembles — l'ordre des cartes dans la
+  main ne compte pas, celui des choix de construction, si ;
+- fabriquer le même objet par deux chemins de construction différents.
+
+### Le plan du nœud
+
+Les capsules suivantes posent les deux règles de base (somme et produit),
+puis les trois familles d'objets qu'elles comptent — listes, arrangements,
+combinaisons —, la formule de Pascal et le binôme de Newton, et le cas des
+tirages avec répétition, où le dénombrement et l'équiprobabilité cessent de
+coïncider. La dernière capsule revient au poker et vérifie les calculs par
+simulation.

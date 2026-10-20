@@ -1,0 +1,83 @@
+---
+title: Fonctions monotones — des sauts, et pas trop
+minutes: 8
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: qcm
+  question: 'Une fonction croissante $f : \mathbb{R} \to \mathbb{R}$ est discontinue en $a$. Que peut-on dire ?'
+  choix:
+  - 'Rien : elle peut osciller près de $a$ comme $\sin(1/x)$.'
+  - '$f(a^-)$ et $f(a^+)$ existent, et $f(a^-) < f(a^+)$ : la discontinuité est un saut.'
+  - '$f$ n''a pas de limite à droite en $a$.'
+  reponse: 1
+  explication: 'Une fonction monotone a toujours des limites à gauche et à droite, par le même argument que la limite monotone des suites ($f(a^-) = \sup_{x < a} f(x)$). Elle ne peut donc pas osciller ; une discontinuité est forcément un saut $f(a^-) < f(a^+)$.'
+- type: vrai-faux
+  question: 'Une fonction croissante sur $\mathbb{R}$ peut être discontinue en tout point rationnel.'
+  reponse: true
+  explication: 'Vrai : avec une énumération $(q_n)$ de $\mathbb{Q}$, $f(x) = \sum_{n : q_n \le x} 2^{-n}$ est croissante et saute de $2^{-n}$ en $q_n$. Ce qui est impossible, c''est un ensemble de discontinuités **non dénombrable**, comme un intervalle.'
+---
+
+### Limites à gauche et à droite
+
+> **Proposition.** Soit $f : \,]a, b[\, \to \mathbb{R}$ croissante et
+> $x_0 \in\, ]a, b[$. Alors $f(x_0^-)$ et $f(x_0^+)$ existent, et
+> $$
+> f(x_0^-) = \sup_{x < x_0} f(x) \ \le\ f(x_0) \ \le\ f(x_0^+) = \inf_{x > x_0} f(x) .
+> $$
+
+*Démonstration pour la limite à gauche.* L'ensemble
+$\{f(x) : a < x < x_0\}$ est non vide et majoré par $f(x_0)$ ; soit $s$ sa borne
+supérieure, qui vérifie $s \le f(x_0)$. Pour $\varepsilon > 0$, il existe
+$x_1 < x_0$ avec $f(x_1) > s - \varepsilon$ ; pour $x \in\, ]x_1, x_0[$, la
+croissance donne $s - \varepsilon < f(x_1) \le f(x) \le s$. Avec
+$\delta = x_0 - x_1$, on a donc $|f(x) - s| < \varepsilon$ dès que
+$x_0 - \delta < x < x_0$. $\square$
+
+C'est la démonstration de la limite monotone pour les suites, mot pour mot :
+l'axiome de la borne supérieure, puis sa caractérisation avec $\varepsilon$.
+
+En conséquence, $f$ est continue en $x_0$ si et seulement si
+$f(x_0^-) = f(x_0^+)$, et toute discontinuité est un **saut** de hauteur
+$f(x_0^+) - f(x_0^-) > 0$. Une fonction monotone ne peut pas osciller.
+
+### Les discontinuités sont au plus dénombrables
+
+> **Théorème.** L'ensemble des points de discontinuité d'une fonction monotone
+> sur un intervalle est fini ou dénombrable.
+
+*Démonstration.* Supposons $f$ croissante. À chaque point de discontinuité
+$x$, associons l'intervalle ouvert $I_x = \,]f(x^-), f(x^+)[$, non vide. Si
+$x < y$ sont deux discontinuités, prenons $z$ entre les deux : alors
+$f(x^+) \le f(z) \le f(y^-)$, donc $I_x$ et $I_y$ sont disjoints. Choisissons
+dans chaque $I_x$ un rationnel $r(x)$ — tout intervalle ouvert non vide en
+contient un. Les $I_x$ étant disjoints, l'application $x \mapsto r(x)$ est
+injective, de l'ensemble des discontinuités dans $\mathbb{Q}$, qui est
+dénombrable. $\square$
+
+On utilise ici deux faits admis dans ce nœud : $\mathbb{Q}$ est dénombrable, et
+tout intervalle ouvert non vide contient un rationnel (densité de $\mathbb{Q}$,
+qui découle de la propriété d'Archimède). Les deux sont démontrés chez Tao,
+*Analysis I*, chapitres 5 et 8.
+
+### Piège : dénombrable ne veut pas dire isolé
+
+Les sauts d'une fonction croissante peuvent être **denses**. Soit $(q_n)_{n \ge 1}$
+une énumération des rationnels, et
+$$
+f(x) = \sum_{n \,:\, q_n \le x} 2^{-n} .
+$$
+La somme converge (elle est majorée par $\sum 2^{-n} = 1$), $f$ est croissante,
+et elle saute exactement de $2^{-n}$ en chaque $q_n$ : elle est discontinue en
+tout rationnel et continue en tout irrationnel. Un tel graphe n'a aucun
+« morceau » sur lequel le crayon glisserait. Cette construction utilise les
+séries à termes positifs, l'objet du nœud
+[séries numériques](/maths/n/series-numeriques).
+
+### Le lien avec les fonctions de répartition
+
+Une fonction de répartition est croissante : ce théorème dit qu'une variable
+aléatoire réelle n'a qu'un ensemble au plus dénombrable de valeurs
+$t$ avec $\mathbb{P}(X = t) > 0$. Les « atomes » d'une loi sont donc
+dénombrables, et la fonction ci-dessus est la fonction de répartition d'une loi
+qui charge chaque rationnel $q_n$ avec la probabilité $2^{-n}$ — une loi
+discrète dont les valeurs sont partout denses.

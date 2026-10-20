@@ -1,0 +1,83 @@
+---
+title: Une série est la suite de ses sommes partielles
+minutes: 8
+rubrique: [construction, demonstrations, pieges, intuition]
+checkpoint:
+- type: qcm
+  question: 'Pour quelles valeurs de $q$ la série géométrique $\sum_{n \ge 0} q^n$ converge-t-elle ?'
+  choix:
+  - '$|q| \le 1$'
+  - '$|q| < 1$, et sa somme vaut $\frac{1}{1-q}$'
+  - '$q < 1$'
+  reponse: 1
+  explication: 'Pour $|q| \ge 1$ le terme général ne tend pas vers $0$ : la série diverge grossièrement (pour $q = -1$, les sommes partielles valent $1, 0, 1, 0, \dots$). Pour $|q| < 1$, $S_N = \frac{1 - q^{N+1}}{1 - q} \to \frac{1}{1 - q}$.'
+- type: vrai-faux
+  question: 'Si $u_n \to 0$, alors $\sum u_n$ converge.'
+  reponse: false
+  explication: 'Faux : $u_n \to 0$ est nécessaire, pas suffisant. La série harmonique $\sum 1/n$ diverge, alors que $1/n \to 0$.'
+- type: nombre
+  question: 'Dans la preuve d''Oresme, à partir de quel rang $N = 2^k$ est-on sûr que $\sum_{n=1}^{N} 1/n \ge 10$ ?'
+  reponse: 262144
+  explication: 'La preuve donne $S_{2^k} \ge 1 + k/2$. Il faut $1 + k/2 \ge 10$, soit $k = 18$ et $N = 2^{18} = 262\,144$. La borne est pessimiste (en réalité $S_N \ge 10$ dès $N = 12\,367$), mais elle suffit à prouver la divergence.'
+---
+
+### Définition
+
+Soit $(u_n)_{n \ge 0}$ une suite réelle. La **série** de terme général $u_n$,
+notée $\sum u_n$, est la suite des **sommes partielles**
+
+$$
+S_N = \sum_{n=0}^{N} u_n .
+$$
+
+La série **converge** si $(S_N)$ converge ; sa limite s'appelle la **somme** de
+la série et se note $\sum_{n=0}^{\infty} u_n$. Sinon la série **diverge**. Le
+**reste** d'ordre $N$ d'une série convergente est
+$R_N = \sum_{n > N} u_n = S - S_N$, qui tend vers $0$.
+
+Le symbole $\sum_{n=0}^{\infty} u_n$ désigne une **limite**, pas une addition :
+il n'a de sens qu'après avoir montré que la série converge. Écrire
+$\sum u_n = S$ avant de l'avoir prouvé est l'erreur qui produit les
+« démonstrations » que $1 + 2 + 4 + \cdots = -1$.
+
+### Le terme général tend vers zéro
+
+> **Proposition.** Si $\sum u_n$ converge, alors $u_n \to 0$.
+
+*Démonstration.* $u_n = S_n - S_{n-1}$, et les deux suites $(S_n)$ et
+$(S_{n-1})$ tendent vers la même limite $S$. $\square$
+
+Une série dont le terme général ne tend pas vers $0$ est dite **grossièrement
+divergente** — c'est le premier test, et le seul qui ne coûte rien.
+
+### La série géométrique
+
+Pour $q \ne 1$, $S_N = \sum_{n=0}^{N} q^n = \dfrac{1 - q^{N+1}}{1 - q}$ (multiplier
+par $1 - q$ et télescoper). Si $|q| < 1$, $q^{N+1} \to 0$ et la série converge
+vers $\dfrac{1}{1 - q}$. Si $|q| \ge 1$, $q^n \not\to 0$ : divergence grossière.
+
+C'est la série de référence : presque toutes les séries de ce nœud se
+comparent à elle.
+
+### Piège : la série harmonique diverge
+
+> **Proposition (Oresme, vers 1350).** $\sum_{n \ge 1} 1/n$ diverge.
+
+*Démonstration.* On regroupe les termes par paquets de longueur doublée :
+
+$$
+S_{2^k} = 1 + \tfrac12 + \Big(\tfrac13 + \tfrac14\Big) + \Big(\tfrac15 + \cdots + \tfrac18\Big)
++ \cdots + \Big(\tfrac{1}{2^{k-1} + 1} + \cdots + \tfrac{1}{2^k}\Big) .
+$$
+
+Le paquet numéro $j$ contient $2^{j-1}$ termes, chacun $\ge 1/2^j$ : il vaut au
+moins $1/2$. Donc $S_{2^k} \ge 1 + k/2 \to +\infty$. Comme $(S_N)$ est
+croissante, elle tend vers $+\infty$. $\square$
+
+### Intuition : lentement mais sûrement
+
+La divergence de la série harmonique est **lente** : $S_N$ se comporte comme
+$\ln N$. Il faut dépasser $10^{43}$ termes pour que la somme atteigne $100$.
+Aucune expérience numérique ne « voit » cette divergence en regardant les
+sommes partielles se stabiliser ou non : à l'œil, elles semblent se stabiliser.
+C'est pourquoi la convergence d'une série se **démontre** et ne s'observe pas.

@@ -1,0 +1,75 @@
+---
+kind: simulation
+difficulty: 3
+after: tvi
+---
+Soit $X$ une variable de loi exponentielle de paramètre $\lambda = 2$ :
+$F(t) = 1 - \mathrm{e}^{-2t}$ pour $t \ge 0$.
+
+1. Calculer à la main le quantile $q_p$, solution de $F(q_p) = p$, pour
+   $p \in\, ]0, 1[$.
+2. Programmer une dichotomie qui calcule $q_p$ à $10^{-10}$ près, en partant
+   de l'intervalle $[0, 50]$. Combien d'itérations faut-il, en théorie et en
+   pratique ?
+3. Vérifier sur un échantillon simulé de $10^6$ tirages que la proportion de
+   valeurs $\le q_{0{,}9}$ est proche de $0{,}9$.
+4. La fonction $t \mapsto F(t) - p$ change de signe sur $[0, 50]$ ; pourquoi
+   la dichotomie a-t-elle **une seule** solution à trouver ?
+
+<!-- indice -->
+1 : isoler $\mathrm{e}^{-2q}$, puis prendre le logarithme. 2 : il faut
+$50/2^n < 10^{-10}$.
+
+<!-- indice -->
+Pour 3, `rng.exponential(scale=1/2, size=10**6)` : NumPy paramètre la loi
+exponentielle par son espérance $1/\lambda$, pas par $\lambda$.
+
+<!-- solution -->
+1. $1 - \mathrm{e}^{-2q} = p \iff q_p = -\dfrac{\ln(1 - p)}{2}$.
+2. et 3.
+
+```python
+import numpy as np
+from math import exp, log, ceil, log2
+
+F = lambda t: 1 - exp(-2 * t)
+
+def quantile(p, a=0.0, b=50.0, tol=1e-10):
+    n = 0
+    while b - a >= tol:
+        m = (a + b) / 2
+        a, b = (a, m) if F(m) >= p else (m, b)
+        n += 1
+    return (a + b) / 2, n
+
+print("iterations theoriques :", ceil(log2(50 / 1e-10)))
+for p in (0.5, 0.9, 0.99):
+    q, n = quantile(p)
+    print(f"p={p}: dichotomie {q:.10f}  formule {-log(1 - p) / 2:.10f}  ({n} iterations)")
+
+rng = np.random.default_rng(0)
+x = rng.exponential(scale=1 / 2, size=10**6)
+q90, _ = quantile(0.9)
+print(f"proportion <= q_0.9 : {(x <= q90).mean():.4f}")
+```
+
+Sortie :
+
+```
+iterations theoriques : 39
+p=0.5: dichotomie 0.3465735902  formule 0.3465735903  (39 iterations)
+p=0.9: dichotomie 1.1512925465  formule 1.1512925465  (39 iterations)
+p=0.99: dichotomie 2.3025850930  formule 2.3025850930  (39 iterations)
+proportion <= q_0.9 : 0.9000
+```
+
+   Il faut $n > \log_2(50 \cdot 10^{10}) \approx 38{,}9$, soit $39$
+   itérations, et c'est ce qu'on observe : le nombre d'itérations de la
+   dichotomie ne dépend que de la longueur de départ et de la précision, pas
+   de la fonction.
+
+4. $F$ est **strictement** croissante sur $[0, +\infty[$ : elle ne prend chaque
+   valeur qu'une fois. Pour une loi discrète, $F$ est en escalier, l'équation
+   $F(t) = p$ peut n'avoir aucune solution ou en avoir une infinité, et l'on
+   définit le quantile par $q_p = \inf\{t : F(t) \ge p\}$ — l'inverse
+   généralisée, au niveau 1.

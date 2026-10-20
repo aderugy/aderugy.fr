@@ -1,0 +1,69 @@
+---
+title: Séries à termes positifs — comparer au lieu de calculer
+minutes: 8
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: qcm
+  question: '$\sum \frac{1}{n^2 + n}$ :'
+  choix:
+  - 'diverge, car elle se compare à la série harmonique ;'
+  - 'converge, et sa somme vaut $1$ (télescopage : $\frac{1}{n^2+n} = \frac{1}{n} - \frac{1}{n+1}$) ;'
+  - 'converge, mais on ne peut pas calculer sa somme.'
+  reponse: 1
+  explication: '$S_N = \sum_{n=1}^N \big(\frac1n - \frac1{n+1}\big) = 1 - \frac{1}{N+1} \to 1$. C''est aussi la série de comparaison qui démontre la convergence de $\sum 1/n^2$, puisque $\frac{1}{n^2} \le \frac{2}{n^2+n}$.'
+- type: vrai-faux
+  question: 'Si $u_n \sim v_n$ et $\sum v_n$ converge, alors $\sum u_n$ converge, même si $v_n$ change de signe.'
+  reponse: false
+  explication: 'Faux : le critère des équivalents exige des termes de signe constant. Avec $v_n = \frac{(-1)^n}{\sqrt n}$ (série convergente) et $u_n = v_n + \frac1n$, on a $u_n \sim v_n$ et $\sum u_n$ diverge.'
+---
+
+### La remarque qui fait tout
+
+Si $u_n \ge 0$ pour tout $n$, la suite des sommes partielles est
+**croissante**. Par le théorème de la limite monotone :
+
+> **Proposition.** Une série à termes positifs converge si et seulement si ses
+> sommes partielles sont majorées. Sinon, elle tend vers $+\infty$.
+
+C'est encore l'axiome de la borne supérieure, et c'est la seule raison pour
+laquelle on peut démontrer qu'une série converge **sans connaître sa somme**.
+Pour une série à termes positifs, on note $\sum u_n = +\infty$ quand elle
+diverge : cette écriture a un sens, contrairement au cas général.
+
+### Comparaison
+
+> **Théorème de comparaison.** Soient $0 \le u_n \le v_n$ pour tout $n$ assez
+> grand.
+>
+> - Si $\sum v_n$ converge, $\sum u_n$ converge.
+> - Si $\sum u_n$ diverge, $\sum v_n$ diverge.
+
+*Démonstration.* Quitte à retirer un nombre fini de termes, ce qui ne change
+pas la nature de la série, on suppose l'inégalité vraie pour tout $n$. Alors
+$\sum_{n \le N} u_n \le \sum_{n \le N} v_n \le \sum_{n=0}^{\infty} v_n$ : les sommes
+partielles de $\sum u_n$ sont majorées. La seconde assertion est la
+contraposée de la première. $\square$
+
+> **Corollaire (équivalents).** Si $u_n \ge 0$, $v_n > 0$ et $u_n \sim v_n$,
+> c'est-à-dire $u_n / v_n \to 1$, alors les séries $\sum u_n$ et $\sum v_n$
+> sont de même nature.
+
+*Démonstration.* À partir d'un certain rang, $\tfrac12 v_n \le u_n \le 2 v_n$ ;
+on applique deux fois la comparaison. $\square$
+
+**Exemple.** $\sum \frac{1}{n^2}$ converge : pour $n \ge 1$,
+$\frac{1}{n^2} \le \frac{2}{n(n+1)} = 2\Big(\frac1n - \frac1{n+1}\Big)$, et la
+série de droite a pour sommes partielles $2\big(1 - \frac{1}{N+1}\big) \le 2$.
+Sa somme, $\pi^2/6$, est un résultat d'Euler, admis ici : une démonstration
+se trouve chez Abbott, *Understanding Analysis*, 2<sup>e</sup> édition,
+chapitre 8.
+
+### Piège : le signe constant est une hypothèse
+
+Le critère des équivalents est **faux** pour des séries de signe quelconque.
+Soit $v_n = \frac{(-1)^n}{\sqrt n}$ — sa série converge, par le critère des
+séries alternées (capsule 6) — et $u_n = \frac{(-1)^n}{\sqrt n} + \frac{1}{n}$.
+Alors $u_n / v_n = 1 + \frac{(-1)^n}{\sqrt n} \to 1$, donc $u_n \sim v_n$. Mais
+$\sum u_n = \sum v_n + \sum \frac1n$ est la somme d'une série convergente et
+d'une série divergente : elle diverge. La comparaison repose sur la monotonie
+des sommes partielles, qui disparaît avec les signes.

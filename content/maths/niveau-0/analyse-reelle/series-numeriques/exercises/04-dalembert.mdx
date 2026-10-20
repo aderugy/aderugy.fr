@@ -1,0 +1,30 @@
+---
+kind: calcul
+difficulty: 2
+after: regles
+---
+Déterminer la nature des séries suivantes par la règle de d'Alembert, ou dire
+pourquoi elle ne conclut pas.
+
+1. $\displaystyle\sum \frac{n^2}{3^n}$
+2. $\displaystyle\sum \frac{n!}{n^n}$
+3. $\displaystyle\sum \frac{2^n\, n!}{n^n}$
+4. $\displaystyle\sum \frac{1}{\binom{2n}{n}}$
+
+<!-- indice -->
+Pour 2 et 3, $\frac{(n+1)^n}{n^n} = \big(1 + \frac1n\big)^n \to \mathrm{e}$
+(admis ici : c'est la limite qui définit $\mathrm{e}$ chez beaucoup d'auteurs,
+et elle découle de $\ln(1+x) \sim x$).
+
+<!-- indice -->
+Pour 4, simplifier $\binom{2n}{n} \big/ \binom{2n+2}{n+1}$.
+
+<!-- solution -->
+1. $\frac{u_{n+1}}{u_n} = \frac13\big(\frac{n+1}{n}\big)^2 \to \frac13 < 1$ : converge.
+2. $\frac{u_{n+1}}{u_n} = \frac{(n+1)!}{n!} \cdot \frac{n^n}{(n+1)^{n+1}}
+   = \frac{n^n}{(n+1)^n} = \big(1 + \frac1n\big)^{-n} \to \frac1{\mathrm{e}} < 1$ :
+   converge.
+3. Le rapport vaut $2\big(1 + \frac1n\big)^{-n} \to \frac{2}{\mathrm{e}} < 1$ :
+   converge. (Avec $3^n$ au lieu de $2^n$, $\frac{3}{\mathrm{e}} > 1$ : diverge.)
+4. $\frac{u_{n+1}}{u_n} = \frac{\binom{2n}{n}}{\binom{2n+2}{n+1}}
+   = \frac{(n+1)^2}{(2n+2)(2n+1)} = \frac{n+1}{2(2n+1)} \to \frac14$ : converge.

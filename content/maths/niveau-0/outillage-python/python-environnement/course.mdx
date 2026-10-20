@@ -1,0 +1,37 @@
+---
+title: Environnement, notebooks et reproductibilité
+status: published
+updated: 2026-10-20
+---
+
+## Liens {#liens}
+
+- [python-numpy](/maths/n/python-numpy) : tableaux, vectorisation et
+  générateurs aléatoires de NumPy, dont ce nœud n'a utilisé que le strict
+  nécessaire.
+- [generation-aleatoire](/maths/n/generation-aleatoire) : ce que font les
+  méthodes `normal`, `exponential` à partir des bits uniformes du générateur
+  — inversion, rejet.
+- [monte-carlo](/maths/n/monte-carlo) : l'incertitude d'une estimation de
+  Monte-Carlo, en $1/\sqrt N$, qu'il faut publier avec elle.
+- [verification-numerique](/maths/n/verification-numerique) : le protocole de
+  la capsule 6, appliqué aux vérifications de tout le parcours.
+- [comparaisons-multiples](/maths/n/comparaisons-multiples) : choisir la graine
+  après coup est un cas de tests multiples non déclarés.
+- [description-donnees](/maths/n/description-donnees) : la variance empirique,
+  et la façon stable de la calculer.
+
+## Références {#references}
+
+- Nicholas J. Higham, *Accuracy and Stability of Numerical Algorithms*,
+  2<sup>e</sup> édition, chapitres 2 (arithmétique flottante) et 4
+  (sommation). La borne de la capsule 4 y est démontrée sans
+  approximation au premier ordre.
+- David Goldberg, « What Every Computer Scientist Should Know About
+  Floating-Point Arithmetic », *ACM Computing Surveys*, vol. 23, n° 1, 1991.
+- Documentation de NumPy, section « Random sampling », pages « Random
+  Generator », « Parallel random number generation » et « Compatibility
+  policy » : la politique de stabilité des flux aléatoires d'une version à
+  l'autre.
+- Documentation de Python, module `venv` et PEP 668 (« Marking Python base
+  environments as externally managed »).

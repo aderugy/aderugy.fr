@@ -1,0 +1,79 @@
+---
+title: Sur un segment, les bornes sont atteintes
+minutes: 8
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: qcm
+  question: 'Laquelle de ces fonctions continues **n''atteint pas** sa borne supérieure ?'
+  choix:
+  - '$x \mapsto x(1 - x)$ sur $[0, 1]$'
+  - '$x \mapsto x$ sur $[0, 1[$'
+  - '$x \mapsto \sin x$ sur $\mathbb{R}$'
+  reponse: 1
+  explication: 'Sur $[0, 1[$, $\sup x = 1$ n''est atteint en aucun point : l''intervalle n''est pas fermé. La première est sur un segment (maximum $1/4$ en $1/2$) ; la troisième atteint $1$ en $\pi/2$ bien que $\mathbb{R}$ ne soit pas borné — le théorème donne une condition suffisante, pas nécessaire.'
+- type: vrai-faux
+  question: 'Une fonction continue sur $]0, 1]$ est bornée.'
+  reponse: false
+  explication: 'Faux : $x \mapsto 1/x$ est continue sur $]0, 1]$ et non majorée. Le théorème demande un segment $[a, b]$, fermé **et** borné.'
+- type: qcm
+  question: 'Dans la démonstration, à quoi sert Bolzano-Weierstrass ?'
+  choix:
+  - 'À montrer que $f$ est continue.'
+  - 'À extraire, d''une suite de $[a, b]$ le long de laquelle $f$ s''approche de son sup, une sous-suite convergente — dont la limite reste dans $[a, b]$ parce que le segment est fermé.'
+  - 'À montrer que $\sup f$ existe.'
+  reponse: 1
+  explication: 'L''existence du sup (dans $\overline{\mathbb{R}}$) est immédiate ; la difficulté est qu''il soit **atteint**. Bolzano-Weierstrass fournit un point limite, la fermeture le garde dans le domaine, et la continuité fait passer $f$ à la limite.'
+---
+
+### L'énoncé
+
+> **Théorème des bornes atteintes.** Une fonction continue sur un segment
+> $[a, b]$ est bornée et atteint ses bornes : il existe $c, d \in [a, b]$ tels
+> que $f(c) = \inf_{[a,b]} f$ et $f(d) = \sup_{[a,b]} f$.
+
+Avec les valeurs intermédiaires : **l'image d'un segment par une fonction
+continue est un segment**, $f([a, b]) = [f(c), f(d)]$.
+
+### Démonstration
+
+*$f$ est majorée.* Sinon, pour tout $n$ il existe $x_n \in [a, b]$ avec
+$f(x_n) > n$. La suite $(x_n)$ est bornée ; par
+[Bolzano-Weierstrass](/maths/n/suites-reelles/m/bolzano-weierstrass), elle a une
+suite extraite $(x_{\varphi(n)})$ qui converge vers un réel $x^\ast$. Comme
+$a \le x_{\varphi(n)} \le b$, le passage à la limite dans les inégalités larges
+donne $x^\ast \in [a, b]$. Par continuité, $f(x_{\varphi(n)}) \to f(x^\ast)$, donc
+la suite $(f(x_{\varphi(n)}))$ est bornée — alors que
+$f(x_{\varphi(n)}) > \varphi(n) \ge n$. Contradiction.
+
+*La borne supérieure est atteinte.* Soit $M = \sup_{[a,b]} f$, qui existe
+maintenant dans $\mathbb{R}$. Par la caractérisation de la borne supérieure,
+pour tout $n \ge 1$ il existe $y_n \in [a, b]$ avec $M - 1/n < f(y_n) \le M$,
+donc $f(y_n) \to M$. On extrait de $(y_n)$ une suite convergente
+$y_{\psi(n)} \to d$ ; comme plus haut $d \in [a, b]$, et par continuité
+$f(y_{\psi(n)}) \to f(d)$. Mais $(f(y_{\psi(n)}))$ est extraite d'une suite qui
+tend vers $M$, donc tend aussi vers $M$. Par unicité de la limite, $f(d) = M$.
+
+Pour l'inf, appliquer ce qui précède à $-f$. $\square$
+
+Les trois ingrédients sont visibles et chacun est indispensable : Bolzano-Weierstrass
+(il faut que $[a, b]$ soit **borné**), le passage à la limite dans les
+inégalités larges (il faut que $[a, b]$ soit **fermé**), et la continuité de
+$f$.
+
+### Piège : retirer une hypothèse, une à une
+
+| hypothèse retirée | contre-exemple | ce qui casse |
+|---|---|---|
+| intervalle fermé | $x \mapsto x$ sur $[0, 1[$ | le sup $1$ n'est pas atteint : $d$ sortirait du domaine |
+| intervalle fermé | $x \mapsto 1/x$ sur $]0, 1]$ | $f$ n'est même pas bornée |
+| intervalle borné | $x \mapsto x$ sur $[0, +\infty[$ | pas de valeur d'adhérence pour $x_n = n$ |
+| continuité | $f(x) = x$ sur $[0, 1[$, $f(1) = 0$ | sup $1$ non atteint sur le segment $[0, 1]$ |
+
+### Ce que ce théorème rend possible
+
+Il garantit l'existence d'un **optimum** sans le calculer. C'est l'argument qui
+justifie qu'un problème de maximum de vraisemblance a une solution quand
+l'espace des paramètres est un segment et la vraisemblance continue ; et c'est
+pour avoir des solutions sur des domaines non bornés qu'on introduira la
+[convexité](/maths/n/optimisation-convexe) et la coercivité. Le même argument
+d'extraction démontre, à la capsule suivante, le théorème de Heine.

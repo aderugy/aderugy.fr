@@ -1,0 +1,56 @@
+---
+kind: preuve
+difficulty: 5
+after: reordonnement
+---
+Soit $\sum u_n$ une série semi-convergente et $L \in \mathbb{R}$. On note
+$(p_k)$ la suite des termes $\ge 0$ et $(m_k)$ celle des valeurs absolues des
+termes $< 0$, chacune dans l'ordre d'apparition.
+
+1. Montrer que $\sum p_k = \sum m_k = +\infty$.
+2. On construit un réordonnement : on prend des $p_k$, dans l'ordre, jusqu'à ce
+   que la somme dépasse strictement $L$ ; puis des $-m_k$ jusqu'à repasser
+   en dessous ou sur $L$ ; et ainsi de suite. Montrer que la construction ne
+   s'arrête jamais et utilise chaque terme exactement une fois.
+3. Montrer que la série réordonnée converge vers $L$.
+
+<!-- indice -->
+Pour 1 : si $\sum p_k$ convergeait, $\sum m_k$ convergerait aussi (car
+$\sum u_n$ converge), et la série serait absolument convergente. Écrire
+$|u_n| = u_n + 2\max(-u_n, 0)$.
+
+<!-- indice -->
+Pour 2, utiliser 1 pour voir que chaque phase se termine. Comme chaque phase
+consomme au moins un terme, les deux réserves sont épuisées dans l'ordre.
+
+<!-- indice -->
+Pour 3, après la fin d'une phase, l'écart à $L$ est au plus le dernier terme
+ajouté ; et $p_k \to 0$, $m_k \to 0$.
+
+<!-- solution -->
+1. Notons $u_n^+ = \max(u_n, 0)$ et $u_n^- = \max(-u_n, 0)$, de sorte que
+   $u_n = u_n^+ - u_n^-$ et $|u_n| = u_n^+ + u_n^-$. Les séries $\sum u_n^+$ et
+   $\sum p_k$ ont les mêmes termes non nuls, dans le même ordre, donc la même
+   nature ; de même $\sum u_n^-$ et $\sum m_k$. Si $\sum u_n^+$ convergeait,
+   $\sum u_n^- = \sum (u_n^+ - u_n)$ convergerait, et
+   $\sum |u_n| = \sum u_n^+ + \sum u_n^-$ aussi : contradiction. Donc
+   $\sum p_k = +\infty$, et symétriquement $\sum m_k = +\infty$. En particulier
+   les deux suites sont infinies.
+2. Une phase « positive » commence à une somme $\le L$ et ajoute des $p_k$
+   jusqu'à dépasser $L$ ; comme $\sum p_k = +\infty$, elle se termine en un
+   nombre fini d'étapes. De même pour une phase négative. Chaque phase
+   consomme au moins un terme, et les termes de chaque réserve sont pris dans
+   l'ordre : tout $p_k$ et tout $m_k$ finit par être utilisé, une seule fois.
+   Le réordonnement est une bijection des indices.
+3. Soit $T_j$ la $j$-ème somme partielle de la série réordonnée. À la fin
+   d'une phase positive dont le dernier terme est $p_k$, on a
+   $L < T_j \le L + p_k$ (avant ce terme, la somme était $\le L$). Pendant la
+   phase négative suivante, les sommes restent dans $[\,L - m_{\ell},\ L + p_k]$,
+   où $m_\ell$ est le dernier terme de cette phase. Ainsi, entre deux fins de
+   phase, $|T_j - L|$ est majoré par le plus grand des derniers termes des deux
+   phases concernées. Comme $u_n \to 0$, $p_k \to 0$ et $m_k \to 0$, et les
+   indices de ces derniers termes tendent vers l'infini avec le nombre de
+   phases. Donc $T_j \to L$. $\square$
+
+Pour $L = +\infty$, viser successivement $1, 2, 3, \dots$ au lieu de $L$ dans
+les phases positives, en n'insérant qu'un seul terme négatif entre deux.

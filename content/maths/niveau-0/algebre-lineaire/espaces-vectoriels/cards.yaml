@@ -1,0 +1,94 @@
+# Cartes de révision du nœud. L'état FSRS vit en base ; `ref` pointe vers la
+# capsule d'origine (décisions D1 et D25).
+
+cards:
+  - id: sous-espace
+    ref: espace
+    front: "Comment montre-t-on le plus souvent qu'un ensemble est un espace vectoriel ?"
+    back: |
+      En le voyant comme sous-espace d'un espace connu : il contient $0$ et
+      est stable par $u + \lambda v$. Plus rapide encore : le reconnaître comme
+      noyau d'une application linéaire.
+
+  - id: reunion
+    ref: espace
+    front: "La réunion de deux sous-espaces est-elle un sous-espace ?"
+    back: |
+      Seulement si l'un contient l'autre (contre-exemple : les deux axes de
+      $\mathbb{R}^2$). L'intersection l'est toujours ; le plus petit
+      sous-espace contenant les deux est $F + G$.
+
+  - id: libre
+    ref: familles
+    front: "Définition d'une famille libre, et le piège classique."
+    back: |
+      $\sum \lambda_i u_i = 0 \Rightarrow$ tous les $\lambda_i$ nuls. Elle ne
+      se teste pas deux à deux : $(1,0,0), (0,1,0), (1,1,0)$ sont deux à deux
+      non colinéaires et liés (multicolinéarité).
+
+  - id: base-coordonnees
+    ref: familles
+    front: "Caractérisation d'une base par les coordonnées."
+    back: |
+      Tout vecteur s'écrit de façon **unique** comme combinaison des vecteurs
+      de la base : existence = génératrice, unicité = libre.
+
+  - id: steinitz
+    ref: dimension
+    front: "Lemme d'échange (Steinitz) : énoncé et idée."
+    back: |
+      Si $E$ est engendré par $m$ vecteurs, toute famille libre a au plus $m$
+      éléments. On remplace un à un les générateurs par les vecteurs libres,
+      en restant générateur. Conséquence : toutes les bases ont même cardinal.
+
+  - id: n-vecteurs
+    ref: dimension
+    front: "En dimension $n$, que suffit-il de vérifier pour qu'une famille de $n$ vecteurs soit une base ?"
+    back: |
+      Qu'elle est libre, **ou** qu'elle est génératrice : l'un entraîne
+      l'autre. Faux en dimension infinie.
+
+  - id: injectivite-noyau
+    ref: lineaires
+    front: "Comment tester l'injectivité d'une application linéaire ?"
+    back: |
+      $f$ injective $\iff \ker f = \{0\}$, car $f(u) = f(v) \iff u - v \in \ker f$.
+
+  - id: theoreme-rang
+    ref: rang
+    front: "Théorème du rang : énoncé et hypothèse."
+    back: |
+      $\dim E = \dim\ker f + \operatorname{rg} f$, pour $E$ de **dimension
+      finie**. Preuve : compléter une base du noyau ; les images des vecteurs
+      ajoutés forment une base de l'image.
+
+  - id: rang-numerique
+    ref: rang
+    front: "Pourquoi le rang calculé par NumPy n'est-il pas « le » rang ?"
+    back: |
+      Il compte les valeurs singulières au-dessus d'un seuil. Avec des données
+      bruitées, la bonne mesure de redondance est le conditionnement, pas un
+      entier.
+
+  - id: colonnes-images
+    ref: matrices
+    front: "Que contient la colonne $j$ de la matrice de $f$ ?"
+    back: |
+      Les coordonnées de $f(e_j)$, image du $j$-ème vecteur de la base de
+      départ. Le produit $\mathbf{B}\mathbf{A}$ est la matrice de $g \circ f$.
+
+  - id: changement-base
+    ref: matrices
+    front: "Formule de changement de base pour un endomorphisme."
+    back: |
+      $\mathbf{A}' = \mathbf{P}^{-1}\mathbf{A}\mathbf{P}$, où les colonnes de
+      $\mathbf{P}$ sont les nouveaux vecteurs de base exprimés dans l'ancienne.
+
+  - id: solutions-affines
+    ref: systemes
+    front: "Structure des solutions de $\\mathbf{A}\\mathbf{x} = \\mathbf{b}$, et lien avec la régression."
+    back: |
+      Vide, ou $\mathbf{x}_0 + \ker\mathbf{A}$, de dimension
+      $p - \operatorname{rg}\mathbf{A}$. En régression, $\boldsymbol\beta$ est
+      identifiable ssi les colonnes de $\mathbf{X}$ sont libres — jamais si
+      $p > n$.

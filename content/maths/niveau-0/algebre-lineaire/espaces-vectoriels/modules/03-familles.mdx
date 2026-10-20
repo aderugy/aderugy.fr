@@ -1,0 +1,84 @@
+---
+title: Familles libres, génératrices, bases
+minutes: 9
+rubrique: [construction, intuition, pieges]
+checkpoint:
+- type: vrai-faux
+  question: 'Trois vecteurs de $\mathbb{R}^3$ deux à deux non colinéaires forment une famille libre.'
+  reponse: false
+  explication: 'Faux : $(1,0,0)$, $(0,1,0)$ et $(1,1,0)$ sont deux à deux non colinéaires, et le troisième est la somme des deux premiers. La liberté est une propriété de la famille entière, pas des paires.'
+- type: qcm
+  question: 'Quelles sont les coordonnées du polynôme $P = 3 + 2X + X^2$ dans la base $(1, X - 1, (X - 1)^2)$ de $\mathbb{R}_2[X]$ ?'
+  choix:
+  - '$(3, 2, 1)$'
+  - '$(6, 4, 1)$'
+  - '$(6, 2, 1)$'
+  reponse: 1
+  explication: 'Avec $Y = X - 1$, $X = Y + 1$ et $P = 3 + 2(Y+1) + (Y+1)^2 = 6 + 4Y + Y^2$. Les coordonnées dépendent de la base : le vecteur est le même, sa description change.'
+- type: vrai-faux
+  question: 'Toute famille contenant le vecteur nul est liée.'
+  reponse: true
+  explication: 'Vrai : $1 \cdot 0_E = 0_E$ est une combinaison linéaire nulle à coefficients non tous nuls.'
+---
+
+### Combinaisons linéaires et sous-espace engendré
+
+Une **combinaison linéaire** des vecteurs $u_1, \dots, u_p$ est un vecteur
+$\lambda_1 u_1 + \cdots + \lambda_p u_p$, avec $\lambda_i \in \mathbb{R}$.
+L'ensemble de ces combinaisons, noté $\operatorname{Vect}(u_1, \dots, u_p)$,
+est un sous-espace : le plus petit qui contienne les $u_i$.
+
+Dans le langage de la régression, $\operatorname{Vect}(x_1, \dots, x_p)$ est
+l'ensemble de toutes les prédictions linéaires possibles à partir des
+colonnes $x_j$.
+
+### Trois propriétés d'une famille
+
+Soit $\mathcal{F} = (u_1, \dots, u_p)$ une famille finie de vecteurs de $E$.
+
+- $\mathcal{F}$ est **génératrice** si $\operatorname{Vect}(\mathcal{F}) = E$ :
+  tout vecteur est une combinaison des $u_i$.
+- $\mathcal{F}$ est **libre** si la seule combinaison nulle est la combinaison
+  triviale :
+  $$
+  \lambda_1 u_1 + \cdots + \lambda_p u_p = 0 \ \Longrightarrow\ \lambda_1 = \cdots = \lambda_p = 0 .
+  $$
+  Sinon elle est **liée** : l'un des $u_i$ est combinaison des autres.
+- $\mathcal{F}$ est une **base** si elle est libre et génératrice.
+
+> **Proposition.** $\mathcal{F}$ est une base si et seulement si tout vecteur
+> $u \in E$ s'écrit **de manière unique** $u = \sum_i \lambda_i u_i$. Les
+> $\lambda_i$ sont les **coordonnées** de $u$ dans la base.
+
+*Démonstration.* L'existence de l'écriture, c'est le caractère générateur. Si
+$\sum \lambda_i u_i = \sum \mu_i u_i$, alors $\sum (\lambda_i - \mu_i) u_i = 0$,
+et la liberté donne $\lambda_i = \mu_i$ : unicité. Réciproquement, l'unicité de
+l'écriture de $0 = \sum 0 \cdot u_i$ est exactement la liberté. $\square$
+
+### Exemples
+
+- La **base canonique** $(e_1, \dots, e_n)$ de $\mathbb{R}^n$ : $e_i$ a un $1$
+  en position $i$ et des $0$ ailleurs. Les coordonnées d'un vecteur sont ses
+  composantes.
+- $(1, X, \dots, X^d)$ est une base de $\mathbb{R}_d[X]$ : un polynôme est nul
+  si et seulement si tous ses coefficients le sont.
+- Dans l'espace des fonctions $\mathbb{R} \to \mathbb{R}$, la famille
+  $(\cos, \sin)$ est libre : si $a\cos + b\sin = 0$, évaluer en $0$ donne
+  $a = 0$, en $\pi/2$ donne $b = 0$.
+
+### Intuition : la liberté, c'est l'absence de redondance
+
+Une famille libre ne contient aucun vecteur qui « répète » les autres ; une
+famille génératrice n'en oublie aucun. Une base est exactement au milieu :
+assez pour tout atteindre, pas un de trop. Retirer un vecteur d'une base la
+rend non génératrice ; en ajouter un la rend liée. Le théorème de la capsule
+suivante dit que ce « milieu » a toujours le même nombre d'éléments.
+
+### Piège : la liberté ne se teste pas deux à deux
+
+$(1,0,0)$, $(0,1,0)$, $(1,1,0)$ : aucun n'est multiple d'un autre, et pourtant
+$u_1 + u_2 - u_3 = 0$. Tester les paires ne suffit que pour deux vecteurs. En
+régression, c'est la **multicolinéarité** : aucune paire de colonnes n'est
+corrélée à $\pm 1$, et pourtant une colonne est combinaison exacte des autres.
+On la détecte par le rang de la matrice (capsule 6), pas par la matrice des
+corrélations.

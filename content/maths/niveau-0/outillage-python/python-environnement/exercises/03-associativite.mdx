@@ -1,0 +1,35 @@
+---
+kind: preuve
+difficulty: 2
+after: flottants
+---
+On note $\oplus$ l'addition machine : $a \oplus b = \mathrm{fl}(a + b)$, l'arrondi
+au plus proche de la somme exacte.
+
+1. Montrer que $\oplus$ est commutative.
+2. Montrer qu'elle n'est pas associative, avec des flottants de $[0, 1]$.
+3. En déduire que deux programmes qui somment les mêmes nombres dans des ordres
+   différents peuvent donner deux résultats différents, et que ce n'est pas un
+   bogue.
+
+<!-- indice -->
+1 : $a + b = b + a$ dans $\mathbb{R}$, et $\mathrm{fl}$ ne dépend que du réel
+arrondi.
+
+<!-- indice -->
+2 : essayer $0{,}1$, $0{,}2$, $0{,}3$ et calculer les deux parenthésages.
+
+<!-- solution -->
+1. $a \oplus b = \mathrm{fl}(a + b) = \mathrm{fl}(b + a) = b \oplus a$ : la somme
+   exacte est commutative, et l'arrondi n'est qu'une fonction de cette somme.
+2. En Python, `(0.1 + 0.2) + 0.3` donne `0.6000000000000001` et
+   `0.1 + (0.2 + 0.3)` donne `0.6`. Les deux parenthésages arrondissent des
+   sommes intermédiaires différentes ($0{,}1 + 0{,}2$ dans un cas,
+   $0{,}2 + 0{,}3$ dans l'autre), et ces arrondis ne se compensent pas de la
+   même façon.
+3. Une somme de $n$ termes s'évalue par une suite de $n - 1$ additions
+   machine ; changer l'ordre change les sommes intermédiaires et donc les
+   arrondis. Les deux résultats sont des approximations également légitimes de
+   la somme exacte, à l'intérieur de la borne $(n-1)u\sum|x_k|$ de la capsule.
+   Un test de non-régression sur un résultat flottant compare donc avec une
+   tolérance, jamais avec `==`.

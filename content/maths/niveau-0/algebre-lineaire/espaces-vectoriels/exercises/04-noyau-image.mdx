@@ -1,0 +1,36 @@
+---
+kind: calcul
+difficulty: 2
+after: rang
+---
+Soit $f : \mathbb{R}^3 \to \mathbb{R}^3$ de matrice (dans la base canonique)
+$$
+\mathbf{A} = \begin{bmatrix} 1 & 2 & 3 \\ 2 & 4 & 6 \\ 1 & 0 & 1 \end{bmatrix}.
+$$
+
+1. Déterminer une base de $\ker f$ et une base de $\operatorname{Im} f$.
+2. Vérifier le théorème du rang.
+3. Le vecteur $(1, 2, 0)$ est-il dans l'image ? Et $(1, 0, 0)$ ?
+
+<!-- indice -->
+La deuxième ligne est le double de la première : le système
+$\mathbf{A}\mathbf{x} = 0$ se réduit à deux équations.
+
+<!-- indice -->
+L'image est engendrée par les colonnes ; tout vecteur de l'image a sa
+deuxième coordonnée égale au double de la première.
+
+<!-- solution -->
+1. $\mathbf{A}\mathbf{x} = 0$ équivaut à $x + 2y + 3z = 0$ et $x + z = 0$, soit
+   $x = -z$ et $y = -z$ : $\ker f = \operatorname{Vect}\big((1, 1, -1)\big)$,
+   de dimension $1$. Les colonnes $c_1 = (1, 2, 1)$ et $c_2 = (2, 4, 0)$ sont
+   libres et $c_3 = c_1 + c_2$ : $\operatorname{Im} f = \operatorname{Vect}(c_1, c_2)$,
+   de dimension $2$. (La relation $c_1 + c_2 - c_3 = 0$ est exactement
+   $\mathbf{A}(1, 1, -1)^\top = 0$.)
+2. $1 + 2 = 3 = \dim \mathbb{R}^3$.
+3. Tout vecteur de l'image vérifie $y = 2x$, car c'est vrai de $c_1$ et $c_2$ ;
+   réciproquement, $\{y = 2x\}$ est un plan, de dimension $2$, qui contient
+   l'image de dimension $2$ : ils sont égaux. $(1, 2, 0)$ vérifie $y = 2x$ : il
+   est dans l'image, et en effet $(1, 2, 0) = \frac12 c_2$. $(1, 0, 0)$ ne la
+   vérifie pas : il n'est pas dans l'image, et le système
+   $\mathbf{A}\mathbf{x} = (1, 0, 0)^\top$ n'a pas de solution.

@@ -1,0 +1,32 @@
+---
+kind: contre-exemple
+difficulty: 2
+after: continuite
+---
+Soit $f(x) = x\,\mathbf{1}_{\mathbb{Q}}(x)$ : $f(x) = x$ si $x$ est rationnel,
+$0$ sinon.
+
+1. Montrer que $f$ est continue en $0$.
+2. Montrer que $f$ est discontinue en tout $a \ne 0$.
+3. Construire une fonction continue en exactement deux points, $0$ et $1$.
+
+On admet que tout intervalle ouvert non vide contient des rationnels et des
+irrationnels.
+
+<!-- indice -->
+Pour 2, utiliser deux suites tendant vers $a$, l'une de rationnels, l'autre
+d'irrationnels.
+
+<!-- indice -->
+Pour 3, remplacer le facteur $x$ par un polynôme qui s'annule en $0$ et en $1$.
+
+<!-- solution -->
+1. $|f(x)| \le |x|$ pour tout $x$, donc $|f(x) - f(0)| \le |x|$, et
+   $\delta = \varepsilon$ convient.
+2. Soit $a \ne 0$. Il existe des rationnels $r_n \to a$ et des irrationnels
+   $s_n \to a$ (un de chaque dans $]a - 1/n, a + 1/n[$). Alors $f(r_n) = r_n \to a$
+   et $f(s_n) = 0 \to 0$. Comme $a \ne 0$, les deux limites diffèrent : par la
+   caractérisation séquentielle, $f$ n'a pas de limite en $a$.
+3. $g(x) = x(x - 1)\,\mathbf{1}_{\mathbb{Q}}(x)$. Même argument : en $0$ et en
+   $1$, $|g(x)| \le |x(x-1)| \to 0 = g(0) = g(1)$ ; ailleurs, les suites
+   rationnelles donnent $a(a - 1) \ne 0$ et les irrationnelles $0$.

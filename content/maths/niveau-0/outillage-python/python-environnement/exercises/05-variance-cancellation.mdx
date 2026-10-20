@@ -1,0 +1,60 @@
+---
+kind: simulation
+difficulty: 3
+after: flottants
+---
+La variance empirique peut se calculer par deux formules égales en
+arithmétique exacte :
+$$
+v_1 = \frac1n \sum_i x_i^2 - \bar x^2 , \qquad
+v_2 = \frac1n \sum_i (x_i - \bar x)^2 .
+$$
+
+1. Pour $x_i = 10^9 + U_i$, avec $U_i$ uniformes sur $[0, 1]$ et
+   $n = 10^5$, calculer $v_1$ et $v_2$ en `float64`. Quelle est la vraie valeur
+   attendue ?
+2. Expliquer le résultat de $v_1$ à l'aide de la borne d'erreur de la capsule.
+3. Quelle formule utilise `np.var` ?
+
+<!-- indice -->
+La variance d'une uniforme sur $[0, 1]$ vaut $1/12$, et ajouter une constante
+ne la change pas.
+
+<!-- indice -->
+$\frac1n \sum x_i^2$ et $\bar x^2$ valent environ $10^{18}$, et leur
+différence $1/12$. Une erreur relative de $10^{-16}$ sur $10^{18}$, c'est une
+erreur absolue de l'ordre de $100$.
+
+<!-- solution -->
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+x = 1e9 + rng.random(10**5)
+m = x.mean()
+v1 = np.mean(x**2) - m**2
+v2 = np.mean((x - m)**2)
+print(f"v1 = {v1:.6f}")
+print(f"v2 = {v2:.6f}")
+print(f"np.var = {np.var(x):.6f}   1/12 = {1/12:.6f}")
+```
+
+Sortie :
+
+```
+v1 = -256.000000
+v2 = 0.083202
+np.var = 0.083202   1/12 = 0.083333
+```
+
+1. $v_2$ et `np.var` donnent $\approx 1/12 \approx 0{,}0833$ ; $v_1$ donne un
+   nombre sans rapport, parfois négatif — une « variance » impossible.
+2. $\frac1n\sum x_i^2$ et $\bar x^2$ sont de l'ordre de $10^{18}$ et ne sont
+   connus qu'à $10^{18} \cdot 10^{-16} = 100$ près : leur différence, qui vaut
+   $1/12$, est entièrement noyée dans les arrondis. C'est l'**élimination
+   catastrophique** : soustraire deux nombres presque égaux ne crée pas
+   d'erreur, mais révèle celle qu'ils portaient déjà.
+3. `np.var` centre d'abord (formule $v_2$, dite « à deux passages »). La
+   formule $v_1$, élégante sur le papier et dans les démonstrations
+   ($\mathbb{V}(X) = \mathbb{E}[X^2] - \mathbb{E}[X]^2$), est à proscrire en
+   calcul dès que la moyenne est grande devant l'écart-type.

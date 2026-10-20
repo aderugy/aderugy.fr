@@ -1,0 +1,47 @@
+---
+kind: contre-exemple
+difficulty: 3
+after: combinaisons
+---
+On cherche le nombre de mains de $5$ cartes contenant **au moins deux cœurs**.
+Un étudiant raisonne ainsi : « je choisis deux cœurs parmi $13$, puis trois
+cartes quelconques parmi les $50$ restantes, soit
+$\binom{13}{2}\binom{50}{3} = 1\,528\,800$. »
+
+1. Exhiber une main précise que ce raisonnement compte plusieurs fois, et dire
+   combien de fois.
+2. Donner le bon nombre.
+3. Vérifier, par un calcul de somme, que le nombre de l'étudiant est bien
+   égal à $\sum_{j} \binom{j}{2} N_j$, où $N_j$ est le nombre de mains à
+   exactement $j$ cœurs.
+
+<!-- indice -->
+Une main contenant trois cœurs peut être fabriquée en choisissant d'abord
+n'importe lesquels de deux de ses trois cœurs.
+
+<!-- indice -->
+Découper selon le nombre exact $j$ de cœurs : $N_j = \binom{13}{j}\binom{39}{5-j}$.
+
+<!-- solution -->
+1. La main $\{A\heartsuit, K\heartsuit, Q\heartsuit, 2\spadesuit, 3\spadesuit\}$
+   est fabriquée en choisissant d'abord $\{A\heartsuit, K\heartsuit\}$, ou
+   $\{A\heartsuit, Q\heartsuit\}$, ou $\{K\heartsuit, Q\heartsuit\}$ : trois
+   fois, c'est-à-dire $\binom{3}{2}$. Une main à $j$ cœurs est comptée
+   $\binom{j}{2}$ fois.
+
+2. Par complémentaire, en retirant les mains à $0$ et à $1$ cœur :
+   $$
+   \binom{52}{5} - \binom{39}{5} - 13\binom{39}{4}
+   = 2\,598\,960 - 575\,757 - 1\,069\,263 = 953\,940 .
+   $$
+
+3. $N_2 = 78 \times 9\,139 = 712\,842$, $N_3 = 286 \times 741 = 211\,926$,
+   $N_4 = 715 \times 39 = 27\,885$, $N_5 = 1\,287$. On retrouve
+   $N_2 + N_3 + N_4 + N_5 = 953\,940$, et
+   $$
+   1 \cdot 712\,842 + 3 \cdot 211\,926 + 6 \cdot 27\,885 + 10 \cdot 1\,287
+   = 1\,528\,800 ,
+   $$
+   le nombre de l'étudiant. Son calcul compte exactement les couples (main,
+   paire de cœurs de la main) : c'est un double comptage correct… d'autre
+   chose que ce qui était demandé.

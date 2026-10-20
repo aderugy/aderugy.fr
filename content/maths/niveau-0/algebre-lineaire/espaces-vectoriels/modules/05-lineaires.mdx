@@ -1,0 +1,88 @@
+---
+title: Applications linéaires, noyau et image
+minutes: 8
+rubrique: [construction, intuition, demonstrations, pieges]
+checkpoint:
+- type: qcm
+  question: 'Laquelle de ces applications est linéaire ?'
+  choix:
+  - '$f : \mathbb{R}^2 \to \mathbb{R},\ (x, y) \mapsto x + y + 1$'
+  - '$D : \mathbb{R}_3[X] \to \mathbb{R}_3[X],\ P \mapsto P''$'
+  - '$g : \mathbb{R}^2 \to \mathbb{R},\ (x, y) \mapsto xy$'
+  reponse: 1
+  explication: 'La dérivation vérifie $(P + \lambda Q)'' = P'' + \lambda Q''$. La première n''envoie pas $0$ sur $0$ (elle est affine). La troisième n''est pas additive : $g(2u) = 4g(u)$.'
+- type: qcm
+  question: 'Quel est le noyau de la dérivation $D : \mathbb{R}_3[X] \to \mathbb{R}_3[X]$ ?'
+  choix:
+  - '$\{0\}$'
+  - 'les polynômes constants'
+  - 'les polynômes de degré $3$'
+  reponse: 1
+  explication: '$P'' = 0$ si et seulement si $P$ est constant : $\ker D = \mathbb{R}_0[X]$, de dimension $1$. $D$ n''est donc pas injective — deux polynômes qui diffèrent d''une constante ont la même dérivée.'
+- type: vrai-faux
+  question: 'Une application linéaire $f$ est injective si et seulement si $\ker f = \{0\}$.'
+  reponse: true
+  explication: 'Vrai : $f(u) = f(v) \iff f(u - v) = 0 \iff u - v \in \ker f$. Il suffit de tester les antécédents de $0$, au lieu de tous les couples.'
+---
+
+### Définition
+
+Soient $E$, $F$ deux espaces vectoriels. $f : E \to F$ est **linéaire** si
+
+$$
+f(u + \lambda v) = f(u) + \lambda f(v) \qquad \text{pour tous } u, v \in E,\ \lambda \in \mathbb{R}.
+$$
+
+Alors $f(0_E) = 0_F$ (prendre $u = v = 0$, $\lambda = 1$), et $f$ préserve
+toutes les combinaisons linéaires finies. Une application linéaire bijective
+est un **isomorphisme** ; sa réciproque est encore linéaire.
+
+### Exemples qui reviendront
+
+- Une matrice $\mathbf{A} \in \mathcal{M}_{n,p}(\mathbb{R})$ définit
+  $\mathbf{x} \mapsto \mathbf{A}\mathbf{x}$, de $\mathbb{R}^p$ dans $\mathbb{R}^n$.
+- La dérivation, de l'espace des fonctions dérivables dans celui des
+  fonctions ; l'intégrale $f \mapsto \int_a^b f$, des fonctions continues dans
+  $\mathbb{R}$.
+- Sur un univers fini $\Omega$ muni d'une probabilité, l'**espérance**
+  $X \mapsto \mathbb{E}[X] = \sum_{\omega} X(\omega)\,\mathbb{P}(\{\omega\})$ est
+  une forme linéaire sur l'espace des variables aléatoires. La linéarité de
+  l'espérance — l'outil de calcul le plus utilisé du niveau 1 — est
+  littéralement cela.
+- Les coordonnées dans une base $(e_1, \dots, e_n)$ :
+  $u \mapsto (\lambda_1, \dots, \lambda_n)$ est un isomorphisme de $E$ sur
+  $\mathbb{R}^n$. **Tout espace de dimension $n$ « est » $\mathbb{R}^n$**, une fois
+  une base choisie.
+
+### Noyau et image
+
+Le **noyau** $\ker f = \{u \in E : f(u) = 0\}$ et l'**image**
+$\operatorname{Im} f = \{f(u) : u \in E\}$ sont des sous-espaces de $E$ et de
+$F$ respectivement.
+
+> **Proposition.** $f$ est injective si et seulement si $\ker f = \{0_E\}$.
+
+*Démonstration.* Si $f$ est injective, $f(u) = 0 = f(0)$ entraîne $u = 0$.
+Réciproquement, si $\ker f = \{0\}$ et $f(u) = f(v)$, alors $f(u - v) = 0$,
+donc $u - v = 0$. $\square$
+
+### Intuition : une application linéaire est déterminée par une base
+
+Si $(e_1, \dots, e_p)$ est une base de $E$, une application linéaire $f$ est
+entièrement fixée par les $p$ vecteurs $f(e_1), \dots, f(e_p)$ : par linéarité,
+$f(\sum \lambda_j e_j) = \sum \lambda_j f(e_j)$. Et réciproquement, **n'importe
+quels** $p$ vecteurs de $F$ sont les images d'une unique application linéaire.
+C'est ce qui permet de ranger $f$ dans un tableau de nombres — sa matrice,
+capsule 7.
+
+Le noyau mesure ce que $f$ **écrase** : deux vecteurs qui diffèrent d'un
+élément du noyau ont la même image. L'image mesure ce que $f$ **atteint**.
+
+### Piège : affine n'est pas linéaire
+
+$x \mapsto 2x + 1$ est appelée « fonction linéaire » au lycée et ne l'est pas
+au sens de ce nœud : elle n'envoie pas $0$ sur $0$. C'est une application
+**affine**, une linéaire suivie d'une translation. La distinction n'est pas
+pédante : la linéarité de l'espérance donne $\mathbb{E}[2X + 1] = 2\mathbb{E}[X] + 1$
+parce que $\mathbb{E}$ est linéaire et $\mathbb{E}[1] = 1$, mais la variance,
+qui vérifie $\mathbb{V}(2X + 1) = 4\,\mathbb{V}(X)$, n'est ni linéaire ni affine.

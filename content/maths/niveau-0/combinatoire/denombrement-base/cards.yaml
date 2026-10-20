@@ -1,0 +1,89 @@
+# Cartes de révision du nœud. L'état FSRS vit en base ; `ref` pointe vers la
+# capsule d'origine (décisions D1 et D25).
+
+cards:
+  - id: regle-produit
+    ref: principes
+    front: "Règle du produit sous sa forme « arbre de choix » : quelle est la condition à vérifier ?"
+    back: |
+      À chaque étape, le **nombre** de choix ne dépend pas des choix
+      précédents (les choix eux-mêmes peuvent en dépendre), et deux suites de
+      choix différentes donnent deux objets différents. Alors le total est le
+      produit des nombres de choix.
+
+  - id: parties
+    ref: principes
+    front: "Cardinal de $\\mathcal{P}(E)$ pour $\\operatorname{card} E = n$, et la bijection qui le prouve."
+    back: |
+      $2^n$. La partie $A$ correspond au mot
+      $(\mathbf{1}_A(e_1), \dots, \mathbf{1}_A(e_n)) \in \{0,1\}^n$.
+
+  - id: arrangements
+    ref: arrangements
+    front: "Nombre d'arrangements de $k$ éléments parmi $n$, et ce qu'ils comptent d'autre."
+    back: |
+      $A_n^k = n(n-1)\cdots(n-k+1) = \dfrac{n!}{(n-k)!}$ si $k \le n$, $0$ sinon.
+      Ce sont les listes de $k$ éléments distincts, c'est-à-dire les
+      injections de $\{1, \dots, k\}$ dans un ensemble à $n$ éléments.
+
+  - id: binomial-double-comptage
+    ref: combinaisons
+    front: "Pourquoi $\\binom{n}{k} = \\dfrac{n!}{k!\\,(n-k)!}$ ? (une phrase)"
+    back: |
+      Double comptage des arrangements : un arrangement, c'est une partie à
+      $k$ éléments puis un ordre sur elle, d'où $A_n^k = \binom{n}{k}\,k!$.
+
+  - id: au-moins-un
+    ref: combinaisons
+    front: "Que signale l'expression « au moins un » dans un dénombrement ?"
+    back: |
+      Un risque de surcomptage : « choisir celui qui garantit la propriété,
+      puis le reste » compte plusieurs fois les objets qui la vérifient
+      plusieurs fois. Passer au complémentaire, ou découper selon le nombre
+      exact.
+
+  - id: pascal
+    ref: pascal
+    front: "Formule de Pascal et son argument combinatoire."
+    back: |
+      $\binom{n}{k} = \binom{n-1}{k-1} + \binom{n-1}{k}$. On distingue un
+      élément $a$ : les parties qui le contiennent ($k - 1$ autres éléments à
+      choisir parmi $n - 1$) et celles qui ne le contiennent pas.
+
+  - id: binome
+    ref: binome
+    front: "Binôme de Newton : énoncé, et l'hypothèse qu'on oublie."
+    back: |
+      $(a+b)^n = \sum_{k=0}^n \binom{n}{k} a^k b^{n-k}$, **à condition que
+      $ab = ba$**. Faux en général pour deux matrices.
+
+  - id: somme-alternee
+    ref: binome
+    front: "$\\sum_{k=0}^n (-1)^k \\binom{n}{k} = ?$"
+    back: |
+      $0$ pour $n \ge 1$ (binôme en $(1 - 1)^n$), $1$ pour $n = 0$ : autant de
+      parties de taille paire que de taille impaire.
+
+  - id: etoiles-barres
+    ref: repetition
+    front: "Nombre de solutions de $x_1 + \\cdots + x_n = k$ dans $\\mathbb{N}^n$ ?"
+    back: |
+      $\binom{n+k-1}{k}$ : $k$ étoiles et $n - 1$ barres, on choisit les
+      positions des barres. C'est aussi le nombre de multi-ensembles de
+      taille $k$ sur $n$ valeurs.
+
+  - id: multi-ensembles-equiprobables
+    ref: repetition
+    front: "Deux dés équilibrés : les 21 résultats non ordonnés sont-ils équiprobables ?"
+    back: |
+      Non. $\{1,1\}$ a la probabilité $1/36$, $\{1,2\}$ la probabilité $2/36$.
+      L'équiprobabilité vit sur les $36$ couples ordonnés : on compte dans
+      l'univers que la physique du tirage rend équiprobable.
+
+  - id: roles-identiques
+    ref: poker
+    front: "Double paire au poker : pourquoi $\\binom{13}{2}$ et non $13 \\times 12$ pour les hauteurs ?"
+    back: |
+      Les deux paires jouent le même rôle : choisir « la première puis la
+      seconde » fabrique chaque main deux fois. Au full, brelan et paire ont
+      des rôles différents, et $13 \times 12$ est correct.

@@ -1,0 +1,52 @@
+---
+kind: preuve
+difficulty: 4
+after: pascal
+---
+Soit $s_n$ le nombre de parties de $\{1, \dots, n\}$ qui ne contiennent pas
+deux entiers consécutifs (la partie vide compte).
+
+1. Calculer $s_1, s_2, s_3$.
+2. Montrer que $s_n = s_{n-1} + s_{n-2}$ pour $n \ge 3$.
+3. Montrer que le nombre de telles parties ayant exactement $k$ éléments vaut
+   $\binom{n - k + 1}{k}$, et en déduire une identité entre les nombres de
+   Fibonacci et les coefficients binomiaux.
+
+<!-- indice -->
+Pour 2, distinguer l'élément $n$ et découper selon qu'il appartient à la
+partie ou non — exactement la méthode de la formule de Pascal.
+
+<!-- indice -->
+Pour 3, si $a_1 < a_2 < \dots < a_k$ sont les éléments, poser
+$b_i = a_i - (i - 1)$ et montrer que $(b_i)$ est une suite strictement
+croissante d'éléments de $\{1, \dots, n - k + 1\}$.
+
+<!-- solution -->
+1. $s_1 = 2$ ($\varnothing$, $\{1\}$), $s_2 = 3$ ($\varnothing, \{1\}, \{2\}$),
+   $s_3 = 5$ (les mêmes, plus $\{3\}$ et $\{1, 3\}$).
+
+2. Soit $A$ une partie sans consécutifs de $\{1, \dots, n\}$.
+   - Si $n \notin A$, $A$ est une partie sans consécutifs de
+     $\{1, \dots, n-1\}$, et réciproquement : $s_{n-1}$ possibilités.
+   - Si $n \in A$, alors $n - 1 \notin A$, et $A \setminus \{n\}$ est une
+     partie sans consécutifs de $\{1, \dots, n - 2\}$. Réciproquement, ajouter
+     $n$ à une telle partie n'introduit pas de consécutifs, puisque $n - 1$ en
+     est absent. C'est une bijection : $s_{n-2}$ possibilités.
+
+   Les deux cas sont disjoints, d'où $s_n = s_{n-1} + s_{n-2}$. Avec
+   $s_1 = 2 = F_3$ et $s_2 = 3 = F_4$ (Fibonacci, $F_1 = F_2 = 1$), on obtient
+   $s_n = F_{n+2}$.
+
+3. Soit $a_1 < \cdots < a_k$ sans consécutifs, c'est-à-dire
+   $a_{i+1} \ge a_i + 2$. Posons $b_i = a_i - (i - 1)$. Alors
+   $b_{i+1} - b_i = a_{i+1} - a_i - 1 \ge 1$, $b_1 = a_1 \ge 1$ et
+   $b_k = a_k - k + 1 \le n - k + 1$ : $(b_i)$ est une partie à $k$ éléments
+   de $\{1, \dots, n - k + 1\}$. Réciproquement, de toute partie
+   $b_1 < \dots < b_k$ de cet ensemble, $a_i = b_i + i - 1$ redonne une partie
+   sans consécutifs de $\{1, \dots, n\}$. Les deux applications sont
+   réciproques l'une de l'autre : il y a $\binom{n-k+1}{k}$ parties de taille
+   $k$. En sommant sur $k$ :
+   $$
+   F_{n+2} = \sum_{k \ge 0} \binom{n - k + 1}{k} .
+   $$
+   Pour $n = 3$ : $\binom{4}{0} + \binom{3}{1} + \binom{2}{2} = 1 + 3 + 1 = 5$.

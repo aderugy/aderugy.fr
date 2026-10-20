@@ -1,0 +1,111 @@
+---
+title: Tirages avec répétition, et le piège de l'équiprobabilité
+minutes: 9
+rubrique: [construction, intuition, pieges, simulation]
+checkpoint:
+- type: nombre
+  question: 'On lance deux dés indiscernables. Combien de résultats **non ordonnés** différents peut-on observer ?'
+  reponse: 21
+  explication: 'Ce sont les multi-ensembles de taille $2$ sur $6$ valeurs : $\binom{6 + 2 - 1}{2} = \binom{7}{2} = 21$, soit $6$ doubles et $15$ paires de valeurs distinctes. Répondre $36$, c''est compter les résultats ordonnés.'
+- type: vrai-faux
+  question: 'Avec deux dés équilibrés, chacun des 21 résultats non ordonnés a la probabilité $1/21$.'
+  reponse: false
+  explication: 'Faux : le résultat $\{1, 2\}$ correspond à deux issues ordonnées, $(1,2)$ et $(2,1)$, le double $\{1,1\}$ à une seule. $\mathbb{P}(\{1,2\}) = 2/36$, $\mathbb{P}(\{1,1\}) = 1/36$. L''équiprobabilité vit sur les $36$ couples, pas sur les $21$ multi-ensembles.'
+- type: qcm
+  question: 'Combien de solutions $(x_1, x_2, x_3) \in \mathbb{N}^3$ a l''équation $x_1 + x_2 + x_3 = 10$ ?'
+  choix:
+  - $\binom{10}{3} = 120$
+  - $\binom{12}{2} = 66$
+  - $3^{10}$
+  reponse: 1
+  explication: 'Étoiles et barres : $10$ étoiles et $2$ barres, soit $12$ positions dont on choisit celles des $2$ barres. $\binom{12}{2} = 66$. Le choix $\binom{10}{3}$ compte des parties à $3$ éléments d''un ensemble à $10$, sans rapport avec l''équation.'
+---
+
+### Le problème
+
+Dans une urne de $n$ boules numérotées, on tire $k$ fois **avec remise** et on
+note seulement **combien de fois** chaque numéro est sorti, sans l'ordre. Le
+résultat est un **multi-ensemble** de taille $k$ sur $n$ valeurs : un ensemble
+où les répétitions sont permises, mais pas l'ordre. Combien y en a-t-il ?
+
+Le réflexe « $n^k$ listes, divisées par $k!$ » ne fonctionne pas, et pas
+seulement parce que $n^k/k!$ n'est pas toujours entier : la liste $(1, 1)$
+correspond à un seul ordre, la liste $(1, 2)$ à deux. Diviser par $k!$ suppose
+que **chaque** objet correspond au **même** nombre de listes ; ici c'est faux.
+
+### Étoiles et barres
+
+> **Proposition.** Le nombre de multi-ensembles de taille $k$ sur $n$ valeurs
+> est
+> $$
+> \binom{n + k - 1}{k} = \binom{n + k - 1}{n - 1} .
+> $$
+> C'est aussi le nombre de solutions $(x_1, \dots, x_n) \in \mathbb{N}^n$ de
+> $x_1 + \cdots + x_n = k$.
+
+*Démonstration.* Un multi-ensemble est déterminé par ses multiplicités
+$(x_1, \dots, x_n)$, entiers positifs de somme $k$ : c'est la seconde forme
+de l'énoncé. On code une telle solution par un mot de $k$ étoiles et $n - 1$
+barres : $x_1$ étoiles, une barre, $x_2$ étoiles, une barre, …, $x_n$
+étoiles. Par exemple, pour $n = 3$ et $k = 4$, la solution $(2, 0, 2)$ s'écrit
+`★★||★★`. Ce codage est une bijection : sa réciproque lit les longueurs des
+blocs d'étoiles séparés par les barres. Un mot de longueur $n + k - 1$ est
+déterminé par les positions de ses $n - 1$ barres, d'où
+$\binom{n + k - 1}{n - 1}$ mots. $\square$
+
+### Les quatre cases du tableau
+
+Tirer $k$ éléments parmi $n$ se fait de quatre façons, selon que l'ordre
+compte et que la répétition est permise :
+
+| | ordre compte | ordre ne compte pas |
+|---|---|---|
+| **sans répétition** | $A_n^k = \dfrac{n!}{(n-k)!}$ | $\dbinom{n}{k}$ |
+| **avec répétition** | $n^k$ | $\dbinom{n+k-1}{k}$ |
+
+Trois des quatre cases se déduisent l'une de l'autre en divisant par $k!$ ou
+en multipliant ; la quatrième, non. C'est la seule où des objets différents
+correspondent à des nombres de listes différents.
+
+### Piège : compter juste n'est pas modéliser juste
+
+Les $21$ résultats non ordonnés de deux dés sont correctement comptés, et
+pourtant **ils ne sont pas équiprobables**. Les deux dés, même identiques,
+sont deux objets physiques distincts ; l'univers où chaque issue a la même
+probabilité est celui des $36$ couples. Le double $\{1, 1\}$ a la probabilité
+$1/36$, la paire $\{1, 2\}$ la probabilité $2/36$.
+
+Ce n'est pas un détail d'école : Leibniz lui-même s'est trompé sur une question
+de ce type, en affirmant qu'avec deux dés, une somme de $11$ et une somme de
+$12$ étaient aussi faciles à obtenir l'une que l'autre, parce que chacune ne
+se réalise que d'une seule manière. Il comptait des multi-ensembles. La règle
+à retenir : **on compte dans l'univers où l'équiprobabilité est justifiée par
+la physique du tirage**, et c'est presque toujours celui des listes.
+
+```python
+import numpy as np
+from collections import Counter
+
+rng = np.random.default_rng(0)
+N = 10**6
+d = rng.integers(1, 7, size=(N, 2))
+paires = Counter(map(tuple, np.sort(d, axis=1)))
+print("resultats non ordonnes observes :", len(paires))
+for r in [(1, 1), (1, 2), (5, 6), (6, 6)]:
+    print(f"P({r}) observee = {paires[r] / N:.4f}")
+print(f"1/36 = {1/36:.4f}   2/36 = {2/36:.4f}   1/21 = {1/21:.4f}")
+```
+
+Sortie obtenue :
+
+```
+resultats non ordonnes observes : 21
+P((1, 1)) observee = 0.0279
+P((1, 2)) observee = 0.0554
+P((5, 6)) observee = 0.0557
+P((6, 6)) observee = 0.0280
+1/36 = 0.0278   2/36 = 0.0556   1/21 = 0.0476
+```
+
+Les fréquences se groupent autour de $1/36$ pour les doubles et de $2/36$ pour
+les autres ; aucune n'est proche de $1/21$.

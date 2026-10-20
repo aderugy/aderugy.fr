@@ -1,0 +1,36 @@
+---
+kind: qcm
+difficulty: 1
+after: espace
+---
+Lesquels de ces ensembles sont des sous-espaces vectoriels de l'espace
+indiqué ? Justifier.
+
+1. $\{(x, y, z) \in \mathbb{R}^3 : x - 2y + z = 0\}$.
+2. $\{(x, y) \in \mathbb{R}^2 : x \ge 0\}$.
+3. Les polynômes $P \in \mathbb{R}_3[X]$ tels que $P(1) = 0$.
+4. Les fonctions $f : \mathbb{R} \to \mathbb{R}$ telles que $f(0) = 1$.
+5. Les suites réelles bornées.
+6. Les matrices $2 \times 2$ de déterminant nul.
+
+<!-- indice -->
+Trois vérifications : contient-il $0$ ? Est-il stable par somme ? Par produit
+par un réel **négatif** ?
+
+<!-- indice -->
+Pour 6, $\begin{bmatrix} 1 & 0 \\ 0 & 0 \end{bmatrix}$ et
+$\begin{bmatrix} 0 & 0 \\ 0 & 1 \end{bmatrix}$.
+
+<!-- solution -->
+1. **Oui** : c'est le noyau de la forme linéaire $(x, y, z) \mapsto x - 2y + z$.
+   Un noyau est toujours un sous-espace.
+2. **Non** : $(1, 0)$ y est, $-1 \cdot (1, 0)$ non. Stable par somme, pas par
+   multiplication par un réel négatif : c'est un **cône**.
+3. **Oui** : noyau de l'application linéaire $P \mapsto P(1)$.
+4. **Non** : la fonction nulle n'y est pas.
+5. **Oui** : la suite nulle est bornée, et $|u_n + \lambda v_n| \le M + |\lambda| M'$.
+6. **Non** : les deux matrices de l'indice ont un déterminant nul, et leur
+   somme est l'identité, de déterminant $1$.
+
+Les trois « oui » ont la même forme : ce sont des noyaux d'applications
+linéaires. C'est la façon la plus rapide de reconnaître un sous-espace.

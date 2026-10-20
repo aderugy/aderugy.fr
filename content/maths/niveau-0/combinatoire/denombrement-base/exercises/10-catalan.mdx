@@ -1,0 +1,72 @@
+---
+kind: preuve
+difficulty: 5
+after: pascal
+---
+On considère les chemins de $(0, 0)$ à $(2n, 0)$ formés de $2n$ pas
+$(1, +1)$ ou $(1, -1)$ — autrement dit les suites
+$(\varepsilon_1, \dots, \varepsilon_{2n}) \in \{-1, +1\}^{2n}$ de somme nulle.
+Un tel chemin est **mauvais** s'il descend strictement sous l'axe, c'est-à-dire
+si une somme partielle $\varepsilon_1 + \cdots + \varepsilon_j$ vaut $-1$.
+
+1. Combien y a-t-il de chemins de $(0,0)$ à $(2n, 0)$ ?
+2. **Principe de réflexion.** Pour un mauvais chemin, soit $j$ le premier
+   instant où la somme partielle vaut $-1$. On change le signe de tous les pas
+   d'indice $> j$. Montrer que l'on obtient une bijection entre les mauvais
+   chemins et **tous** les chemins de $(0,0)$ à $(2n, -2)$.
+3. En déduire que le nombre de bons chemins (ceux qui restent $\ge 0$) est
+   le nombre de Catalan
+   $$
+   C_n = \binom{2n}{n} - \binom{2n}{n+1} = \frac{1}{n+1}\binom{2n}{n} .
+   $$
+4. Vérifier pour $n = 1, 2, 3$ en dessinant les chemins.
+
+<!-- indice -->
+Un chemin de $(0,0)$ à $(2n, 0)$ a autant de pas montants que descendants.
+Un chemin de $(0,0)$ à $(2n, -2)$ a $n - 1$ pas montants et $n + 1$
+descendants.
+
+<!-- indice -->
+Pour 2, après réflexion, la somme des pas d'indice $> j$ passe de $+1$
+(il fallait remonter de $-1$ à $0$) à $-1$. Pour la réciproque, tout chemin
+qui finit en $-2$ passe forcément par $-1$ : on peut y appliquer la même
+transformation.
+
+<!-- indice -->
+Pour l'égalité finale, écrire $\binom{2n}{n+1} = \frac{n}{n+1}\binom{2n}{n}$.
+
+<!-- solution -->
+1. Un chemin est déterminé par l'ensemble des $n$ instants où il monte :
+   $\binom{2n}{n}$ chemins.
+
+2. Soit $\gamma$ un mauvais chemin, et $j$ le premier instant où
+   $S_j = \varepsilon_1 + \cdots + \varepsilon_j = -1$. Les pas d'indice
+   $> j$ ont pour somme $0 - (-1) = +1$ ; après changement de signe, leur
+   somme vaut $-1$, et le nouveau chemin $\gamma'$ finit en $-1 - 1 = -2$.
+
+   Réciproquement, soit $\delta$ un chemin de $(0, 0)$ à $(2n, -2)$. Ses
+   sommes partielles partent de $0$, varient de $\pm 1$ à chaque pas et
+   finissent en $-2$ : elles passent par $-1$ (valeurs intermédiaires pour
+   une suite à pas $\pm 1$). Soit $j$ le premier instant où elles valent $-1$ ;
+   changer le signe des pas d'indice $> j$ donne un chemin qui finit en $0$ et
+   passe par $-1$ à l'instant $j$ : un mauvais chemin.
+
+   Les deux transformations ne modifient pas les $j$ premiers pas, donc pas
+   l'instant $j$ du premier passage en $-1$ ; elles sont réciproques l'une de
+   l'autre. C'est une bijection.
+
+3. Un chemin vers $(2n, -2)$ a $n - 1$ pas montants parmi $2n$ :
+   $\binom{2n}{n-1} = \binom{2n}{n+1}$ chemins, donc autant de mauvais chemins.
+   Les bons sont
+   $$
+   \binom{2n}{n} - \binom{2n}{n+1}
+   = \binom{2n}{n}\left(1 - \frac{n}{n+1}\right) = \frac{1}{n+1}\binom{2n}{n} ,
+   $$
+   en utilisant $\binom{2n}{n+1} = \frac{(2n)!}{(n+1)!\,(n-1)!} = \frac{n}{n+1}\binom{2n}{n}$.
+
+4. $C_1 = 1$ (monter, descendre), $C_2 = 2$ ($\nearrow\nearrow\searrow\searrow$
+   et $\nearrow\searrow\nearrow\searrow$), $C_3 = 5$.
+
+Le principe de réflexion reviendra tel quel pour la marche aléatoire simple
+et, en temps continu, pour le mouvement brownien : la loi du maximum se
+calcule par la même symétrie.

@@ -1,0 +1,59 @@
+---
+title: Le problème — une équation qu'on ne sait pas résoudre
+minutes: 6
+rubrique: [position, probleme]
+checkpoint:
+- type: vrai-faux
+  question: 'Si $f(0) < 0 < f(1)$, alors l''équation $f(x) = 0$ a une solution dans $[0, 1]$, quelle que soit la fonction $f$.'
+  reponse: false
+  explication: 'Faux sans hypothèse sur $f$ : la fonction qui vaut $-1$ sur $[0, 1/2[$ et $1$ sur $[1/2, 1]$ change de signe sans jamais s''annuler. C''est la continuité qui interdit ce saut, et tout le nœud sert à le démontrer.'
+- type: qcm
+  question: 'Pourquoi la médiane d''une loi continue se calcule-t-elle par dichotomie ?'
+  choix:
+  - 'Parce que la fonction de répartition $F$ est dérivable.'
+  - 'Parce que $F$ est continue et croissante, donc $F(x) = 1/2$ a une solution qu''on encadre de plus en plus finement.'
+  - 'Parce que $F$ admet une expression explicite.'
+  reponse: 1
+  explication: 'La dichotomie n''utilise ni dérivée ni formule : seulement le changement de signe de $F - 1/2$ aux bornes d''un intervalle, puis le théorème des valeurs intermédiaires pour garantir qu''une solution est dans la moitié retenue.'
+---
+
+### Position dans le graphe
+
+Ce nœud prolonge [les suites réelles](/maths/n/suites-reelles) aux fonctions :
+toute limite de fonction s'y ramène à des limites de suites. Il ouvre la
+[dérivation](/maths/n/derivation-taylor), qui est une limite de taux
+d'accroissement, et prépare les fonctions de répartition du niveau 1, dont la
+continuité à droite et les sauts encodent toute la loi d'une variable
+aléatoire.
+
+### Le problème
+
+Soit $X$ une variable aléatoire de fonction de répartition
+$F(t) = \mathbb{P}(X \le t)$. Sa **médiane** est un réel $m$ tel que
+$F(m) = 1/2$. Pour la loi normale centrée réduite, $F$ n'a pas d'expression
+avec des fonctions usuelles ; l'équation $F(m) = 1/2$ ne se résout pas par un
+calcul. Pour un quantile à $97{,}5\,\%$ — celui des intervalles de confiance —,
+pas davantage.
+
+La méthode qu'utilise n'importe quelle bibliothèque est la **dichotomie** : on
+part de $a$ et $b$ avec $F(a) < 1/2 < F(b)$, on regarde le milieu, on garde la
+moitié où le changement de signe a lieu, et on recommence. Après $n$ étapes,
+la solution est encadrée à $(b - a)/2^n$ près. Mais l'argument contient un
+trou : **pourquoi y a-t-il une solution dans la moitié retenue ?** Il en faut
+une à chaque étape, sinon on encadre du vide.
+
+La réponse est le théorème des valeurs intermédiaires, et il est faux sans
+hypothèse : une fonction qui saute de $-1$ à $1$ change de signe sans
+s'annuler. Il faut donc une notion qui interdise les sauts — la continuité —,
+et pour la définir, une notion de limite pour les fonctions. C'est le
+programme du nœud.
+
+### Le plan
+
+Les capsules suivantes définissent la limite d'une fonction en un point, la
+relient aux suites (caractérisation séquentielle), définissent la continuité,
+puis démontrent les deux théorèmes fondamentaux sur un segment : valeurs
+intermédiaires et bornes atteintes. Elles terminent par la continuité
+uniforme et par les fonctions monotones, dont les discontinuités sont des
+sauts et sont au plus dénombrables — le cas exact des fonctions de
+répartition.

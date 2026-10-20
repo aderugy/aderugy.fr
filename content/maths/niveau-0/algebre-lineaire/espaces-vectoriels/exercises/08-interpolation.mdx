@@ -1,0 +1,48 @@
+---
+kind: preuve
+difficulty: 3
+after: matrices
+---
+Soient $x_0, \dots, x_d$ des réels deux à deux distincts, et
+$\varphi : \mathbb{R}_d[X] \to \mathbb{R}^{d+1}$,
+$P \mapsto \big(P(x_0), \dots, P(x_d)\big)$.
+
+1. Montrer que $\varphi$ est linéaire et injective. On admet qu'un polynôme non
+   nul de degré au plus $d$ a au plus $d$ racines.
+2. En déduire que $\varphi$ est un isomorphisme : pour toutes valeurs
+   $y_0, \dots, y_d$, il existe un unique $P \in \mathbb{R}_d[X]$ tel que
+   $P(x_i) = y_i$.
+3. Écrire la matrice de $\varphi$ dans la base $(1, X, \dots, X^d)$ et la base
+   canonique. Que conclut-on sur cette matrice ?
+4. Construire explicitement $P$ à l'aide des polynômes
+   $L_i = \prod_{j \ne i} \frac{X - x_j}{x_i - x_j}$.
+
+<!-- indice -->
+1 : si $\varphi(P) = 0$, $P$ a $d + 1$ racines distinctes.
+
+<!-- indice -->
+2 : $\dim \mathbb{R}_d[X] = d + 1 = \dim \mathbb{R}^{d+1}$, et une application
+linéaire injective entre espaces de même dimension finie est bijective.
+
+<!-- solution -->
+1. $\varphi(P + \lambda Q) = \big(P(x_i) + \lambda Q(x_i)\big)_i$ : linéaire. Si
+   $\varphi(P) = 0$, $P$ s'annule en $d + 1$ points distincts ; s'il était non
+   nul, il aurait au plus $d$ racines. Donc $P = 0$ : $\ker\varphi = \{0\}$.
+2. Par le théorème du rang, $\operatorname{rg}\varphi = d + 1 - 0 = \dim\mathbb{R}^{d+1}$ :
+   $\varphi$ est surjective, donc bijective. L'existence et l'unicité du
+   polynôme d'interpolation sont exactement la surjectivité et l'injectivité.
+3. La colonne $j$ contient $\varphi(X^j) = (x_0^j, \dots, x_d^j)$ :
+   $$
+   \mathbf{V} = \begin{bmatrix}
+   1 & x_0 & \cdots & x_0^d \\
+   \vdots & & & \vdots \\
+   1 & x_d & \cdots & x_d^d
+   \end{bmatrix},
+   $$
+   la **matrice de Vandermonde**. Elle est inversible, sans aucun calcul de
+   déterminant.
+4. $L_i(x_k)$ vaut $1$ si $k = i$ et $0$ sinon : un facteur s'annule dès que
+   $k \ne i$. Donc $P = \sum_i y_i L_i$ convient, et c'est l'unique solution.
+   Les $(L_i)$ sont l'image réciproque par $\varphi$ de la base canonique :
+   c'est une autre base de $\mathbb{R}_d[X]$, celle où les coordonnées d'un
+   polynôme sont ses valeurs aux points $x_i$.

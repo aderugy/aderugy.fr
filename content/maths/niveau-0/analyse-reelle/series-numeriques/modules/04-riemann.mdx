@@ -1,0 +1,99 @@
+---
+title: Séries de Riemann, par condensation
+minutes: 9
+rubrique: [construction, demonstrations, simulation]
+checkpoint:
+- type: qcm
+  question: 'Pour quelles valeurs de $\alpha$ la série $\sum 1/n^{\alpha}$ converge-t-elle ?'
+  choix:
+  - '$\alpha \ge 1$'
+  - '$\alpha > 1$'
+  - '$\alpha > 0$'
+  reponse: 1
+  explication: 'Convergence si et seulement si $\alpha > 1$. Le cas limite $\alpha = 1$ est la série harmonique, qui diverge ; pour $0 < \alpha \le 1$, les termes tendent vers $0$ et la série diverge quand même.'
+- type: nombre
+  question: 'Le reste $\sum_{n > N} 1/n^2$ est de l''ordre de $1/N$. Combien de termes faut-il, à peu près, pour approcher $\pi^2/6$ à $10^{-6}$ près par une somme partielle ?'
+  reponse: 1000000
+  tolerance: 100000
+  explication: 'Il faut $1/N \approx 10^{-6}$, soit environ un million de termes. Chaque chiffre décimal supplémentaire coûte dix fois plus de termes : c''est une convergence lente, comme celle de la moyenne empirique en $1/\sqrt n$, en un peu mieux.'
+- type: vrai-faux
+  question: '$\sum \frac{1}{n \ln n}$ (pour $n \ge 2$) converge, car $\frac{1}{n \ln n} \le \frac1n$ et le terme décroît plus vite que celui de la série harmonique.'
+  reponse: false
+  explication: 'Faux : majorer par une série **divergente** ne prouve rien. Par condensation, $2^k \cdot \frac{1}{2^k \ln 2^k} = \frac{1}{k \ln 2}$, terme d''une série harmonique : $\sum \frac{1}{n \ln n}$ diverge.'
+---
+
+### Le critère de condensation
+
+> **Théorème (Cauchy).** Soit $(u_n)_{n \ge 1}$ une suite **positive et
+> décroissante**. Alors $\sum u_n$ et $\sum 2^k u_{2^k}$ sont de même nature.
+
+*Démonstration.* On reprend les paquets d'Oresme. Pour $k \ge 0$, le paquet
+$P_k = \{2^k, \dots, 2^{k+1} - 1\}$ a $2^k$ éléments ; par décroissance, chaque
+terme $u_n$ avec $n \in P_k$ vérifie $u_{2^{k+1}} \le u_n \le u_{2^k}$. Donc
+
+$$
+2^k u_{2^{k+1}} \ \le\ \sum_{n \in P_k} u_n \ \le\ 2^k u_{2^k} .
+$$
+
+En sommant sur $k = 0, \dots, K$, les paquets recouvrent exactement
+$\{1, \dots, 2^{K+1} - 1\}$ :
+
+$$
+\frac12 \sum_{k=1}^{K+1} 2^{k} u_{2^{k}} \ \le\ \sum_{n=1}^{2^{K+1}-1} u_n \ \le\ \sum_{k=0}^{K} 2^k u_{2^k} .
+$$
+
+Si $\sum 2^k u_{2^k}$ converge, l'inégalité de droite majore les sommes
+partielles de $\sum u_n$ (qui sont croissantes : il suffit de les majorer sur
+la sous-suite d'indices $2^{K+1} - 1$). Si $\sum u_n$ converge, celle de gauche
+majore les sommes partielles de $\sum 2^k u_{2^k}$. $\square$
+
+La décroissance est indispensable : c'est elle qui encadre chaque paquet par
+ses termes extrêmes.
+
+### Les séries de Riemann
+
+> **Corollaire.** $\sum_{n \ge 1} \dfrac{1}{n^{\alpha}}$ converge si et seulement
+> si $\alpha > 1$.
+
+*Démonstration.* Si $\alpha \le 0$, le terme ne tend pas vers $0$. Si
+$\alpha > 0$, la suite $1/n^\alpha$ est positive et décroissante, et
+$2^k \cdot \frac{1}{(2^k)^\alpha} = \big(2^{1-\alpha}\big)^k$ : c'est une série
+géométrique de raison $2^{1 - \alpha}$, convergente si et seulement si
+$2^{1-\alpha} < 1$, soit $\alpha > 1$. $\square$
+
+Ce sont les séries de référence pour les comparaisons « polynomiales »,
+comme la série géométrique l'est pour les comparaisons « exponentielles ». Le
+même critère tranche les cas logarithmiques : $\sum \frac{1}{n \ln n}$ diverge,
+$\sum \frac{1}{n (\ln n)^2}$ converge.
+
+### Vérification numérique : convergence lente
+
+```python
+from math import pi
+
+cible = pi**2 / 6
+s, n = 0.0, 0
+for N in (10, 100, 1000, 10**4, 10**5, 10**6):
+    while n < N:
+        n += 1
+        s += 1 / n**2
+    print(f"N={N:>8}  S_N={s:.10f}  reste={cible - s:.3e}  N*reste={N * (cible - s):.4f}")
+```
+
+Sortie obtenue :
+
+```
+N=      10  S_N=1.5497677312  reste=9.517e-02  N*reste=0.9517
+N=     100  S_N=1.6349839002  reste=9.950e-03  N*reste=0.9950
+N=    1000  S_N=1.6439345667  reste=9.995e-04  N*reste=0.9995
+N=   10000  S_N=1.6448340718  reste=1.000e-04  N*reste=1.0000
+N=  100000  S_N=1.6449240669  reste=1.000e-05  N*reste=1.0000
+N= 1000000  S_N=1.6449330668  reste=1.000e-06  N*reste=1.0000
+```
+
+La dernière colonne se stabilise vers $1$ : le reste se comporte comme $1/N$.
+On peut le prévoir par condensation, ou en comparant la série à une intégrale
+([intégration de Riemann](/maths/n/integration-riemann)) :
+$\sum_{n > N} \frac{1}{n^2} \approx \int_N^\infty \frac{\mathrm{d}x}{x^2} = \frac1N$.
+Savoir qu'une série converge ne dit rien de la vitesse — on l'avait vu pour les
+suites, et pour la même raison.

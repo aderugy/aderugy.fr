@@ -1,0 +1,98 @@
+---
+title: La dimension est bien définie — le lemme d'échange
+minutes: 10
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: nombre
+  question: 'Quelle est la dimension de l''espace des matrices $3 \times 3$ réelles **symétriques** ?'
+  reponse: 6
+  explication: 'Une matrice symétrique est déterminée par sa diagonale ($3$ coefficients) et par sa partie strictement au-dessus ($3$ coefficients) : $\frac{3 \times 4}{2} = 6$. Une base est formée des $E_{ii}$ et des $E_{ij} + E_{ji}$ pour $i < j$.'
+- type: qcm
+  question: 'Dans $\mathbb{R}^4$, on a une famille libre de $4$ vecteurs. Que peut-on en conclure ?'
+  choix:
+  - 'Rien de plus : il faut encore vérifier qu''elle est génératrice.'
+  - 'C''est une base : en dimension $n$, une famille libre de $n$ vecteurs est automatiquement génératrice.'
+  - 'Elle est liée, car $4$ vecteurs en dimension $4$ le sont toujours.'
+  reponse: 1
+  explication: 'Si elle n''était pas génératrice, on pourrait la compléter en une base à au moins $5$ éléments, contre $\dim = 4$. En dimension connue, il suffit donc de vérifier **une** des deux propriétés, avec le bon nombre de vecteurs.'
+- type: vrai-faux
+  question: 'L''espace des polynômes réels $\mathbb{R}[X]$ (de degré quelconque) est de dimension finie.'
+  reponse: false
+  explication: 'Faux : pour tout $d$, la famille $(1, X, \dots, X^d)$ est libre, donc toute famille génératrice finie aurait au moins $d + 1$ éléments, pour tout $d$ — impossible. $\mathbb{R}[X]$ est de dimension infinie.'
+---
+
+### Le lemme d'échange
+
+On dit que $E$ est de **dimension finie** s'il admet une famille génératrice
+finie. Tout repose sur un lemme de comptage.
+
+> **Lemme (Steinitz).** Si $E$ est engendré par $m$ vecteurs, toute famille
+> libre de $E$ a au plus $m$ éléments.
+
+*Démonstration.* Soient $(g_1, \dots, g_m)$ génératrice et
+$(\ell_1, \dots, \ell_p)$ libre. On montre par récurrence sur
+$k = 0, \dots, p$ la propriété $(\mathcal{P}_k)$ : $k \le m$ et, quitte à
+renuméroter les $g_i$, la famille $(\ell_1, \dots, \ell_k, g_{k+1}, \dots, g_m)$
+est génératrice.
+
+Pour $k = 0$ c'est l'hypothèse. Supposons-la vraie pour $k < p$. Comme la
+famille est génératrice, on peut écrire
+$$
+\ell_{k+1} = \alpha_1 \ell_1 + \cdots + \alpha_k \ell_k + \beta_{k+1} g_{k+1} + \cdots + \beta_m g_m .
+$$
+Si tous les $\beta_j$ étaient nuls (en particulier si $k = m$, où il n'y a
+aucun $g_j$), $\ell_{k+1}$ serait combinaison de $\ell_1, \dots, \ell_k$, ce
+qui contredit la liberté. Donc $k < m$, et un $\beta_j$ est non nul ;
+renumérotons pour que ce soit $\beta_{k+1}$. On peut alors isoler
+$$
+g_{k+1} = \frac{1}{\beta_{k+1}}\Big(\ell_{k+1} - \sum_{i \le k} \alpha_i \ell_i - \sum_{j > k+1} \beta_j g_j\Big) ,
+$$
+qui est dans $\operatorname{Vect}(\ell_1, \dots, \ell_{k+1}, g_{k+2}, \dots, g_m)$.
+Ce sous-espace contient donc tous les vecteurs de l'ancienne famille
+génératrice : il vaut $E$, et la nouvelle famille est génératrice.
+
+Et l'on a vu que $k < m$, donc $k + 1 \le m$ : $(\mathcal{P}_{k+1})$ est
+établie. Au rang $k = p$, on obtient $p \le m$. $\square$
+
+L'idée est de **remplacer un à un** les générateurs par les vecteurs libres,
+en gardant à chaque étape une famille génératrice ; la liberté garantit qu'on
+a toujours un générateur à évincer.
+
+### Conséquences
+
+> **Théorème.** Si $E$ est de dimension finie, il admet des bases, et toutes
+> ont le même nombre d'éléments, appelé **dimension** de $E$ et noté $\dim E$.
+
+*Existence.* Partons d'une famille génératrice finie et retirons tant qu'il y
+en a un vecteur combinaison des autres : on reste générateur, et quand on
+s'arrête, la famille est libre. *Égalité des cardinaux.* Si $\mathcal{B}$ et
+$\mathcal{B}'$ sont deux bases, $\mathcal{B}$ libre et $\mathcal{B}'$
+génératrice donnent $|\mathcal{B}| \le |\mathcal{B}'|$ par le lemme, et
+inversement. $\square$
+
+On en tire, pour $\dim E = n$ :
+
+- une famille libre a au plus $n$ éléments, une famille génératrice au moins $n$ ;
+- **théorème de la base incomplète** : toute famille libre se complète en une
+  base (tant qu'elle n'est pas génératrice, un vecteur hors de son $\operatorname{Vect}$
+  peut lui être ajouté sans la rendre liée, et le lemme borne le nombre
+  d'ajouts) ;
+- une famille de $n$ vecteurs est une base dès qu'elle est libre, **ou** dès
+  qu'elle est génératrice ;
+- un sous-espace $F$ vérifie $\dim F \le \dim E$, avec égalité si et
+  seulement si $F = E$.
+
+Exemples : $\dim \mathbb{R}^n = n$, $\dim \mathbb{R}_d[X] = d + 1$,
+$\dim \mathcal{M}_{n,p}(\mathbb{R}) = np$.
+
+### Piège : l'hypothèse « dimension finie »
+
+L'espace des polynômes $\mathbb{R}[X]$, celui des suites réelles, celui des
+fonctions continues sur $[0, 1]$ n'ont aucune famille génératrice finie. Le
+lemme d'échange y reste vrai mais ne dit plus rien, et les énoncés comme
+« libre à $n$ éléments implique base » perdent leur sens : une famille libre
+infinie peut ne pas être génératrice — $(X^{2k})_{k \ge 0}$ dans $\mathbb{R}[X]$
+—, et un sous-espace strict peut être « aussi gros » que l'espace entier — les
+polynômes pairs. C'est dans ces espaces de dimension infinie que vivront les
+variables aléatoires de [$L^2$](/maths/n/projection-l2), où il faudra remplacer
+les bases finies par d'autres outils.

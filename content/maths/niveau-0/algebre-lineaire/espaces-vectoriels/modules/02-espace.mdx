@@ -1,0 +1,91 @@
+---
+title: Espaces vectoriels et sous-espaces
+minutes: 8
+rubrique: [construction, intuition, pieges]
+checkpoint:
+- type: qcm
+  question: 'Lequel de ces ensembles est un sous-espace vectoriel de $\mathbb{R}^2$ ?'
+  choix:
+  - '$\{(x, y) : x + y = 1\}$'
+  - '$\{(x, y) : y = 3x\}$'
+  - '$\{(x, y) : xy = 0\}$'
+  reponse: 1
+  explication: 'La droite $y = 3x$ passe par $0$ et est stable par somme et produit par un réel. La première ne contient pas $0$ (c''est une droite affine). La troisième est la réunion des deux axes : $(1,0) + (0,1) = (1,1)$ n''y est pas.'
+- type: vrai-faux
+  question: 'La réunion de deux sous-espaces vectoriels est un sous-espace vectoriel.'
+  reponse: false
+  explication: 'Faux en général : la réunion des deux axes de $\mathbb{R}^2$ n''est pas stable par addition. Elle l''est seulement si l''un des sous-espaces contient l''autre. L''intersection, elle, est toujours un sous-espace.'
+- type: vrai-faux
+  question: 'L''ensemble des suites réelles convergentes est un sous-espace vectoriel de l''espace de toutes les suites réelles.'
+  reponse: true
+  explication: 'Vrai : la suite nulle converge, et une somme ou un multiple de suites convergentes converge (opérations sur les limites). En revanche les suites convergeant vers $1$ ne forment pas un sous-espace : la somme de deux d''entre elles tend vers $2$.'
+---
+
+### Définition
+
+Un **espace vectoriel réel** est un ensemble $E$ muni d'une addition
+$E \times E \to E$ et d'une multiplication par les réels
+$\mathbb{R} \times E \to E$ telles que :
+
+- $(E, +)$ est un groupe commutatif : associativité, commutativité, un
+  élément neutre $0_E$, un opposé $-u$ pour tout $u$ ;
+- pour tous $\lambda, \mu \in \mathbb{R}$ et $u, v \in E$ :
+  $\lambda(u + v) = \lambda u + \lambda v$,
+  $(\lambda + \mu)u = \lambda u + \mu u$, $\lambda(\mu u) = (\lambda\mu)u$ et
+  $1 \cdot u = u$.
+
+Les éléments de $E$ s'appellent des **vecteurs**, ceux de $\mathbb{R}$ des
+**scalaires**. On remplace $\mathbb{R}$ par $\mathbb{C}$ pour un espace
+vectoriel complexe ; tout ce nœud vaut mot pour mot sur un corps quelconque.
+
+### Les exemples qui serviront
+
+- $\mathbb{R}^n$, avec les opérations coordonnée par coordonnée. Ses vecteurs
+  s'écrivent en colonne, comme le fixent les conventions de notation du
+  corpus.
+- Les fonctions de $X$ dans $\mathbb{R}$, pour un ensemble $X$ quelconque, avec
+  $(f + g)(x) = f(x) + g(x)$ et $(\lambda f)(x) = \lambda f(x)$. Quand $X$ est
+  un univers $\Omega$, ce sont les variables aléatoires.
+- Les suites réelles : c'est le cas $X = \mathbb{N}$.
+- $\mathbb{R}_d[X]$, les polynômes de degré au plus $d$.
+- Les matrices $n \times p$ réelles, $\mathcal{M}_{n,p}(\mathbb{R})$.
+
+### Sous-espaces
+
+Une partie $F \subseteq E$ est un **sous-espace vectoriel** si elle contient
+$0_E$ et est stable par combinaison linéaire : $u, v \in F$ et
+$\lambda \in \mathbb{R}$ entraînent $u + \lambda v \in F$. Muni des opérations
+de $E$, c'est alors un espace vectoriel — les axiomes, vrais dans $E$, le
+restent dans $F$.
+
+C'est presque toujours ainsi qu'on démontre qu'un ensemble est un espace
+vectoriel : on le plonge dans un espace connu et on vérifie les deux
+conditions. Les polynômes de degré $\le d$ sont un sous-espace des fonctions ;
+les suites convergentes, un sous-espace des suites ; les solutions de
+$y'' + y = 0$, un sous-espace des fonctions deux fois dérivables.
+
+### Intuition : des plans qui passent par l'origine
+
+Dans $\mathbb{R}^3$, les sous-espaces sont exactement $\{0\}$, les droites
+passant par l'origine, les plans passant par l'origine et $\mathbb{R}^3$
+lui-même — on le démontrera avec la dimension. « Passer par l'origine » est
+l'image de « contenir $0_E$ », et « être plat » celle de la stabilité par
+combinaison linéaire.
+
+### Piège : contenir zéro n'est pas une formalité
+
+La droite $\{(x, y) : x + y = 1\}$ n'est stable ni par addition — la somme de
+$(1, 0)$ et $(0, 1)$ est $(1, 1)$, hors de la droite — ni par multiplication
+par un réel, et elle ne contient pas $0$.
+C'est un sous-espace **affine** — un sous-espace vectoriel translaté — et les
+solutions d'un système linéaire avec second membre non nul en sont un
+(capsule 8).
+
+### Piège : la réunion
+
+Si $F$ et $G$ sont des sous-espaces, $F \cap G$ en est un (vérification
+directe), mais $F \cup G$ n'en est un que si $F \subseteq G$ ou
+$G \subseteq F$. En effet, si $u \in F \setminus G$ et $v \in G \setminus F$,
+alors $u + v \notin F$ — sinon $v = (u + v) - u \in F$ — et de même
+$u + v \notin G$. Le plus petit sous-espace contenant $F$ et $G$ est la
+**somme** $F + G = \{u + v : u \in F, v \in G\}$.

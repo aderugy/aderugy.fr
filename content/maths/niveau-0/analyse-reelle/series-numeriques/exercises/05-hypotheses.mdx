@@ -1,0 +1,30 @@
+---
+kind: contre-exemple
+difficulty: 2
+after: absolue
+---
+Pour chaque énoncé faux, donner un contre-exemple et dire quelle hypothèse
+manque pour le rendre vrai.
+
+1. Si $u_n \to 0$ et les $u_n$ alternent de signe, alors $\sum u_n$ converge.
+2. Si $u_n \sim v_n$ et $\sum v_n$ converge, alors $\sum u_n$ converge.
+3. Si $\sum |u_n|$ diverge, alors $\sum u_n$ diverge.
+
+<!-- indice -->
+Pour 1, faire alterner $\frac1n$ et $\frac1{n^2}$. Pour 2, ajouter à un terme
+alterné convergent une petite perturbation positive.
+
+<!-- indice -->
+Pour 3, une série semi-convergente suffit.
+
+<!-- solution -->
+1. **Faux** : $u_n = \frac{(-1)^n}{n}$ si $n$ est pair, $\frac{(-1)^n}{n^2}$ si
+   $n$ est impair. Les sommes partielles d'indice pair contiennent
+   $\sum_{k \le N} \frac{1}{2k} \to +\infty$ moins une série convergente :
+   divergence. Hypothèse manquante : $(|u_n|)$ **décroissante** (critère des
+   séries alternées).
+2. **Faux** : $v_n = \frac{(-1)^n}{\sqrt n}$ et
+   $u_n = \frac{(-1)^n}{\sqrt n} + \frac1n$. Hypothèse manquante : $v_n$ de
+   **signe constant** à partir d'un rang.
+3. **Faux** : $u_n = \frac{(-1)^n}{n}$. La réciproque vraie est : si
+   $\sum |u_n|$ converge, $\sum u_n$ converge.

@@ -1,0 +1,60 @@
+---
+kind: calcul
+difficulty: 2
+after: graines
+---
+La fonction suivante estime $\mathbb{P}(X + Y > 1{,}5)$ pour $X, Y$ uniformes
+indépendantes sur $[0, 1]$ :
+
+```text
+def estime(N):
+    np.random.seed(0)
+    x = np.random.random(N)
+    y = np.random.random(N)
+    return np.mean(x + y > 1.5)
+```
+
+1. Pourquoi deux appels `estime(1000)` donnent-ils exactement le même nombre ?
+   Pourquoi est-ce un défaut, et non une qualité, si l'on veut mesurer la
+   variabilité de l'estimateur ?
+2. Réécrire la fonction avec un générateur passé en argument, et l'appeler sur
+   $5$ flux indépendants.
+3. Calculer la valeur exacte et comparer.
+
+<!-- indice -->
+Graine fixée **dans** la fonction : chaque appel repart du même état.
+
+<!-- indice -->
+La valeur exacte est l'aire du triangle $\{x + y > 1{,}5\}$ dans le carré unité.
+
+<!-- solution -->
+1. La graine est remise à $0$ à chaque appel : la fonction tire toujours les
+   mêmes $2N$ nombres. On ne peut plus obtenir deux réalisations
+   indépendantes de l'estimateur, ni donc estimer sa dispersion. Et la
+   fonction modifie l'état global, ce qui perturbe tout autre code qui
+   l'utilise.
+2.
+
+```python
+import numpy as np
+
+def estime(rng, N):
+    x, y = rng.random(N), rng.random(N)
+    return np.mean(x + y > 1.5)
+
+flux = [np.random.default_rng(s) for s in np.random.SeedSequence(0).spawn(5)]
+print([round(float(estime(rng, 1000)), 3) for rng in flux])
+print("exact :", 0.5 * 0.5**2)
+```
+
+Sortie :
+
+```
+[0.144, 0.13, 0.139, 0.116, 0.134]
+exact : 0.125
+```
+
+3. Le triangle a pour sommets $(0{,}5 ; 1)$, $(1 ; 0{,}5)$, $(1 ; 1)$ :
+   aire $\frac12 \cdot 0{,}5^2 = 0{,}125$. Les cinq estimations fluctuent
+   autour, avec un écart-type de l'ordre de
+   $\sqrt{0{,}125 \cdot 0{,}875 / 1000} \approx 0{,}010$.

@@ -1,0 +1,79 @@
+---
+title: Le binôme de Newton
+minutes: 8
+rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: nombre
+  question: Quel est le coefficient de $x^3$ dans le développement de $(2 + x)^5$ ?
+  reponse: 40
+  explication: 'Le terme en $x^3$ est $\binom{5}{3} x^3 \, 2^{2} = 10 \times 4 \, x^3 = 40\,x^3$. L''oubli typique est la puissance de $2$ : répondre $10$, c''est développer $(1 + x)^5$.'
+- type: qcm
+  question: 'Que vaut $\displaystyle\sum_{k=0}^{n} (-1)^k \binom{n}{k}$ pour $n \ge 1$ ?'
+  choix:
+  - $0$
+  - $2^n$
+  - $(-1)^n$
+  reponse: 0
+  explication: 'C''est le binôme avec $a = -1$, $b = 1$ : $(1 - 1)^n = 0$ pour $n \ge 1$. Combinatoirement, une partie de taille paire et une de taille impaire se répondent en ajoutant ou retirant un élément fixé : il y en a autant de chaque sorte. Pour $n = 0$ la somme vaut $1$.'
+- type: vrai-faux
+  question: 'La formule $(a + b)^n = \sum_k \binom{n}{k} a^k b^{n-k}$ reste vraie pour deux matrices carrées $A$ et $B$ quelconques.'
+  reponse: false
+  explication: 'Faux : la démonstration utilise $ab = ba$ pour regrouper les mots qui ont le même nombre de $a$. Pour des matrices qui ne commutent pas, $(A + B)^2 = A^2 + AB + BA + B^2 \ne A^2 + 2AB + B^2$.'
+---
+
+### L'énoncé
+
+> **Binôme de Newton.** Pour tous nombres réels (ou complexes) $a, b$ et tout
+> entier $n \ge 0$,
+> $$
+> (a + b)^n = \sum_{k=0}^{n} \binom{n}{k} a^k b^{n-k} .
+> $$
+
+C'est de là que les $\binom{n}{k}$ tirent leur nom de **coefficients
+binomiaux**.
+
+### Démonstration combinatoire
+
+Développer $(a + b)^n = (a + b)(a + b)\cdots(a + b)$ sans rien regrouper, c'est
+choisir dans chacun des $n$ facteurs soit $a$ soit $b$, et faire le produit :
+on obtient la somme des $2^n$ mots de longueur $n$ sur l'alphabet $\{a, b\}$.
+Un mot qui contient $k$ fois la lettre $a$ vaut $a^k b^{n-k}$, **parce que $a$
+et $b$ commutent**. Un tel mot est déterminé par l'ensemble des positions où
+figure $a$, qui est une partie à $k$ éléments de $\{1, \dots, n\}$ : il y en a
+$\binom{n}{k}$. En regroupant les mots selon $k$, on obtient la formule. $\square$
+
+Une démonstration par récurrence sur $n$ existe, et utilise la formule de
+Pascal pour passer de $n$ à $n + 1$ ; elle est l'exercice 6 du nœud. Les deux
+preuves utilisent la commutativité : la première en regroupant les mots, la
+seconde en écrivant $a \cdot a^k b^{n-k} = a^{k+1} b^{n-k}$ après avoir
+multiplié à gauche.
+
+### Trois conséquences immédiates
+
+- $a = b = 1$ : $\sum_k \binom{n}{k} = 2^n$. On retrouve le cardinal de
+  $\mathcal{P}(E)$, découpé selon la taille des parties.
+- $a = -1, b = 1$ : $\sum_k (-1)^k \binom{n}{k} = 0$ pour $n \ge 1$. Il y a
+  autant de parties de taille paire que de taille impaire. C'est le cœur de la
+  démonstration du principe d'inclusion-exclusion.
+- $a = p, b = 1 - p$ avec $p \in [0, 1]$ :
+  $\sum_k \binom{n}{k} p^k (1-p)^{n-k} = 1$. Ce sont les probabilités de la
+  loi binomiale $\mathrm{Bin}(n, p)$, qui somment bien à $1$.
+
+### Piège : la commutativité est une hypothèse
+
+Pour deux matrices carrées $\mathbf{A}$ et $\mathbf{B}$,
+
+$$
+(\mathbf{A} + \mathbf{B})^2 = \mathbf{A}^2 + \mathbf{A}\mathbf{B} + \mathbf{B}\mathbf{A} + \mathbf{B}^2 ,
+$$
+
+et ce n'est $\mathbf{A}^2 + 2\mathbf{A}\mathbf{B} + \mathbf{B}^2$ que si
+$\mathbf{A}\mathbf{B} = \mathbf{B}\mathbf{A}$. Avec
+$\mathbf{A} = \begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}$ et
+$\mathbf{B} = \begin{bmatrix} 0 & 0 \\ 1 & 0 \end{bmatrix}$, on a
+$\mathbf{A}^2 = \mathbf{B}^2 = 0$ et $\mathbf{A}\mathbf{B} \ne \mathbf{B}\mathbf{A}$ :
+$(\mathbf{A}+\mathbf{B})^2 = \mathbf{I}$, alors que la formule du binôme
+donnerait $2\mathbf{A}\mathbf{B} = \begin{bmatrix} 2 & 0 \\ 0 & 0 \end{bmatrix}$.
+Retirer la commutativité fait tomber le théorème. Le cas où il reste vrai —
+$\mathbf{A}$ et $\mathbf{B}$ commutent — sert à calculer l'exponentielle d'une
+matrice, en [réduction](/maths/n/diagonalisation).

@@ -1,0 +1,113 @@
+---
+title: Systèmes linéaires et colonnes redondantes
+minutes: 9
+rubrique: [construction, demonstrations, simulation, pieges]
+checkpoint:
+- type: qcm
+  question: 'Le système $\mathbf{A}\mathbf{x} = \mathbf{b}$, avec $\mathbf{A}$ de taille $5 \times 8$ et de rang $5$, a :'
+  choix:
+  - 'au plus une solution ;'
+  - 'une infinité de solutions, formant un sous-espace affine de dimension $3$ ;'
+  - 'aucune solution en général.'
+  reponse: 1
+  explication: 'Rang $5 = $ nombre de lignes : l''application est surjective, donc une solution existe pour tout $\mathbf{b}$. L''ensemble des solutions est $\mathbf{x}_0 + \ker \mathbf{A}$, et $\dim \ker \mathbf{A} = 8 - 5 = 3$.'
+- type: vrai-faux
+  question: 'Si les colonnes de la matrice de régression $\mathbf{X}$ sont liées, deux vecteurs de coefficients différents peuvent donner exactement les mêmes prédictions $\mathbf{X}\boldsymbol\beta$.'
+  reponse: true
+  explication: 'Vrai : si $\mathbf{X}\mathbf{v} = 0$ avec $\mathbf{v} \ne 0$, alors $\mathbf{X}(\boldsymbol\beta + t\mathbf{v}) = \mathbf{X}\boldsymbol\beta$ pour tout $t$. Les coefficients ne sont pas identifiables ; seules les prédictions le sont.'
+---
+
+### Structure des solutions
+
+Soit $\mathbf{A} \in \mathcal{M}_{n,p}(\mathbb{R})$ et $\mathbf{b} \in \mathbb{R}^n$.
+
+> **Proposition.** Le système $\mathbf{A}\mathbf{x} = \mathbf{b}$ a une solution
+> si et seulement si $\mathbf{b} \in \operatorname{Im}\mathbf{A}$. Dans ce cas,
+> si $\mathbf{x}_0$ est une solution, l'ensemble des solutions est
+> $$
+> \mathbf{x}_0 + \ker \mathbf{A} = \{\mathbf{x}_0 + \mathbf{v} : \mathbf{A}\mathbf{v} = 0\},
+> $$
+> un sous-espace affine de dimension $p - \operatorname{rg}\mathbf{A}$.
+
+*Démonstration.* Le premier point est la définition de l'image. Si
+$\mathbf{A}\mathbf{x}_0 = \mathbf{b}$, alors $\mathbf{A}\mathbf{x} = \mathbf{b}$
+équivaut à $\mathbf{A}(\mathbf{x} - \mathbf{x}_0) = 0$, c'est-à-dire
+$\mathbf{x} - \mathbf{x}_0 \in \ker\mathbf{A}$. La dimension vient du théorème
+du rang. $\square$
+
+« Solution générale = solution particulière + solution de l'équation
+homogène » : la même phrase décrit les équations différentielles linéaires,
+pour la même raison.
+
+En particulier, la solution est **unique** quand elle existe si et seulement si
+$\ker\mathbf{A} = \{0\}$, c'est-à-dire si les **colonnes** de $\mathbf{A}$ sont
+libres.
+
+### Application : l'identifiabilité en régression
+
+Dans la régression $\mathbf{y} \approx \mathbf{X}\boldsymbol\beta$, la matrice
+$\mathbf{X}$ a $n$ lignes (individus) et $p$ colonnes (variables). Les
+prédictions possibles forment $\operatorname{Im}\mathbf{X}$, et le meilleur
+ajustement au sens des moindres carrés est la projection de $\mathbf{y}$ sur ce
+sous-espace — unique, et objet du nœud
+[projections](/maths/n/espaces-euclidiens-projections). Mais le vecteur
+$\boldsymbol\beta$ qui la réalise est unique **si et seulement si les colonnes
+de $\mathbf{X}$ sont libres**, c'est-à-dire $\operatorname{rg}\mathbf{X} = p$.
+Sinon, on peut lui ajouter n'importe quel élément du noyau.
+
+Conséquence immédiate du théorème du rang : $\operatorname{rg}\mathbf{X} \le n$,
+donc **avec plus de variables que d'individus ($p > n$), les coefficients ne
+sont jamais identifiables**. C'est le point de départ de la statistique en
+[grande dimension](/maths/n/ridge-regularisation).
+
+### Vérification numérique
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(1)
+n = 50
+x1, x2 = rng.normal(size=(2, n))
+y = 2 * x1 - x2 + 0.1 * rng.normal(size=n)
+
+# Colonnes liees : x3 = x1 + x2
+X = np.column_stack([x1, x2, x1 + x2])
+beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+v = np.array([1.0, 1.0, -1.0])                 # X @ v = 0
+print("X v =", np.abs(X @ v).max().round(12))
+for t in (0.0, 5.0, -100.0):
+    b = beta + t * v
+    print(f"beta = {np.round(b, 3)}   erreur = {np.linalg.norm(y - X @ b):.6f}")
+
+# Colonnes presque liees : les coefficients deviennent instables
+for bruit in (1e-1, 1e-3, 1e-6):
+    Xb = np.column_stack([x1, x2, x1 + x2 + bruit * rng.normal(size=n)])
+    b, *_ = np.linalg.lstsq(Xb, y, rcond=None)
+    print(f"bruit {bruit:.0e} : beta = {np.round(b, 2)}")
+```
+
+Sortie obtenue :
+
+```
+X v = 0.0
+beta = [ 1.655 -1.326  0.329]   erreur = 0.651064
+beta = [ 6.655  3.674 -4.671]   erreur = 0.651064
+beta = [ -98.345 -101.326  100.329]   erreur = 0.651064
+bruit 1e-01 : beta = [ 2.06 -0.93 -0.07]
+bruit 1e-03 : beta = [ 4.86  1.88 -2.88]
+bruit 1e-06 : beta = [-26719.69 -26722.66  26721.67]
+```
+
+Dans le premier bloc, trois vecteurs de coefficients très différents donnent
+**exactement** la même erreur : la prédiction est déterminée, les coefficients
+non. `lstsq` renvoie l'un d'eux — celui de plus petite norme — sans prévenir.
+Dans le second, les colonnes sont libres mais presque liées : les coefficients
+existent et sont uniques, et ils prennent des valeurs énormes qui se
+compensent, d'autant plus que la troisième colonne est proche de
+$x_1 + x_2$. Lire ces coefficients comme des effets serait une erreur.
+
+### Piège : « autant d'équations que d'inconnues » ne garantit rien
+
+Un système carré peut n'avoir aucune solution ou une infinité :
+$x + y = 1,\ 2x + 2y = 3$ n'en a aucune ; $x + y = 1,\ 2x + 2y = 2$ en a une
+infinité. Ce qui décide est le **rang** de la matrice, pas sa forme.

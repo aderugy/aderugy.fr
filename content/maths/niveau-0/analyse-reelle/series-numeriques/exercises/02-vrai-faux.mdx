@@ -1,0 +1,31 @@
+---
+kind: qcm
+difficulty: 1
+after: regles
+---
+Vrai ou faux ? Justifier en une ou deux lignes.
+
+1. Si $\sum u_n$ converge, alors $u_n \to 0$.
+2. Si $\sum u_n$ et $\sum v_n$ divergent, alors $\sum (u_n + v_n)$ diverge.
+3. Si $u_n > 0$ et $\frac{u_{n+1}}{u_n} < 1$ pour tout $n$, alors $\sum u_n$ converge.
+4. $\sum \frac{1}{n^{1{,}0001}}$ converge.
+5. Si $\sum u_n$ converge, alors $\sum u_n^2$ converge.
+
+<!-- indice -->
+Pour 2, prendre $v_n = -u_n$. Pour 3, regarder la série harmonique. Pour 5,
+les termes peuvent changer de signe.
+
+<!-- indice -->
+Pour 5, $u_n = \frac{(-1)^n}{\sqrt n}$.
+
+<!-- solution -->
+1. **Vrai.** $u_n = S_n - S_{n-1} \to S - S = 0$.
+2. **Faux.** $u_n = 1$, $v_n = -1$ : $\sum (u_n + v_n) = 0$.
+3. **Faux.** Pour $u_n = 1/n$, $\frac{u_{n+1}}{u_n} = \frac{n}{n+1} < 1$, et la
+   série diverge. La règle de d'Alembert demande que la **limite** du rapport
+   soit $< 1$, ce qui force le rapport à rester sous un $q < 1$ fixé.
+4. **Vrai.** Série de Riemann avec $\alpha = 1{,}0001 > 1$ — convergente, très
+   lentement.
+5. **Faux.** $u_n = \frac{(-1)^n}{\sqrt n}$ donne une série convergente (séries
+   alternées), et $u_n^2 = \frac1n$ une série divergente. C'est vrai pour des
+   termes **positifs** (exercice 8).

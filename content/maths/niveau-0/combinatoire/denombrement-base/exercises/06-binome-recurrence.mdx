@@ -1,0 +1,45 @@
+---
+kind: preuve
+difficulty: 3
+after: binome
+---
+Démontrer la formule du binôme de Newton par récurrence sur $n$, en utilisant
+la formule de Pascal. Indiquer précisément à quelle ligne la commutativité
+$ab = ba$ est utilisée.
+
+<!-- indice -->
+Écrire $(a+b)^{n+1} = (a + b)(a+b)^n$, développer avec l'hypothèse de
+récurrence, puis décaler l'indice dans l'une des deux sommes obtenues.
+
+<!-- indice -->
+Après décalage, les deux sommes portent sur $a^k b^{n+1-k}$ ; leurs
+coefficients sont $\binom{n}{k-1}$ et $\binom{n}{k}$. La convention
+$\binom{n}{-1} = \binom{n}{n+1} = 0$ évite de traiter les bords à part.
+
+<!-- solution -->
+Pour $n = 0$, les deux membres valent $1$.
+
+Supposons la formule vraie au rang $n$. Alors
+$$
+(a+b)^{n+1} = (a + b) \sum_{k=0}^{n} \binom{n}{k} a^k b^{n-k}
+= \sum_{k=0}^{n} \binom{n}{k} a^{k+1} b^{n-k}
++ \sum_{k=0}^{n} \binom{n}{k} b \, a^k b^{n-k} .
+$$
+**C'est ici que sert la commutativité** : on récrit
+$b \, a^k b^{n-k} = a^k b^{n+1-k}$, ce qui demande de faire passer $b$ à
+droite des $a$. Dans la première somme on pose $j = k + 1$ :
+$$
+(a+b)^{n+1} = \sum_{j=1}^{n+1} \binom{n}{j-1} a^{j} b^{n+1-j}
++ \sum_{j=0}^{n} \binom{n}{j} a^j b^{n+1-j} .
+$$
+Avec la convention $\binom{n}{-1} = \binom{n}{n+1} = 0$, les deux sommes
+portent sur $j = 0, \dots, n+1$, et la formule de Pascal donne
+$$
+(a+b)^{n+1} = \sum_{j=0}^{n+1} \left[\binom{n}{j-1} + \binom{n}{j}\right] a^j b^{n+1-j}
+= \sum_{j=0}^{n+1} \binom{n+1}{j} a^j b^{n+1-j} .
+$$
+La formule est vraie au rang $n + 1$. $\square$
+
+Pour des matrices qui ne commutent pas, la démonstration s'arrête exactement à
+la ligne signalée : $\mathbf{B}\mathbf{A}^k$ n'a aucune raison de valoir
+$\mathbf{A}^k\mathbf{B}$.

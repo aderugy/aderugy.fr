@@ -1,0 +1,27 @@
+---
+kind: calcul
+difficulty: 1
+after: familles
+---
+Dans $\mathbb{R}^3$, on considère $u_1 = (1, 0, 1)$, $u_2 = (0, 1, 1)$,
+$u_3 = (1, 1, 0)$ et $u_4 = (1, 1, 2)$.
+
+1. La famille $(u_1, u_2, u_3)$ est-elle libre ? Est-ce une base de $\mathbb{R}^3$ ?
+2. La famille $(u_1, u_2, u_4)$ est-elle libre ?
+3. Donner les coordonnées de $w = (2, 3, 1)$ dans la base $(u_1, u_2, u_3)$.
+
+<!-- indice -->
+Écrire $a u_1 + b u_2 + c u_3 = 0$ coordonnée par coordonnée : on obtient un
+système de trois équations à trois inconnues.
+
+<!-- indice -->
+Pour 2, regarder $u_1 + u_2$.
+
+<!-- solution -->
+1. $a u_1 + b u_2 + c u_3 = (a + c,\ b + c,\ a + b) = 0$ donne $a = -c$, $b = -c$,
+   puis $a + b = -2c = 0$ : $a = b = c = 0$. Libre, et trois vecteurs libres
+   en dimension $3$ forment une base.
+2. $u_1 + u_2 = (1, 1, 2) = u_4$ : liée.
+3. On résout $a + c = 2$, $b + c = 3$, $a + b = 1$. En sommant :
+   $2(a + b + c) = 6$, donc $a + b + c = 3$, d'où $b = 1$, $a = 0$, $c = 2$.
+   Vérification : $0 \cdot u_1 + 1 \cdot u_2 + 2\,u_3 = (2, 3, 1)$.

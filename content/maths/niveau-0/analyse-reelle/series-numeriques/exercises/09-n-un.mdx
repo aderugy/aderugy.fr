@@ -1,0 +1,42 @@
+---
+kind: preuve
+difficulty: 4
+after: positives
+---
+Soit $(u_n)$ positive et **décroissante**, telle que $\sum u_n$ converge.
+
+1. Montrer que $\sum_{k = n+1}^{2n} u_k \ge n\,u_{2n}$, et en déduire
+   $n\,u_n \to 0$.
+2. Montrer par un contre-exemple que l'hypothèse de décroissance est
+   indispensable.
+3. En déduire, sans condensation, que $\sum \frac{1}{n}$ diverge.
+
+<!-- indice -->
+La somme de la question 1 est une tranche $S_{2n} - S_n$ de la série : elle
+tend vers $0$ (critère de Cauchy). Cela donne $2n\,u_{2n} \to 0$ ; il reste les
+indices impairs.
+
+<!-- indice -->
+Pour les impairs : $(2n+1)\,u_{2n+1} \le (2n+1)\,u_{2n}$ par décroissance, et
+$(2n+1)u_{2n} = \frac{2n+1}{2n} \cdot 2n\,u_{2n}$.
+
+<!-- indice -->
+Pour 2, une suite nulle sauf aux carrés parfaits.
+
+<!-- solution -->
+1. Les $n$ termes $u_{n+1}, \dots, u_{2n}$ sont tous $\ge u_{2n}$ par
+   décroissance, d'où l'inégalité. Le membre de gauche vaut $S_{2n} - S_n$, qui
+   tend vers $0$ puisque $(S_n)$ converge. Donc $n\,u_{2n} \to 0$, et
+   $2n\,u_{2n} \to 0$. Pour les indices impairs,
+   $0 \le (2n+1)\,u_{2n+1} \le (2n+1)\,u_{2n} = \frac{2n+1}{2n}\,(2n\,u_{2n}) \to 0$.
+   Les deux suites extraites $(m u_m)_{m \text{ pair}}$ et
+   $(m u_m)_{m \text{ impair}}$ tendent vers $0$, donc $m\,u_m \to 0$.
+2. $u_n = \frac{1}{n}$ si $n$ est un carré parfait, $0$ sinon. Alors
+   $\sum u_n = \sum_{k \ge 1} \frac{1}{k^2}$ converge, et pourtant
+   $n\,u_n = 1$ pour tout carré $n = k^2$ : $n u_n \not\to 0$.
+3. $u_n = 1/n$ est positive, décroissante, et $n\,u_n = 1 \not\to 0$ : la
+   série ne peut pas converger.
+
+Ce résultat (dit d'Olivier) dit qu'une série convergente à termes décroissants a
+un terme général $o(1/n)$ ; il ne donne aucune réciproque :
+$\sum \frac{1}{n \ln n}$ vérifie $n u_n \to 0$ et diverge.

@@ -1,0 +1,78 @@
+---
+title: Limite d'une fonction en un point — le jeu ε-δ
+minutes: 8
+rubrique: [construction, intuition, pieges]
+checkpoint:
+- type: qcm
+  question: 'Laquelle de ces phrases est la définition de $\lim_{x \to a} f(x) = \ell$ (pour $a$ adhérent au domaine $D$) ?'
+  choix:
+  - '$\forall \delta > 0,\ \exists \varepsilon > 0,\ \forall x \in D,\ |x - a| < \delta \Rightarrow |f(x) - \ell| < \varepsilon$'
+  - '$\forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x \in D,\ |x - a| < \delta \Rightarrow |f(x) - \ell| < \varepsilon$'
+  - '$\exists \delta > 0,\ \forall \varepsilon > 0,\ \forall x \in D,\ |x - a| < \delta \Rightarrow |f(x) - \ell| < \varepsilon$'
+  reponse: 1
+  explication: 'La tolérance $\varepsilon$ sur les valeurs est imposée d''abord, on répond par une distance $\delta$ sur les abscisses. La première phrase est vraie pour toute fonction bornée ; la troisième force $f = \ell$ sur tout un voisinage.'
+- type: nombre
+  question: 'Pour $f(x) = 3x + 1$, $a = 2$, $\ell = 7$ et $\varepsilon = 0{,}03$, quel est le plus grand $\delta$ qui convient ?'
+  reponse: 0.01
+  tolerance: 0.000001
+  explication: '$|f(x) - 7| = 3|x - 2| < 0{,}03$ équivaut à $|x - 2| < 0{,}01$. Le plus grand $\delta$ est $\varepsilon / 3$ : la pente fixe le taux d''échange entre tolérance sur les valeurs et distance sur les abscisses.'
+- type: vrai-faux
+  question: '$f(x) = x$ si $x \ne 0$ et $f(0) = 5$. Avec la définition de ce nœud, $\lim_{x \to 0} f(x)$ existe.'
+  reponse: false
+  explication: 'Faux avec la convention française adoptée ici, où $x = a$ est permis : il faudrait $|f(0) - \ell| < \varepsilon$ et $|f(x) - \ell| < \varepsilon$ près de $0$, donc $\ell = 5$ et $\ell = 0$. En revanche la limite **épointée** (sur $x \ne 0$) vaut $0$.'
+---
+
+### Définition
+
+Soit $f : D \to \mathbb{R}$ avec $D \subseteq \mathbb{R}$, et $a$ un point
+**adhérent** à $D$ : tout intervalle $]a - \delta, a + \delta[$ rencontre $D$.
+On dit que $f$ tend vers $\ell$ en $a$ si
+
+$$
+\forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x \in D,\quad
+|x - a| < \delta \ \Longrightarrow\ |f(x) - \ell| < \varepsilon .
+$$
+
+On note $\lim_{x \to a} f(x) = \ell$, ou $f(x) \xrightarrow[x \to a]{} \ell$. La
+limite, si elle existe, est unique : même démonstration que pour les suites,
+avec $\varepsilon = |\ell - \ell'|/2$.
+
+**Limite épointée, à droite, à gauche.** On restreint $f$ à un sous-ensemble
+de $D$ — à $D \setminus \{a\}$, à $D \cap\, ]a, +\infty[$, à
+$D \cap\, ]-\infty, a[$ — et on prend la limite de la restriction, notée
+$\lim_{x \to a,\, x \ne a}$, $f(a^+)$, $f(a^-)$.
+
+**En l'infini.** $\lim_{x \to +\infty} f(x) = \ell$ si
+$\forall \varepsilon > 0,\ \exists A,\ \forall x \in D,\ x > A \Rightarrow |f(x) - \ell| < \varepsilon$.
+C'est la définition des suites, avec $A$ réel au lieu de $N$ entier.
+
+### Intuition : le même jeu, sur l'axe des abscisses
+
+C'est le jeu des suites, déplacé. L'adversaire annonce une bande horizontale
+de demi-largeur $\varepsilon$ autour de $\ell$ ; je dois répondre une bande
+verticale de demi-largeur $\delta$ autour de $a$ dans laquelle le graphe de
+$f$ reste dans la bande horizontale. Le rang « à partir duquel » des suites
+devient une distance « en deçà de laquelle ». Et comme pour les suites,
+$\delta$ dépend de $\varepsilon$ — et ici, en général, aussi de $a$ : c'est
+toute la question de la continuité uniforme, quatre capsules plus loin.
+
+### Piège : deux conventions coexistent
+
+La définition ci-dessus autorise $x = a$ quand $a \in D$. Si $f$ est définie en
+$a$, une limite en $a$ ne peut alors valoir que $f(a)$ — c'est la convention des
+programmes français de classes préparatoires. La littérature anglophone
+(Rudin, Abbott) prend la limite **épointée** : $x \ne a$ y est imposé, et la
+fonction $f(x) = x$ pour $x \ne 0$, $f(0) = 5$, a pour limite $0$ en $0$.
+
+Les deux conventions sont cohérentes ; ce qui ne l'est pas, c'est d'en changer
+au milieu d'un raisonnement. Ce corpus suit la convention française, et écrit
+explicitement « $x \ne a$ » quand il veut la limite épointée. Avec elle,
+« $f$ est continue en $a$ » équivaut simplement à « $f$ a une limite en $a$ ».
+
+### Piège : l'ordre des quantificateurs
+
+Inverser $\forall \varepsilon$ et $\exists \delta$ change tout. « Il existe
+$\delta$ tel que pour tout $\varepsilon$… » force $|f(x) - \ell| < \varepsilon$
+pour tout $\varepsilon$, donc $f(x) = \ell$ : la fonction est constante près de
+$a$. « Pour tout $\delta$ il existe $\varepsilon$… » est vrai dès que $f$ est
+bornée. Ni l'une ni l'autre n'est une limite.

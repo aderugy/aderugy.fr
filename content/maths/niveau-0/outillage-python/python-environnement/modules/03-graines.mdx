@@ -1,0 +1,110 @@
+---
+title: Générateurs pseudo-aléatoires et graines
+minutes: 9
+rubrique: [construction, intuition, pieges, simulation]
+checkpoint:
+- type: qcm
+  question: 'Quelle est la bonne façon d''obtenir des tirages reproductibles avec NumPy ?'
+  choix:
+  - '`np.random.seed(0)` en tête du script, puis `np.random.normal(...)` partout.'
+  - 'Créer `rng = np.random.default_rng(0)` et passer `rng` aux fonctions qui tirent des nombres.'
+  - 'Ne rien faire : NumPy utilise la graine $0$ par défaut.'
+  reponse: 1
+  explication: 'Un générateur explicite, passé en argument, rend visibles les dépendances au hasard et évite qu''une bibliothèque appelée entre-temps consomme le générateur global. `np.random.seed` fonctionne mais repose sur un état global partagé ; et sans graine, NumPy tire une graine du système à chaque exécution.'
+- type: vrai-faux
+  question: 'Pour lancer $8$ simulations indépendantes en parallèle, il suffit d''utiliser les graines $0, 1, \dots, 7$.'
+  reponse: false
+  explication: 'Faux en principe, même si cela marche souvent : rien ne garantit que des graines voisines donnent des suites sans corrélation. La méthode prévue est `np.random.SeedSequence(graine).spawn(8)`, qui dérive des états initiaux construits pour être indépendants.'
+---
+
+### Pseudo-aléatoire
+
+Un ordinateur ne tire pas de nombres au hasard : il calcule une suite
+**déterministe** $s_0, s_1, s_2, \dots$ définie par une récurrence
+$s_{k+1} = T(s_k)$ sur un état interne, et en extrait des nombres qui
+**se comportent** comme des tirages indépendants uniformes — ils passent les
+tests statistiques qu'on leur applique. C'est un **générateur
+pseudo-aléatoire**. L'état initial $s_0$ est fixé par la **graine** (*seed*).
+
+Conséquence : **même graine, même suite**, sur toute machine et pour toujours,
+tant que l'algorithme ne change pas. C'est ce qui rend une simulation
+reproductible, et c'est aussi ce qui permet de déboguer un code aléatoire.
+
+### Avec NumPy
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(42)        # generateur PCG64, graine 42
+print(rng.integers(0, 10, size=8))
+print(np.random.default_rng(42).integers(0, 10, size=8))   # meme graine
+print(np.random.default_rng(43).integers(0, 10, size=8))   # autre graine
+print(np.random.default_rng().integers(0, 10, size=8))     # sans graine : change a chaque execution
+```
+
+Sortie obtenue :
+
+```
+[0 7 6 4 4 8 0 6]
+[0 7 6 4 4 8 0 6]
+[5 6 4 0 5 0 2 8]
+[5 2 7 5 4 1 1 2]
+```
+
+Les deux premières lignes sont identiques. La dernière ne l'est d'une exécution
+à l'autre que par hasard : sans graine, NumPy initialise le générateur à partir
+de l'entropie du système d'exploitation.
+
+### Intuition : un livre de nombres au hasard
+
+Un générateur, c'est un immense livre de nombres « au hasard » déjà écrits ; la
+graine dit à quelle page l'ouvrir. Deux lecteurs qui ouvrent à la même page lisent
+la même chose. Le livre de PCG64 a $2^{128}$ pages : on ne revient jamais au
+début par accident.
+
+### Les deux disciplines
+
+1. **Un générateur explicite, passé en argument.** Une fonction qui tire des
+   nombres reçoit `rng` ; elle ne fabrique pas le sien et n'utilise pas l'état
+   global `np.random.*`. Le hasard devient une entrée comme une autre, et
+   l'appel `simulation(rng=np.random.default_rng(0))` est reproductible.
+2. **Des flux indépendants pour le parallèle.**
+   `np.random.SeedSequence(2026).spawn(k)` produit $k$ états initiaux construits
+   pour être statistiquement indépendants. On en fait $k$ générateurs, un par
+   tâche.
+
+### Piège : l'état global est partagé
+
+```python
+import numpy as np
+
+def bruit():                       # une fonction « innocente » d'une bibliotheque
+    return np.random.normal()      # consomme le generateur GLOBAL
+
+np.random.seed(0)
+a = np.random.normal(size=3)
+np.random.seed(0)
+bruit()                            # un appel intercale...
+b = np.random.normal(size=3)
+print("a :", np.round(a, 4))
+print("b :", np.round(b, 4), "  <- decale d'un tirage")
+```
+
+Sortie obtenue :
+
+```
+a : [1.7641 0.4002 0.9787]
+b : [0.4002 0.9787 2.2409]   <- decale d'un tirage
+```
+
+Le second vecteur est le premier décalé d'un cran : un appel sans rapport,
+caché dans une fonction, a consommé un nombre. Avec un générateur passé en
+argument, `bruit` n'aurait pas pu toucher au flux de l'appelant.
+
+### Piège : la graine ne fixe pas la version
+
+NumPy garantit que les **bits** produits par un générateur à graine donnée ne
+changent pas, mais pas que les **méthodes de tirage** (`normal`, `choice`,
+`integers`…) transforment ces bits de la même façon d'une version à l'autre :
+un meilleur algorithme peut remplacer l'ancien. La graine reproduit un résultat
+**dans un environnement donné** ; d'où la capsule précédente.

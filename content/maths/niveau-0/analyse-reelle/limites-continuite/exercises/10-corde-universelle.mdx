@@ -1,0 +1,48 @@
+---
+kind: preuve
+difficulty: 4
+after: tvi
+---
+Soit $f : [0, 1] \to \mathbb{R}$ continue avec $f(0) = f(1)$.
+
+1. Montrer qu'il existe $x \in [0, 1/2]$ tel que $f(x + 1/2) = f(x)$.
+2. Plus généralement, pour tout entier $n \ge 1$, montrer qu'il existe
+   $x \in [0, 1 - 1/n]$ tel que $f(x + 1/n) = f(x)$.
+
+3. Un coureur parcourt $10$ km en $1$ h, à allure variable. Montrer qu'il
+   existe une fenêtre de $30$ min pendant laquelle il couvre exactement
+   $5$ km. Et une fenêtre de $20$ min pendant laquelle il couvre exactement
+   $10/3$ km ?
+
+<!-- indice -->
+Poser $g(x) = f(x + 1/n) - f(x)$ sur $[0, 1 - 1/n]$ et calculer
+$\sum_{k=0}^{n-1} g(k/n)$.
+
+<!-- indice -->
+La somme est télescopique et vaut $f(1) - f(0) = 0$. Une somme nulle de $n$
+réels contient un terme $\ge 0$ et un terme $\le 0$.
+
+<!-- solution -->
+Soit $g(x) = f(x + 1/n) - f(x)$, continue sur $[0, 1 - 1/n]$. Alors
+$$
+\sum_{k=0}^{n-1} g\!\left(\frac{k}{n}\right)
+= \sum_{k=0}^{n-1} \left[ f\!\left(\frac{k+1}{n}\right) - f\!\left(\frac{k}{n}\right) \right]
+= f(1) - f(0) = 0 .
+$$
+Si l'un des termes est nul, on a trouvé $x$. Sinon, une somme nulle de réels
+non nuls en contient un strictement positif, $g(k/n) > 0$, et un strictement
+négatif, $g(j/n) < 0$. Par le théorème des valeurs intermédiaires appliqué à
+$g$ entre $j/n$ et $k/n$ (deux points de $[0, 1 - 1/n]$), $g$ s'annule. La
+question 1 est le cas $n = 2$. $\square$
+
+**Le coureur.** Soit $d(t)$ la distance parcourue au temps $t$ (en heures),
+continue, avec $d(0) = 0$ et $d(1) = 10$. La fonction $f(t) = d(t) - 10t$
+vérifie $f(0) = f(1) = 0$. Avec $n = 2$, il existe $t$ tel que
+$f(t + 1/2) = f(t)$, c'est-à-dire $d(t + 1/2) - d(t) = 5$. Avec $n = 3$, de
+même, une fenêtre de $20$ min couvre exactement $10/3$ km.
+
+**Le résultat est faux pour une longueur qui n'est pas de la forme $1/n$**
+(théorème de Paul Lévy). Pour $h \in\, ]0, 1[$ qui n'est l'inverse d'aucun
+entier, la fonction $f(x) = \sin^2(\pi x / h) - x \sin^2(\pi / h)$ vérifie
+$f(0) = f(1) = 0$ et $f(x + h) - f(x) = -h \sin^2(\pi/h) \ne 0$ pour tout $x$ :
+aucune corde horizontale de longueur $h$.

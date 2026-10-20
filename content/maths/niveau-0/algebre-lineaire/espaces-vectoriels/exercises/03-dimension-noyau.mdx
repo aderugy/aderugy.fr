@@ -1,0 +1,31 @@
+---
+kind: calcul
+difficulty: 2
+after: dimension
+---
+Soit $F = \{(x, y, z, t) \in \mathbb{R}^4 : x + y + z + t = 0 \text{ et } x - y = 0\}$.
+
+1. Montrer que $F$ est un sous-espace de $\mathbb{R}^4$.
+2. En donner une base, et sa dimension.
+3. Compléter cette base en une base de $\mathbb{R}^4$.
+
+<!-- indice -->
+Paramétrer : exprimer deux des inconnues en fonction des deux autres.
+
+<!-- indice -->
+$y = x$ et $t = -2x - z$ : un élément de $F$ est déterminé par $(x, z)$.
+
+<!-- solution -->
+1. $F$ est le noyau de l'application linéaire
+   $(x, y, z, t) \mapsto (x + y + z + t,\ x - y)$ de $\mathbb{R}^4$ dans $\mathbb{R}^2$.
+2. $y = x$, $t = -2x - z$, donc
+   $(x, y, z, t) = x\,(1, 1, 0, -2) + z\,(0, 0, 1, -1)$. Les deux vecteurs
+   $f_1 = (1, 1, 0, -2)$ et $f_2 = (0, 0, 1, -1)$ engendrent $F$, et sont
+   libres (regarder les première et troisième coordonnées). $\dim F = 2$.
+
+   Le théorème du rang le prévoyait : l'application de 1 est surjective (ses
+   deux formes sont indépendantes), donc $\dim F = 4 - 2 = 2$.
+3. Il faut deux vecteurs. $e_1 = (1, 0, 0, 0)$ et $e_4 = (0, 0, 0, 1)$
+   conviennent : si $a f_1 + b f_2 + c e_1 + d e_4 = 0$, la deuxième coordonnée
+   donne $a = 0$, la troisième $b = 0$, puis la première $c = 0$ et la
+   quatrième $d = 0$.

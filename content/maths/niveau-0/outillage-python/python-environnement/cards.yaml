@@ -1,0 +1,73 @@
+# Cartes de révision du nœud. L'état FSRS vit en base ; `ref` pointe vers la
+# capsule d'origine (décisions D1 et D25).
+
+cards:
+  - id: trois-sources
+    ref: probleme
+    front: "Quelles sont les trois sources de non-reproductibilité d'un calcul numérique ?"
+    back: |
+      Le hasard (graine non fixée), l'environnement (versions de Python et des
+      paquets), l'arithmétique flottante (ordre des opérations). Plus, dans un
+      notebook, l'état caché du noyau.
+
+  - id: epingler
+    ref: environnement
+    front: "Que faut-il versionner pour qu'un environnement Python soit reproductible ?"
+    back: |
+      La liste **exacte** des paquets et de leurs versions, dépendances
+      indirectes comprises (`pip freeze`, ou un fichier de verrouillage), pas
+      le dossier de l'environnement virtuel.
+
+  - id: generateur-argument
+    ref: graines
+    front: "Bonne pratique NumPy pour le hasard dans une fonction ?"
+    back: |
+      Créer `rng = np.random.default_rng(graine)` et le **passer en argument**.
+      Éviter l'état global `np.random.seed` : n'importe quel appel intercalé le
+      consomme.
+
+  - id: flux-paralleles
+    ref: graines
+    front: "Comment obtenir $k$ flux aléatoires indépendants pour des calculs parallèles ?"
+    back: |
+      `np.random.SeedSequence(graine).spawn(k)`, puis un `default_rng` par
+      état obtenu. Pas les graines $0, 1, \dots, k-1$.
+
+  - id: unite-arrondi
+    ref: flottants
+    front: "Unité d'arrondi en double précision, et garantie IEEE 754 sur une opération."
+    back: |
+      $u = 2^{-53} \approx 1{,}1 \cdot 10^{-16}$ ; $a \oplus b = (a + b)(1 + \delta)$
+      avec $|\delta| \le u$. L'epsilon machine $2^{-52}$ vaut $2u$.
+
+  - id: borne-somme
+    ref: flottants
+    front: "Borne d'erreur de la somme naïve de $n$ flottants."
+    back: |
+      $|\hat s - s| \le (n-1)\,u \sum |x_k|$ au premier ordre. Relative à
+      $\sum|x_k|$ : en cas de compensation des signes, l'erreur relative sur la
+      somme peut exploser (élimination catastrophique).
+
+  - id: variance-formule
+    ref: flottants
+    front: "Pourquoi ne pas calculer une variance par $\\overline{x^2} - \\bar x^2$ ?"
+    back: |
+      Élimination catastrophique : deux grands nombres presque égaux, connus à
+      $u$ près en relatif. On centre d'abord ($\frac1n\sum(x_i - \bar x)^2$),
+      comme `np.var`.
+
+  - id: restart-run-all
+    ref: notebooks
+    front: "La règle qui neutralise les pièges des notebooks ?"
+    back: |
+      Redémarrer le noyau et tout exécuter de haut en bas avant de croire ou
+      de partager un résultat. Le noyau garde l'état de cellules supprimées
+      ou exécutées dans le désordre.
+
+  - id: refaire-retrouver
+    ref: protocole
+    front: "Refaire un calcul, retrouver un résultat : quelle différence ?"
+    back: |
+      Refaire : même code, environnement et graine, mêmes chiffres (débogage).
+      Retrouver : autres graines, résultat compatible à l'incertitude près
+      (validité). Une simulation publiée donne graine, versions et incertitude.

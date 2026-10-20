@@ -1,0 +1,47 @@
+---
+kind: preuve
+difficulty: 4
+after: uniforme
+---
+Soit $f : [0, +\infty[ \to \mathbb{R}$ continue, ayant une limite finie $\ell$
+en $+\infty$. Montrer que $f$ est uniformément continue.
+
+En déduire que $x \mapsto \dfrac{1}{1 + x^2}$ et $x \mapsto \arctan x$ sont
+uniformément continues sur $[0, +\infty[$.
+
+<!-- indice -->
+Découper le domaine en $[0, A + 1]$, où Heine s'applique, et
+$[A, +\infty[$, où $f$ est proche de $\ell$. Pourquoi faire chevaucher les deux
+morceaux ?
+
+<!-- indice -->
+Sur $[A, +\infty[$, si $|f - \ell| < \varepsilon/2$, alors deux valeurs de $f$
+diffèrent de moins de $\varepsilon$. Il reste le cas où $x$ et $y$ ne sont pas
+dans le même morceau : c'est le chevauchement de longueur $1$ qui l'exclut,
+pourvu que $\delta \le 1$.
+
+<!-- solution -->
+Soit $\varepsilon > 0$.
+
+*Loin.* Il existe $A \ge 0$ tel que $|f(x) - \ell| < \varepsilon/2$ pour
+$x \ge A$. Pour $x, y \ge A$, alors
+$|f(x) - f(y)| \le |f(x) - \ell| + |\ell - f(y)| < \varepsilon$, sans condition
+sur $|x - y|$.
+
+*Près.* $f$ est continue sur le segment $[0, A + 1]$, donc uniformément
+continue par Heine : il existe $\delta_1 > 0$ tel que
+$|f(x) - f(y)| < \varepsilon$ pour $x, y \in [0, A + 1]$ et $|x - y| < \delta_1$.
+
+*Recollement.* Posons $\delta = \min(\delta_1, 1)$, et soient $x \le y$ avec
+$|x - y| < \delta$. Si $y \le A + 1$, les deux points sont dans $[0, A + 1]$ et
+$|x - y| < \delta_1$. Sinon $y > A + 1$, donc $x > y - 1 \ge A$ : les deux
+points sont dans $[A, +\infty[$. Dans les deux cas,
+$|f(x) - f(y)| < \varepsilon$. $\square$
+
+Le chevauchement $[A, A + 1]$ est le point délicat : sans lui, un couple $x < A < y$
+très proche ne relèverait d'aucun des deux cas.
+
+Les deux fonctions proposées sont continues sur $[0, +\infty[$, de limites
+respectives $0$ et $\pi/2$ en $+\infty$ : le résultat s'applique. La réciproque
+est fausse : $x \mapsto \sqrt{x}$ est uniformément continue sur
+$[0, +\infty[$ sans avoir de limite finie.

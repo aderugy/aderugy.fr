@@ -1,0 +1,30 @@
+---
+kind: calcul
+difficulty: 1
+after: limite
+---
+Déterminer les limites suivantes, ou montrer qu'elles n'existent pas.
+
+1. $\displaystyle\lim_{x \to 2} \frac{x^2 - 4}{x - 2}$ (limite épointée en $2$).
+2. $\displaystyle\lim_{x \to +\infty} \frac{3x^2 - x + 1}{2x^2 + 5}$.
+3. $\displaystyle\lim_{x \to 0^+} \frac{|x|}{x}$ et $\displaystyle\lim_{x \to 0^-} \frac{|x|}{x}$.
+4. $\displaystyle\lim_{x \to +\infty} \big(\sqrt{x + 1} - \sqrt{x}\big)$.
+
+<!-- indice -->
+1 : factoriser le numérateur. 2 : diviser numérateur et dénominateur par
+$x^2$. 4 : multiplier par la quantité conjuguée.
+
+<!-- indice -->
+Pour 3, simplifier $|x|/x$ selon le signe de $x$ avant de passer à la limite.
+
+<!-- solution -->
+1. Pour $x \ne 2$, $\frac{x^2 - 4}{x - 2} = x + 2$, qui tend vers $4$. La
+   fonction n'est pas définie en $2$ : c'est une limite épointée, et la
+   fonction se prolonge par continuité en posant la valeur $4$.
+2. $\frac{3 - 1/x + 1/x^2}{2 + 5/x^2} \to \frac{3}{2}$.
+3. $|x|/x = 1$ pour $x > 0$ et $-1$ pour $x < 0$ : la limite à droite vaut
+   $1$, la limite à gauche $-1$. Comme elles diffèrent, la fonction n'a pas de
+   limite en $0$.
+4. $\sqrt{x+1} - \sqrt{x} = \dfrac{1}{\sqrt{x+1} + \sqrt{x}} \to 0$. C'est la
+   même expression que les pas de la suite $\sqrt{n}$ dans le nœud
+   [suites-reelles](/maths/n/suites-reelles/m/cauchy).

@@ -1,0 +1,73 @@
+---
+kind: simulation
+difficulty: 3
+after: systemes
+---
+1. Fabriquer une matrice $\mathbf{A} = \mathbf{U}\mathbf{V}^\top$ de taille
+   $30 \times 20$, avec $\mathbf{U}$ de taille $30 \times 7$ et $\mathbf{V}$ de
+   taille $20 \times 7$ à coefficients gaussiens. Quel rang attend-on ?
+2. Calculer numériquement le rang et une base du noyau (par la décomposition
+   en valeurs singulières, `np.linalg.svd`), et vérifier le théorème du rang.
+3. Tirer $10^4$ matrices $n \times n$ à coefficients $\pm 1$ équiprobables, pour
+   $n = 2, 4, 8, 12$, et estimer la proportion de matrices non inversibles.
+   Comparer avec des matrices à coefficients gaussiens.
+
+<!-- indice -->
+$\operatorname{Im}(\mathbf{U}\mathbf{V}^\top) \subseteq \operatorname{Im}\mathbf{U}$ :
+le rang est au plus $7$.
+
+<!-- indice -->
+Les lignes de $\mathbf{V}_h^\top$ (troisième sortie de `svd`) associées aux
+valeurs singulières nulles forment une base orthonormée du noyau.
+
+<!-- solution -->
+```python
+import numpy as np
+
+rng = np.random.default_rng(0)
+U, V = rng.normal(size=(30, 7)), rng.normal(size=(20, 7))
+A = U @ V.T
+_, s, Vh = np.linalg.svd(A)
+r = np.linalg.matrix_rank(A)
+N = Vh[r:]                                   # base du noyau, en lignes
+print("rang :", r, "  dim noyau :", N.shape[0], "  somme :", r + N.shape[0])
+print("max |A n| sur la base du noyau :", f"{np.abs(A @ N.T).max():.1e}")
+
+for n in (2, 4, 8, 12):
+    M = rng.choice([-1.0, 1.0], size=(10_000, n, n))
+    pm = (np.linalg.matrix_rank(M) < n).mean()
+    G = rng.normal(size=(10_000, n, n))
+    pg = (np.linalg.matrix_rank(G) < n).mean()
+    print(f"n={n:>2} : +-1 singulieres {pm:.4f}   gaussiennes {pg:.4f}")
+```
+
+Sortie :
+
+```
+rang : 7   dim noyau : 13   somme : 20
+max |A n| sur la base du noyau : 2.7e-15
+n= 2 : +-1 singulieres 0.5049   gaussiennes 0.0000
+n= 4 : +-1 singulieres 0.6601   gaussiennes 0.0000
+n= 8 : +-1 singulieres 0.5198   gaussiennes 0.0000
+n=12 : +-1 singulieres 0.2296   gaussiennes 0.0000
+```
+
+1. et 2. Le rang vaut $7$ : chaque colonne de $\mathbf{A}$ est combinaison des
+   $7$ colonnes de $\mathbf{U}$, et des matrices gaussiennes sont
+   « génériquement » de rang maximal. Le noyau est de dimension
+   $20 - 7 = 13$, et les vecteurs trouvés sont envoyés sur $0$ à $10^{-14}$
+   près.
+
+3. Pour $n = 2$, une matrice $\pm 1$ est singulière avec probabilité $1/2$ : ses
+   deux lignes sont égales ou opposées. La proportion n'est **pas** monotone :
+   elle dépasse $1/2$ pour $n = 4$, où deux lignes (ou deux colonnes) égales ou
+   opposées, ou une ligne combinaison de deux autres, restent fréquentes ; puis
+   elle décroît, lentement — encore près d'une matrice sur quatre pour
+   $n = 12$. Deux lignes égales ou opposées suffisent à rendre la matrice
+   singulière, ce qui arrive avec une probabilité au moins de l'ordre de
+   $n^2 2^{-n}$ ; Tikhomirov a démontré en 2020 que la probabilité de
+   singularité vaut $\big(\frac12 + o(1)\big)^n$, et que cette borne est donc
+   la bonne à l'échelle exponentielle. Les matrices gaussiennes,
+   elles, ne sont jamais singulières dans la simulation : l'ensemble des
+   matrices singulières est de mesure nulle, ce qu'on énoncera proprement au
+   niveau 3.

@@ -1,0 +1,89 @@
+---
+title: Combinaisons — compter des parties
+minutes: 9
+rubrique: [construction, intuition, demonstrations, pieges]
+checkpoint:
+- type: nombre
+  question: Combien de mains de 5 cartes, parmi les $\binom{52}{5}$, contiennent **au moins un as** ?
+  reponse: 886656
+  explication: 'Par complémentaire : $\binom{52}{5} - \binom{48}{5} = 2\,598\,960 - 1\,712\,304 = 886\,656$. Le raisonnement « un as parmi 4, puis 4 cartes parmi les 51 restantes » donne $4 \binom{51}{4} = 999\,600$ : il compte plusieurs fois les mains à plusieurs as.'
+- type: qcm
+  question: Quelle égalité traduit le fait de choisir les $k$ éléments **gardés** ou, ce qui revient au même, les $n-k$ éléments **écartés** ?
+  choix:
+  - $\binom{n}{k} = \binom{n-1}{k-1} + \binom{n-1}{k}$
+  - $\binom{n}{k} = \binom{n}{n-k}$
+  - $k! \binom{n}{k} = A_n^k$
+  reponse: 1
+  explication: 'L''application $A \mapsto E \setminus A$ est une bijection des parties à $k$ éléments sur les parties à $n - k$ éléments (elle est sa propre réciproque). La première égalité est la formule de Pascal, la troisième le lien entre arrangements et combinaisons.'
+- type: vrai-faux
+  question: '$\binom{n}{k}$ est un entier pour tous $0 \le k \le n$, bien que la formule $\frac{n!}{k!\,(n-k)!}$ soit un quotient.'
+  reponse: true
+  explication: 'Vrai, et c''est la définition combinatoire qui le garantit : $\binom{n}{k}$ est un **cardinal**. La formule fermée n''en est qu''une expression, dont l''intégralité n''a rien d''évident a priori.'
+---
+
+### Définition
+
+Pour un ensemble $E$ à $n$ éléments et un entier $0 \le k \le n$, on note
+$\binom{n}{k}$ (lire « $k$ parmi $n$ ») le nombre de **parties** de $E$ à $k$
+éléments. Une telle partie s'appelle une combinaison. On pose $\binom{n}{k} = 0$
+si $k < 0$ ou $k > n$ : il n'y a aucune partie de cette taille. La notation
+française ancienne $C_n^k$ désigne le même nombre.
+
+$\binom{n}{k}$ ne dépend que de $n$ et $k$, pas de $E$ : une bijection
+$E \to F$ induit une bijection entre leurs parties de taille $k$.
+
+### La formule fermée, par double comptage
+
+> **Proposition.** Pour $0 \le k \le n$,
+> $\displaystyle \binom{n}{k} = \frac{A_n^k}{k!} = \frac{n!}{k!\,(n-k)!}$.
+
+*Démonstration.* On compte les arrangements de $k$ éléments de $E$ de deux
+façons. D'une part, il y en a $A_n^k$. D'autre part, un arrangement se
+construit en deux choix : d'abord la **partie** $A$ des $k$ éléments utilisés
+($\binom{n}{k}$ choix), puis l'**ordre** dans lequel on les range, c'est-à-dire
+une permutation de $A$ ($k!$ choix, quel que soit $A$). Deux suites de choix
+différentes donnent deux arrangements différents, et tout arrangement est
+obtenu : la règle du produit donne $A_n^k = \binom{n}{k} \, k!$. $\square$
+
+Ce raisonnement — compter le même ensemble de deux manières et égaler les
+résultats — s'appelle le **double comptage**. Il est plus fiable qu'un calcul
+de factorielles, parce que chaque égalité y a un sens.
+
+### Intuition : diviser par ce qu'on ne veut pas distinguer
+
+Compter les mains de deux cartes, c'est compter les listes de deux cartes
+distinctes ($52 \times 51$) puis identifier les listes qui ne diffèrent que
+par l'ordre : chaque main correspond à exactement $2! = 2$ listes. Diviser par
+$k!$, c'est oublier l'ordre — et ce n'est légitime que parce que **chaque**
+main correspond au **même** nombre de listes. Quand ce nombre varie, diviser
+donne un résultat faux, et c'est ce qui se passe avec les tirages avec
+répétition (capsule 7).
+
+### Symétrie
+
+$\binom{n}{k} = \binom{n}{n-k}$ : l'application qui associe à une partie son
+complémentaire est une bijection des parties à $k$ éléments sur les parties à
+$n - k$ éléments, puisqu'elle est sa propre réciproque.
+
+### Piège : le surcomptage
+
+Combien de mains de cinq cartes contiennent **au moins un as** ? Le
+raisonnement « je choisis un as ($4$ façons), puis quatre cartes quelconques
+parmi les $51$ restantes ($\binom{51}{4}$ façons) » donne
+$4 \times 249\,900 = 999\,600$. C'est faux : une main contenant l'as de pique
+**et** l'as de cœur est fabriquée deux fois, une fois par chaque as choisi en
+premier. La construction n'est pas injective.
+
+Le bon calcul passe par le complémentaire — les mains sans as se choisissent
+parmi $48$ cartes :
+
+$$
+\binom{52}{5} - \binom{48}{5} = 2\,598\,960 - 1\,712\,304 = 886\,656 .
+$$
+
+Le signe qui doit alerter : **« au moins un »**. Une construction qui commence
+par « choisir celui qui garantit la propriété » compte presque toujours
+plusieurs fois les objets qui la vérifient plusieurs fois. Le complémentaire,
+ou le découpage selon le nombre exact d'as, évite le piège ; la formule générale
+pour corriger un surcomptage est celle
+d'[inclusion-exclusion](/maths/n/inclusion-exclusion), objet du nœud suivant.
