@@ -1,0 +1,53 @@
+---
+title: Le problème — approcher ce qu'on ne sait pas écrire
+minutes: 6
+rubrique: [position, probleme]
+---
+
+### Position dans le graphe
+
+Ce nœud n'a aucun prérequis : c'est l'entrée du parcours. Tout ce qui suit en
+analyse — limites de fonctions, séries, intégrale de Riemann — se ramène à des
+limites de suites. Et en probabilités, la loi des grands nombres, la convergence
+presque sûre et les lemmes de Borel-Cantelli sont des énoncés sur des suites de
+nombres réels ou de variables aléatoires : la définition $\varepsilon$-$N$ vue
+ici est littéralement celle qui y sera employée.
+
+### Ce qu'on sait calculer, et ce qu'on veut
+
+On ne sait calculer qu'un nombre fini d'opérations, et pourtant on veut
+manipuler des objets qui n'ont pas d'écriture finie. $\sqrt{2}$ n'est pas un
+quotient d'entiers ; $\pi$ n'a pas de développement décimal qui s'arrête. La
+seule chose qu'on sache produire, c'est une liste de valeurs approchées :
+
+$$
+1,\quad 1{,}5,\quad 1{,}4166\ldots,\quad 1{,}41421568\ldots
+$$
+
+— ici la méthode de Héron pour $\sqrt{2}$, dont chaque terme s'obtient du
+précédent par $u_{n+1} = \tfrac{1}{2}(u_n + 2/u_n)$.
+
+La question n'est pas « ces nombres se rapprochent-ils ? » — cela s'observe.
+Elle est : **de quoi se rapprochent-ils, et ce quelque chose existe-t-il ?**
+Dans $\mathbb{Q}$, la réponse est non : la suite de Héron est faite de
+rationnels, elle se resserre autant qu'on veut, et sa limite n'est pas un
+rationnel. Il n'y a donc pas de théorème de convergence à espérer sans une
+propriété qui distingue $\mathbb{R}$ de $\mathbb{Q}$. Cette propriété est
+l'axiome de la borne supérieure, et tout ce nœud en découle.
+
+Deuxième question, moins visible mais plus utile en pratique : **à quelle
+distance de la limite est-on après $n$ étapes ?** Savoir qu'une suite converge
+ne dit rien du coût. Une moyenne empirique de Monte-Carlo converge, mais gagner
+un chiffre décimal demande cent fois plus de tirages ; la méthode de Héron
+double le nombre de décimales exactes à chaque étape. Ces deux suites convergent
+au même sens et sont incomparables à l'usage. La dernière capsule du nœud le
+vérifie numériquement.
+
+### Le plan du nœud
+
+Une suite réelle est une application $u : \mathbb{N} \to \mathbb{R}$, notée
+$(u_n)_{n \in \mathbb{N}}$. Les capsules suivantes construisent, dans l'ordre :
+l'axiome qui fonde $\mathbb{R}$, la définition de la convergence, ses premières
+conséquences, puis les quatre énoncés qui structurent le nœud — limite
+monotone, Bolzano-Weierstrass, critère de Cauchy, passage à la limite dans les
+inégalités.

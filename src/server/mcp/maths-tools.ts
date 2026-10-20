@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { McpServer, CallToolResult } from "@modelcontextprotocol/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cardKey, exerciseKey, loadCards, loadCourse, loadExercises, RUBRIQUE } from "@/lib/maths/content";
+import { cardKey, exerciseKey, loadCards, loadCourse, loadExercises, loadModules, RUBRIQUE } from "@/lib/maths/content";
 import { childrenOf, loadGraph } from "@/lib/maths/graph/load";
 import type { Graph, GraphNode, ProgressState } from "@/lib/maths/graph/types";
 import { evidenceParNoeud } from "@/lib/maths/progression/evidence";
@@ -45,7 +45,7 @@ export const MATHS_INSTRUCTIONS = `Arthur's probability & statistics parcours (a
 
 How the data works:
 - The graph has domains (levels, e.g. "niveau-0"), topics and concepts, all with stable slug ids. Only concepts carry content and progress. "requires" edges are real prerequisites; "unlocks" is their inverse.
-- Content lives in the site's repository, not in the database: it is read-only here. A concept's content is empty (not written yet), draft or published. The course has nine sections in a fixed order (position, probleme, construction, intuition, demonstrations, pieges, simulation, liens, references), in French, Markdown with KaTeX.
+- Content lives in the site's repository, not in the database: it is read-only here. A concept's content is empty (not written yet), draft or published. Courses are in French, Markdown with KaTeX. A course follows a nine-part rubric (position, probleme, construction, intuition, demonstrations, pieges, simulation, liens, references). Written courses are cut into capsules: one notion each, 5–10 minutes, read in order, each covering some parts of the rubric; liens and references close the node. Arthur finishes capsules in the app (you can see which, not mark them); finishing them all marks the course read.
 - State per concept, computed from evidence, never stored: locked (a prerequisite is not learned yet), available, in-progress, learned, mastered. learned = course read + ≥70% of difficulty ≤3 exercises solved, half of those without a hint (or Arthur marked it learned). mastered = learned + a difficulty 4–5 exercise solved + every card's FSRS stability > 21 days (or marked mastered). Mastery is lost by itself when cards decay.
 - Evidence you may record: the manual status (none, in-progress, learned, mastered — for a node he tested out of, or to override), whether the course was read, study sessions (minutes + note), and exercise attempts (outcome + minutes + note). Outcomes: resolu-seul (solved alone), resolu-avec-indice (solved with a hint), echec (failed), abandonne (gave up). The best attempt per exercise counts. The note of an attempt — what blocked him — is the most valuable field: write it precisely.
 - Entries you record are marked as yours; you can edit or delete only those.
@@ -312,7 +312,7 @@ export function registerMathsTools(server: McpServer) {
     {
       title: "Get a maths node",
       description:
-        "Everything about one node. For a concept: state and why (course read, manual status, exercises, cards against the thresholds), prerequisites and what it unlocks with their states, the course's sections, every exercise with its best outcome, every card with its FSRS state, and the logged sessions and attempts. For a domain or topic: its children.",
+        "Everything about one node. For a concept: state and why (course read, manual status, exercises, cards against the thresholds), prerequisites and what it unlocks with their states, the course's capsules (with which are finished) or sections, every exercise with its best outcome, every card with its FSRS state, and the logged sessions and attempts. For a domain or topic: its children.",
       inputSchema: z.object({ node: nodeRef }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -349,6 +349,8 @@ export function registerMathsTools(server: McpServer) {
         ids.length ? ids.map((id) => `${s.graph.byId.get(id)?.title ?? id} (${id}, ${s.states.get(id) ?? "locked"})`).join("; ") : "none";
 
       const course = loadCourse(node);
+      const capsules = loadModules(node);
+      const done = s.donnees.modules.get(node.id) ?? new Set<string>();
       const exercises = loadExercises(node);
       const cards = loadCards(node);
       const best = new Map<string, AttemptRow>();
@@ -373,16 +375,23 @@ export function registerMathsTools(server: McpServer) {
         `Unlocks: ${rel(node.unlocks)}`,
         "",
         `## Course — ${node.contentStatus}`,
-        course
-          ? sections(course.body).map((x) => `- ${x.title}${x.anchor ? ` (#${x.anchor})` : ""}`).join("\n")
-          : "Not written yet.",
+        !course
+          ? "Not written yet."
+          : capsules.length
+            ? [
+                `${capsules.filter((c) => done.has(c.id)).length}/${capsules.length} capsules finished. Capsules, in order (read one with read_maths_course):`,
+                ...capsules.map(
+                  (c) => `- ${c.numero}. ${c.title} (${c.id}) · ${c.minutes} min · covers ${c.rubrique.join(", ")} · ${done.has(c.id) ? "finished" : "not finished"}`,
+                ),
+              ].join("\n")
+            : sections(course.body).map((x) => `- ${x.title}${x.anchor ? ` (#${x.anchor})` : ""}`).join("\n"),
         "",
         `## Exercises (${exercises.length})`,
         exercises.length
           ? exercises
               .map((e) => {
                 const b = best.get(exerciseKey(node.id, e.id));
-                return `- ${e.id} · ${e.kind} · difficulty ${e.difficulty} · ${plural(e.hints.length, "hint")} · ${b ? `best: ${OUTCOME_LABELS[b.outcome]}` : "not attempted"}`;
+                return `- ${e.id} · ${e.kind} · difficulty ${e.difficulty}${e.after ? ` · after capsule ${e.after}` : ""} · ${plural(e.hints.length, "hint")} · ${b ? `best: ${OUTCOME_LABELS[b.outcome]}` : "not attempted"}`;
               })
               .join("\n")
           : "None.",
@@ -407,10 +416,10 @@ export function registerMathsTools(server: McpServer) {
     {
       title: "Read a maths course",
       description:
-        `The course of a concept, as written (French Markdown with KaTeX and code). Pass a section to get only that part: its anchor (${RUBRIQUE.map((r) => r.id).join(", ")}) or its number (1–9). Without one, the whole course.`,
+        `The course of a concept, as written (French Markdown with KaTeX and code). Pass a section to get only that part: a capsule id or number (from get_maths_node), "liens" or "references", or a rubric part (${RUBRIQUE.map((r) => r.id).join(", ")}) to get every capsule covering it. Without one, the whole course.`,
       inputSchema: z.object({
         concept: conceptRef,
-        section: z.string().max(40).optional().describe("Section anchor or number."),
+        section: z.string().max(60).optional().describe("Capsule id or number, section anchor, or rubric part."),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -423,12 +432,21 @@ export function registerMathsTools(server: McpServer) {
       const all = sections(course.body);
       if (!section) return ok(`# ${r.node.title} — ${r.node.contentStatus}\n\n${course.body.trim()}`);
       const want = section.trim().toLowerCase().replace(/^#/, "");
+      const capsules = loadModules(r.node);
+      const parNumero = /^\d+$/.test(want) ? capsules.find((c) => c.numero === Number(want)) : undefined;
       const hit =
         all.find((x) => x.anchor === want) ??
+        (parNumero && all.find((x) => x.anchor === parNumero.id)) ??
         all.find((x) => x.title.startsWith(`${want}.`)) ??
         all.find((x) => x.title.toLowerCase().includes(want));
-      if (!hit) return failure(`No section "${section}". Sections: ${all.map((x) => x.anchor || x.title).join(", ")}.`);
-      return ok(`# ${r.node.title}\n\n${hit.text}`);
+      if (hit) return ok(`# ${r.node.title}\n\n${hit.text}`);
+      // A rubric part on a node cut into capsules: every capsule covering it.
+      const couvrant = capsules.filter((c) => (c.rubrique as string[]).includes(want));
+      if (couvrant.length) {
+        const textes = couvrant.map((c) => all.find((x) => x.anchor === c.id)?.text ?? "").filter(Boolean);
+        return ok(`# ${r.node.title} — capsules covering ${want}\n\n${textes.join("\n\n")}`);
+      }
+      return failure(`No section "${section}". Sections: ${all.map((x) => x.anchor || x.title).join(", ")}.`);
     },
   );
 

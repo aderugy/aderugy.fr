@@ -1,0 +1,46 @@
+---
+title: Suites extraites et valeurs d'adhérence
+minutes: 6
+rubrique: [construction, pieges, simulation]
+---
+
+### Définitions
+
+Une extraction est une application $\varphi : \mathbb{N} \to \mathbb{N}$
+strictement croissante ; $(u_{\varphi(n)})$ est une suite extraite
+(*subsequence*) de $(u_n)$. Un réel $a$ est une valeur d'adhérence de $(u_n)$
+s'il existe une extraction $\varphi$ telle que $u_{\varphi(n)} \to a$.
+
+Une propriété élémentaire servira au critère de Cauchy : pour toute extraction,
+$\varphi(k) \ge k$. Elle se démontre par récurrence immédiate — $\varphi(0) \ge 0$,
+et $\varphi(k+1) > \varphi(k) \ge k$ donne $\varphi(k+1) \ge k + 1$.
+
+### Piège : bornée, deux valeurs d'adhérence, aucune limite
+
+$u_n = (-1)^n$ est bornée et n'a pas de limite : elle a deux valeurs
+d'adhérence, $-1$ et $1$, atteintes par les rangs impairs et les rangs pairs.
+
+```python
+import numpy as np
+
+# (-1)^n : bornee, deux valeurs d'adherence, aucune limite
+v = np.array([(-1) ** n for n in range(20)])
+print("pairs  ->", np.unique(v[::2]), "  impairs ->", np.unique(v[1::2]))
+```
+
+Sortie obtenue :
+
+```
+pairs  -> [1]   impairs -> [-1]
+```
+
+Une suite convergente a toutes ses suites extraites convergentes vers la même
+limite ; deux valeurs d'adhérence distinctes suffisent donc à prouver la
+divergence.
+
+### Piège : une infinité de valeurs d'adhérence
+
+Une énumération des rationnels de $[0,1]$ admet tout point de $[0,1]$ comme
+valeur d'adhérence. « Avoir une valeur d'adhérence » est donc une information
+très faible ; « en avoir exactement une, et être bornée » équivaut en revanche à
+converger — c'est l'exercice 11 du nœud.

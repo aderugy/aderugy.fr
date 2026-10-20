@@ -1,12 +1,14 @@
 # Cartes de révision du nœud. L'état FSRS (stabilité, difficulté, échéance)
 # vit en base, pas ici : ce fichier ne contient que le contenu, versionné.
 #
-# `ref` pointe vers l'ancre de la section du cours dont la carte provient
-# (décision D1) : une carte échouée ramène au passage exact à relire.
+# `ref` pointe vers la capsule dont la carte provient (son id, le nom du
+# fichier de modules/ sans numéro), ou vers une section du nœud (`liens`,
+# `references`) : une carte échouée ramène au passage exact à relire
+# (décisions D1 et D25).
 
 cards:
   - id: definition-convergence
-    ref: construction
+    ref: definition-convergence
     front: "Écrire la définition de $u_n \\to \\ell$, avec les quantificateurs dans l'ordre."
     back: |
       $\forall \varepsilon > 0,\ \exists N \in \mathbb{N},\ \forall n \ge N,\
@@ -15,7 +17,7 @@ cards:
       L'ordre compte : $N$ dépend de $\varepsilon$, jamais l'inverse.
 
   - id: axiome-borne-sup
-    ref: construction
+    ref: borne-sup
     front: "Quel axiome distingue $\\mathbb{R}$ de $\\mathbb{Q}$, et où sert-il dans ce nœud ?"
     back: |
       L'axiome de la borne supérieure : toute partie non vide et majorée de
@@ -25,7 +27,7 @@ cards:
       monotone ; Bolzano-Weierstrass et le critère de Cauchy en découlent.
 
   - id: caracterisation-sup
-    ref: construction
+    ref: borne-sup
     front: "Caractérisation de $s = \\sup A$ avec un $\\varepsilon$ ?"
     back: |
       $s$ majore $A$, et pour tout $\varepsilon > 0$ il existe $a \in A$ tel que
@@ -35,14 +37,14 @@ cards:
       que $a = \sup A$ » suppose un maximum, qui peut ne pas exister.
 
   - id: limite-monotone
-    ref: construction
+    ref: limite-monotone
     front: "Théorème de la limite monotone : énoncé et limite."
     back: |
       Une suite croissante et majorée converge, et sa limite est
       $\sup_n u_n$. (Symétriquement pour décroissante et minorée, vers l'inf.)
 
   - id: bolzano-weierstrass
-    ref: construction
+    ref: bolzano-weierstrass
     front: "Énoncé de Bolzano-Weierstrass. Que ne dit-il **pas** ?"
     back: |
       De toute suite bornée on peut extraire une suite convergente.
@@ -51,7 +53,7 @@ cards:
       d'adhérence, et diverge.
 
   - id: cauchy-definition
-    ref: construction
+    ref: cauchy
     front: "Définition d'une suite de Cauchy, et pourquoi elle est utile."
     back: |
       $\forall \varepsilon > 0,\ \exists N,\ \forall p, q \ge N,\
@@ -62,7 +64,7 @@ cards:
       $\mathbb{Q}$ — elle équivaut à la convergence.
 
   - id: pas-consecutifs
-    ref: pieges
+    ref: cauchy
     front: "$u_{n+1} - u_n \\to 0$ entraîne-t-il la convergence ? Contre-exemple."
     back: |
       Non. $u_n = \sqrt n$ : $u_{n+1} - u_n = \dfrac{1}{\sqrt{n+1} + \sqrt n}
@@ -72,7 +74,7 @@ cards:
       grands, pas seulement les rangs consécutifs.
 
   - id: inegalites-strictes
-    ref: pieges
+    ref: premieres-proprietes
     front: "Que devient une inégalité stricte par passage à la limite ?"
     back: |
       Elle devient large. $u_n = 1/n > 0$ pour tout $n$, et $\lim u_n = 0$.
@@ -80,7 +82,7 @@ cards:
       De $u_n < v_n$ on ne tire que $\lim u_n \le \lim v_n$.
 
   - id: sup-non-atteint
-    ref: pieges
+    ref: borne-sup
     front: "Donner un ensemble dont la borne supérieure n'est pas un maximum."
     back: |
       $A = \{1 - 1/n : n \ge 1\}$ : $\sup A = 1 \notin A$.
@@ -98,7 +100,7 @@ cards:
       $0$. Elle redevient vraie si $(u_n)$ est monotone.
 
   - id: heron-precision
-    ref: simulation
+    ref: vitesse
     front: "Deux suites convergentes peuvent-elles avoir des coûts incomparables ?"
     back: |
       Oui, et la définition $\varepsilon$-$N$ ne les distingue pas. Héron double

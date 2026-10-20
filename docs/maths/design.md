@@ -127,7 +127,9 @@ Aucun chiffre de progression en gros, aucune bannière.
 ```
 
 Le rail gauche est la rubrique du §6, toujours dans le même ordre, sur toutes les
-pages : il devient un repère mémorisable. Le rail droit est le seul endroit où
+pages : il devient un repère mémorisable. *Depuis D25, pour un nœud découpé en capsules,
+le rail gauche liste les capsules et la colonne centrale devient le parcours ;
+chaque capsule se lit seule dans un lecteur sans rails.* Le rail droit est le seul endroit où
 des chiffres d'état sont affichés. Les exercices sont des bandes séparées par des
 filets, pas des cartes.
 

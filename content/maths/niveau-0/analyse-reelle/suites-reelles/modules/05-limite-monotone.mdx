@@ -1,0 +1,38 @@
+---
+title: La limite monotone, là où l'axiome entre en scène
+minutes: 6
+rubrique: [construction, demonstrations]
+---
+
+### L'énoncé
+
+> **Théorème de la limite monotone.** Une suite croissante et majorée converge,
+> vers $\sup_n u_n$.
+
+Symétriquement, une suite décroissante et minorée converge vers sa borne
+inférieure.
+
+### Démonstration
+
+Soit $(u_n)$ croissante et majorée. La partie
+$A = \{u_n : n \in \mathbb{N}\}$ est non vide et majorée, donc $s = \sup A$
+existe par l'axiome de la borne supérieure. Soit $\varepsilon > 0$. Comme
+$s - \varepsilon$ n'est pas un majorant de $A$, il existe $N$ tel que
+$u_N > s - \varepsilon$. La croissance donne, pour tout $n \ge N$,
+
+$$
+s - \varepsilon < u_N \le u_n \le s < s + \varepsilon ,
+$$
+
+donc $|u_n - s| < \varepsilon$. Ainsi $u_n \to s$. $\square$
+
+### Pourquoi c'est la pièce maîtresse
+
+C'est ici que l'axiome entre en scène, et c'est le seul point du nœud où il est
+utilisé directement : Bolzano-Weierstrass et le critère de Cauchy, dans les
+capsules suivantes, s'en déduisent.
+
+L'étape « $s - \varepsilon$ n'est pas un majorant » est exactement la
+caractérisation de la borne supérieure vue plus tôt. Sans l'axiome, $s$
+n'existerait pas : la suite de Héron est décroissante à partir du rang $1$,
+minorée par $1$, faite de rationnels, et n'a pas de limite dans $\mathbb{Q}$.

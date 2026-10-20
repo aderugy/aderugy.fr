@@ -1,16 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   addAttempt,
   addSession,
+  modulesDoneOf,
   reviewStateOf,
   saveReview,
   setCourseRead,
   setManual,
+  setModuleDone,
 } from "@/server/maths/data";
 import { loadGraph } from "@/lib/maths/graph/load";
-import { cardKey, exerciseKey, loadExercises } from "@/lib/maths/content";
+import { cardKey, exerciseKey, loadExercises, loadModules } from "@/lib/maths/content";
+import { coursTermine, voisine } from "@/lib/maths/progression/capsules";
 import { compiler } from "@/lib/maths/mdx";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import {
@@ -42,6 +46,42 @@ export async function marquerCoursLu(nodeId: string, formData: FormData) {
   await setCourseRead(nodeId, formData.get("read") === "1");
   revalidatePath(`/maths/n/${nodeId}`);
   revalidatePath("/maths");
+}
+
+/**
+ * Termine une capsule, puis enchaîne sur la suivante — ou revient au nœud
+ * après la dernière. Terminer la dernière capsule non lue marque le cours
+ * comme lu : c'est la seule preuve de lecture que lisent les règles de
+ * progression, et elle reste acquise si l'on rouvre ensuite une capsule.
+ */
+export async function terminerCapsule(nodeId: string, moduleId: string) {
+  const capsules = capsulesDe(nodeId);
+  if (!capsules.some((c) => c.id === moduleId))
+    throw new Error(`capsule inconnue : ${nodeId}/${moduleId}`);
+  await setModuleDone(nodeId, moduleId, true);
+  if (coursTermine(capsules, await modulesDoneOf(nodeId)))
+    await setCourseRead(nodeId, true);
+  revalidatePath(`/maths/n/${nodeId}`);
+  revalidatePath(`/maths/n/${nodeId}/m/${moduleId}`);
+  revalidatePath("/maths");
+  const suivante = voisine(capsules, moduleId, 1);
+  redirect(suivante ? `/maths/n/${nodeId}/m/${suivante}` : `/maths/n/${nodeId}`);
+}
+
+/** Rouvre une capsule terminée, pour la relire comme neuve. */
+export async function rouvrirCapsule(nodeId: string, moduleId: string) {
+  const capsules = capsulesDe(nodeId);
+  if (!capsules.some((c) => c.id === moduleId))
+    throw new Error(`capsule inconnue : ${nodeId}/${moduleId}`);
+  await setModuleDone(nodeId, moduleId, false);
+  revalidatePath(`/maths/n/${nodeId}`);
+  revalidatePath(`/maths/n/${nodeId}/m/${moduleId}`);
+  revalidatePath("/maths");
+}
+
+function capsulesDe(nodeId: string) {
+  assertConcept(nodeId);
+  return loadModules(loadGraph().byId.get(nodeId)!);
 }
 
 export async function ajouterSession(nodeId: string, formData: FormData) {

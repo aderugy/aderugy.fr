@@ -1,0 +1,50 @@
+---
+title: La borne supérieure, l'axiome qui fonde ℝ
+minutes: 7
+rubrique: [construction, intuition, pieges]
+---
+
+### Définitions
+
+**Majorant, borne supérieure.** Une partie $A \subseteq \mathbb{R}$ non vide est
+majorée s'il existe $M$ tel que $a \le M$ pour tout $a \in A$. La borne
+supérieure $\sup A$ est le plus petit des majorants.
+
+> **Axiome de la borne supérieure.** Toute partie non vide et majorée de
+> $\mathbb{R}$ admet une borne supérieure dans $\mathbb{R}$.
+
+Ce n'est pas un théorème : c'est ce qui définit $\mathbb{R}$ parmi les corps
+totalement ordonnés. $\mathbb{Q}$ ne le vérifie pas — la partie
+$\{q \in \mathbb{Q} : q^2 < 2\}$ est majorée et n'a pas de borne supérieure
+rationnelle.
+
+### La caractérisation qui sert partout
+
+$s = \sup A$ si et seulement si $s$ majore $A$ et, pour tout
+$\varepsilon > 0$, il existe $a \in A$ tel que $a > s - \varepsilon$.
+
+C'est sous cette forme, et presque jamais sous la forme « plus petit des
+majorants », que la borne supérieure entre dans les démonstrations : la
+première fois sera la limite monotone, deux capsules plus loin.
+
+### Intuition
+
+La borne supérieure, c'est « le meilleur majorant possible ». Elle n'est pas
+forcément atteinte : $\sup\{1 - 1/n : n \ge 1\} = 1$ alors qu'aucun terme ne vaut
+$1$. Un maximum est une borne supérieure qui appartient à l'ensemble ; l'inverse
+est faux, et c'est précisément pour cela que la borne supérieure existe toujours
+alors que le maximum, non.
+
+### Piège : la borne supérieure n'est pas un maximum
+
+$A = \{1 - 1/n : n \ge 1\}$ a pour borne supérieure $1$, qui n'appartient pas à
+$A$. Écrire « soit $a \in A$ tel que $a = \sup A$ » est faux en général ; c'est
+« pour tout $\varepsilon > 0$, il existe $a \in A$ tel que
+$a > \sup A - \varepsilon$ » qu'il faut écrire.
+
+### Admis dans ce nœud
+
+L'unicité de $\mathbb{R}$ à isomorphisme près comme corps totalement ordonné
+vérifiant l'axiome de la borne supérieure, et sa construction effective
+(coupures de Dedekind ou complétion de $\mathbb{Q}$). La démonstration se trouve
+dans Rudin, *Principles of Mathematical Analysis*, chapitre 1 et son appendice.

@@ -1,5 +1,5 @@
 import "server-only";
-import { loadCards, loadCourse, loadExercises } from "@/lib/maths/content";
+import { lienSource, loadCards, loadCourse, loadExercises, loadModules } from "@/lib/maths/content";
 import { loadGraph } from "@/lib/maths/graph/load";
 import type { Graph } from "@/lib/maths/graph/types";
 
@@ -13,6 +13,8 @@ export type Document = {
   titre: string;
   /** Ancre ou fragment vers lequel pointer, sans le `#`. */
   ancre: string;
+  /** Où ouvrir le résultat : la capsule, ou la page du nœud à l'ancre. */
+  lien: string;
   texte: string;
   /** Texte normalisé, pour la recherche. */
   cle: string;
@@ -44,6 +46,7 @@ function doc(
   titre: string,
   ancre: string,
   texte: string,
+  capsules: { id: string }[] = [],
 ): Document {
   return {
     type,
@@ -51,6 +54,7 @@ function doc(
     nodeTitle,
     titre,
     ancre,
+    lien: lienSource(nodeId, ancre, capsules),
     texte,
     cle: normaliser(texte),
     titreCle: normaliser(`${titre} ${nodeTitle}`),
@@ -63,6 +67,7 @@ export function index(graph: Graph = loadGraph()): Document[] {
   const docs: Document[] = [];
 
   for (const node of graph.concepts) {
+    const capsules = loadModules(node);
     docs.push(
       doc(
         "noeud",
@@ -76,15 +81,15 @@ export function index(graph: Graph = loadGraph()): Document[] {
 
     const course = loadCourse(node);
     if (course) {
-      // Une entrée par section : un résultat doit renvoyer au bon endroit du
-      // cours, pas au haut de la page.
+      // Une entrée par section — par capsule pour un nœud découpé (D25) : un
+      // résultat doit renvoyer au bon endroit du cours, pas au haut de la page.
       for (const bloc of course.body.split(/\n(?=## )/)) {
         const entete = /^##\s+(.*?)\s*(?:\{#([\w-]+)\})?\s*$/m.exec(
           bloc.split("\n")[0],
         );
         const titre = entete?.[1] ?? "Introduction";
         const ancre = entete?.[2] ?? "";
-        docs.push(doc("cours", node.id, node.title, titre, ancre, bloc));
+        docs.push(doc("cours", node.id, node.title, titre, ancre, bloc, capsules));
       }
     }
 
@@ -110,6 +115,7 @@ export function index(graph: Graph = loadGraph()): Document[] {
           `carte ${c.id}`,
           c.ref,
           `${c.front}\n${c.back}`,
+          capsules,
         ),
       );
     }

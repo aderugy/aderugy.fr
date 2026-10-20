@@ -1,0 +1,59 @@
+---
+title: Converger — la définition ε-N comme un jeu
+minutes: 8
+rubrique: [construction, intuition, simulation]
+---
+
+### La définition
+
+$(u_n)$ converge vers $\ell \in \mathbb{R}$ si
+
+$$
+\forall \varepsilon > 0,\ \exists N \in \mathbb{N},\ \forall n \ge N,\quad
+|u_n - \ell| < \varepsilon .
+$$
+
+On note $u_n \to \ell$ ou $\lim_{n \to \infty} u_n = \ell$. Une suite qui ne
+converge vers aucun réel est dite divergente.
+
+**Suite bornée.** $(u_n)$ est bornée s'il existe $M \ge 0$ tel que
+$|u_n| \le M$ pour tout $n$. La notion sert dès la capsule suivante.
+
+### Intuition : un jeu à deux coups
+
+La définition $\varepsilon$-$N$ se lit comme un jeu à deux coups. Un adversaire
+annonce une tolérance $\varepsilon$, aussi petite qu'il veut ; je dois répondre
+un rang $N$ à partir duquel je garantis que la suite reste dans la bande
+$]\ell - \varepsilon, \ell + \varepsilon[$. La suite converge si j'ai une réponse
+à *toutes* ses annonces. L'ordre des quantificateurs est l'énoncé : $N$ dépend de
+$\varepsilon$, et c'est l'adversaire qui parle en premier.
+
+### Le rang $N$ se calcule vraiment
+
+Pour $u_n = 1/n$ et $\ell = 0$, la réponse au coup $\varepsilon$ est explicite.
+
+```python
+import numpy as np
+
+# Le rang N de la definition, pour u_n = 1/n et l = 0.
+# L'inegalite est stricte : N = floor(1/eps) + 1, pas ceil(1/eps).
+for eps in (1e-2, 1e-4, 1e-6):
+    N = int(np.floor(1 / eps)) + 1
+    print(f"eps={eps:.0e}  N={N:>9}  |u_N - 0|={1/N:.3e} < eps : {1 / N < eps}")
+```
+
+Sortie obtenue :
+
+```
+eps=1e-02  N=      101  |u_N - 0|=9.901e-03 < eps : True
+eps=1e-04  N=    10001  |u_N - 0|=9.999e-05 < eps : True
+eps=1e-06  N=  1000001  |u_N - 0|=1.000e-06 < eps : True
+```
+
+Avec $\varepsilon = 10^{-2}$, le rang correct est $101$ et non $100$ :
+$u_{100} = 10^{-2}$ n'est pas strictement inférieur à $\varepsilon$. La
+définition demande une inégalité stricte, donc
+$N = \lfloor 1/\varepsilon \rfloor + 1$. L'erreur d'une unité n'a aucune
+conséquence pratique et fausse l'énoncé. (Sur la dernière ligne,
+$1/1\,000\,001 \approx 9{,}99999 \cdot 10^{-7}$ s'affiche arrondi à
+$1{,}000 \cdot 10^{-6}$ : l'inégalité stricte tient bien.)

@@ -49,7 +49,7 @@ export default async function RecherchePage({
             <div className="chrome flex flex-wrap items-baseline gap-x-2">
               <span className="text-muted">{LIBELLE[r.type]}</span>
               <Link
-                href={`/maths/n/${r.nodeId}${r.ancre ? `#${r.ancre}` : ""}`}
+                href={r.lien}
                 className="font-medium hover:text-accent"
               >
                 {r.titre}

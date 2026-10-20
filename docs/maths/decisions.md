@@ -445,3 +445,71 @@ contrôles de widget), passe en noir sur blanc, force un saut de page avant
 chaque nœud et interdit de couper un énoncé, une figure, un bloc de code ou une
 formule affichée. Vérifié en émulant le média d'impression : 22 pages A4
 générées pour le seul nœud rédigé, en-tête et boutons absents.
+
+## D25 — Le cours en capsules — **demandée le 2026-10-20**
+
+Arthur a demandé de gamifier /maths, en commençant par découper les longues
+leçons en micro-modules. Cette décision couvre le découpage seul (phase 1) ;
+l'XP, les séries et les badges viendront ensuite et amenderont le §13, qui les
+exclut aujourd'hui.
+
+**Une capsule = une notion, 5 à 10 minutes.** Pas une section de la rubrique :
+la rubrique du §6 classe le texte par *type* (construction, intuition,
+preuves, pièges), si bien qu'une même notion — la borne supérieure, par
+exemple — était éparpillée sur quatre sections, et qu'une section comme
+« démonstrations » pesait à elle seule 40 % du cours. Couper aux sections
+aurait donné des capsules déséquilibrées mêlant cinq notions. Chaque capsule
+reprend donc l'arc de la rubrique en petit, pour sa notion.
+
+**La rubrique reste une obligation, au niveau du nœud.** Chaque capsule
+déclare dans son frontmatter les sections qu'elle couvre (`rubrique:`) ; les
+sections 1 à 7 doivent être couvertes par l'ensemble des capsules, et la
+coquille `course.mdx` porte les sections 8 et 9 (liens, références), qui
+appartiennent au nœud entier. `src/lib/maths/content.test.ts` le vérifie sur
+le contenu réel, avec les `ref` de cartes et les `after` d'exercices : une
+capsule renommée ne laisse rien pointer dans le vide.
+
+**Format.** `content/<domain>/<topic>/<concept>/modules/NN-<id>.mdx`, avec
+`title`, `minutes` et `rubrique` en frontmatter, des titres internes de
+niveau 3 au plus. Le numéro fixe l'ordre ; l'id — le nom sans numéro — est la
+clé en base et dans les `ref` : on peut réordonner sans rien perdre.
+`course.mdx` garde le `status` (D2 inchangée). Un exercice porte `after: <id>`,
+la capsule à partir de laquelle il est faisable ; une carte porte
+`ref: <id de capsule>`, ou `liens` / `references`.
+
+**Le corpus reste un manuel (§12).** `loadCourse` recompose le cours d'un
+seul tenant — chaque capsule sous un titre de niveau 2 ancré sur son id, puis
+la coquille. La recherche, `/corpus` et le connecteur lisent ce cours composé
+et n'ont presque pas changé ; une recherche ou une carte ratée ouvre
+directement la capsule (`lienSource`).
+
+**Les deux formats cohabitent.** Un nœud sans dossier `modules/` garde le cours
+en continu et le rail de la rubrique. Il n'y en a qu'un rédigé aujourd'hui, et
+il est converti ; les suivants s'écrivent directement en capsules.
+
+**État.** Une table, `maths_module_progress` (migration 0029) : une ligne par
+capsule terminée. Terminer la dernière capsule pose `course_read` : c'est
+toujours la seule preuve de lecture que lisent les règles du §4, qui ne
+changent pas. Rouvrir une capsule ne retire pas `course_read` — le cours a
+bien été lu. La lecture de la table est tolérante tant que la migration n'est
+pas appliquée. Le connecteur lit les capsules terminées et ne peut pas en
+terminer : une capsule se termine en la lisant, dans l'application.
+
+**Pas de verrou entre capsules.** Le parcours en propose une — la première non
+terminée — mais toutes restent ouvertes : relire une démonstration ou sauter
+ce qu'on sait déjà (§2, test de sortie) ne doit rien coûter. Les exercices non
+plus ne sont pas verrouillés ; ils sont rangés après leur capsule.
+
+**Interface.** La page de nœud devient le parcours : jauge `▮▯`, capsules dans
+l'ordre avec leurs exercices, une seule action « reprendre ». Le lecteur
+`/maths/n/<id>/m/<capsule>` est une colonne sans rails, pensée aussi pour le
+téléphone, avec une action principale : « terminer et passer à la suivante ».
+Aucune couleur nouvelle : terminer une capsule n'est pas un niveau de
+maîtrise, la rampe reste réservée à l'état du nœud (§9).
+
+**Contenu de `suites-reelles`.** Le cours a été redistribué en neuf capsules
+sans réécriture de fond : seules les transitions sont neuves. Le grand bloc
+Python de la section 7 est coupé en trois extraits, chacun dans la capsule
+qu'il illustre, et leurs sorties ont été régénérées en exécutant le code (la
+sortie publiée omettait des lignes). Les liens internes `/n/…`, cassés depuis
+l'intégration au site, pointent désormais vers `/maths/n/…`.

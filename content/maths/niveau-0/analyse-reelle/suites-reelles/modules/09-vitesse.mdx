@@ -1,0 +1,79 @@
+---
+title: Converger n'est pas converger vite
+minutes: 8
+rubrique: [simulation]
+---
+
+La première capsule posait deux questions. Tout le nœud a répondu à la
+première — de quoi la suite se rapproche-t-elle. Celle-ci vérifie
+numériquement la seconde : **à quelle distance de la limite est-on après $n$
+étapes ?**
+
+### Héron contre la moyenne empirique
+
+```python
+import numpy as np
+
+# 1. Heron : le nombre de decimales exactes double a chaque iteration
+u, cible = 1.0, np.sqrt(2)
+for n in range(1, 6):
+    u = 0.5 * (u + 2 / u)
+    print(f"Heron  n={n}  u={u:.15f}  erreur={abs(u - cible):.3e}")
+
+# 2. Moyenne empirique : converge aussi, mais l'erreur est aleatoire.
+#    Sur UNE trajectoire elle fluctue ; c'est en moyenne sur les trajectoires
+#    qu'apparait le regime en 1/sqrt(n).
+rng = np.random.default_rng(0)
+R = 400                                    # trajectoires independantes
+for n in (10**2, 10**4, 10**6):
+    x = rng.random((R, n))                 # uniformes sur [0, 1], moyenne 1/2
+    err = np.abs(x.mean(axis=1) - 0.5)
+    print(f"moyenne  n={n:>7}  erreur moyenne={err.mean():.3e}"
+          f"  une trajectoire={err[0]:.3e}")
+```
+
+Sortie obtenue :
+
+```
+Heron  n=1  u=1.500000000000000  erreur=8.579e-02
+Heron  n=2  u=1.416666666666667  erreur=2.453e-03
+Heron  n=3  u=1.414215686274510  erreur=2.124e-06
+Heron  n=4  u=1.414213562374690  erreur=1.595e-12
+Heron  n=5  u=1.414213562373095  erreur=2.220e-16
+moyenne  n=    100  erreur moyenne=2.298e-02  une trajectoire=4.829e-02
+moyenne  n=  10000  erreur moyenne=2.199e-03  une trajectoire=1.551e-03
+moyenne  n=1000000  erreur moyenne=2.334e-04  une trajectoire=3.320e-04
+```
+
+### Ce qu'il faut lire
+
+**Héron.** L'erreur passe de $2 \cdot 10^{-3}$ à $2 \cdot 10^{-6}$ puis
+$1{,}6 \cdot 10^{-12}$ : le nombre de décimales exactes double à chaque
+itération. À l'étape suivante elle devrait valoir $10^{-24}$ ; elle vaut
+$2 \cdot 10^{-16}$, parce qu'on a atteint la précision des flottants sur 64
+bits. La suite mathématique continue de converger, la suite calculée non — c'est
+une limite de la machine, pas du théorème.
+
+**La moyenne empirique.** Multiplier $n$ par $100$ divise l'erreur *moyenne* par
+environ $10$ — c'est le $1/\sqrt{n}$ qui sera démontré au théorème central
+limite. Mais la colonne de droite montre une seule trajectoire, où l'erreur
+peut très bien augmenter quand $n$ augmente. La convergence d'une moyenne
+empirique est un énoncé sur une suite aléatoire : il faut moyenner sur les
+trajectoires pour voir le régime. Confondre les deux est l'erreur qui attend au
+niveau 1.
+
+Les deux suites, Héron et la moyenne empirique, convergent au même sens. La
+définition $\varepsilon$-$N$ ne les distingue pas ; c'est le rôle des vitesses
+de convergence, hors de ce nœud.
+
+### En interactif
+
+Le même phénomène : chaque trait est une trajectoire de moyennes empiriques,
+l'axe des abscisses est logarithmique.
+
+<Convergence />
+
+Changer la loi pour Cauchy est instructif : la moyenne empirique cesse de
+converger. Ce n'est pas un défaut de la simulation, c'est que la loi de Cauchy
+n'a pas d'espérance — et donc que la loi des grands nombres a une hypothèse,
+qui sera énoncée au [niveau 1](/maths/n/loi-grands-nombres-intuitive).

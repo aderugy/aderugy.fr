@@ -17,6 +17,7 @@
 | 2026-09-10 | 4 | `ReviewCard` porte un champ `ref` : l'ancre de la section d'origine. | décision D1, appliquée |
 | 2026-09-10 | 7 | V1 livrée : FSRS, tentatives, déblocage automatique, recherche, Pyodide. | demandée |
 | 2026-09-10 | 7, 9 | V2 livrée. Graphiques à l'encre, jamais de palette catégorielle ; un seul widget, celui qui a du contenu ; l'export PDF est une feuille de style d'impression. | décisions D21 à D24, demandée |
+| 2026-10-20 | 4, 6, 8 | Le cours d'un concept est découpé en capsules (une notion, 5 à 10 min) dans `modules/NN-<id>.mdx` ; la rubrique reste obligatoire au niveau du nœud, chaque capsule déclarant les sections qu'elle couvre. `ReviewCard.ref` désigne une capsule ; un exercice porte `after`. Capsules terminées en base ; terminer la dernière vaut « cours lu ». | décision D25, demandée |
 
 ---
 
@@ -189,9 +190,15 @@ Les arêtes `requires` traversent les niveaux et ne relient que des `concept`.
 
 ## 6. Rubrique de contenu (obligatoire pour chaque nœud `concept`)
 
-Un cours suit toujours cette structure. Elle n'est pas indicative. Chaque section
-porte une **ancre stable** (`## 6. Pièges {#pieges}`) pour que les cartes de
-révision puissent pointer vers leur source.
+Un cours suit toujours cette structure. Elle n'est pas indicative.
+
+**Le cours est découpé en capsules** (décision D25) : une notion par capsule,
+lisible en 5 à 10 minutes, dans `modules/NN-<id>.mdx`. Chaque capsule reprend
+l'arc de la rubrique pour sa notion et déclare en frontmatter les sections
+qu'elle couvre ; l'ensemble des capsules couvre les sections 1 à 7, et
+`course.mdx` porte les sections 8 et 9. Les cartes de révision pointent vers
+leur capsule (`ref: <id>`), les exercices vers la capsule après laquelle ils
+deviennent faisables (`after: <id>`).
 
 1. **Position dans le graphe** `{#position}` — d'où l'on vient, à quoi cela sert
    plus loin, en trois phrases maximum.
@@ -264,7 +271,8 @@ Toute fonctionnalité hors de ces listes doit être justifiée par un nœud en c
 
 ```
 /content/{domain}/{topic}/{concept}/
-    course.mdx
+    course.mdx             ← statut, liens, références
+    modules/NN-<id>.mdx    ← les capsules, dans l'ordre (D25)
     exercises/*.mdx
     cards.yaml
 /content/projects/*.mdx
