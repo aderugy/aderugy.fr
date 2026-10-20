@@ -1,5 +1,6 @@
 "use server";
 
+import { createElement, Fragment, type ReactElement } from "react";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -85,7 +86,7 @@ export async function corrigerCheckpoint(
     ),
   );
   const explications = await Promise.all(
-    questions.map((q, i) => (justes[i] ? compiler(q.explication) : null)),
+    questions.map((q, i) => (justes[i] ? compiler(q.explication).then(cle(i)) : null)),
   );
   return { justes, tout, explications };
 }
@@ -265,7 +266,17 @@ export async function contenuExercice(nodeId: string, exerciseId: string) {
   const [statement, solution, ...hints] = await Promise.all([
     compiler(exercice.statement),
     compiler(exercice.solution),
-    ...exercice.hints.map(compiler),
+    ...exercice.hints.map((h, i) => compiler(h).then(cle(i))),
   ]);
   return { statement, hints, solution };
+}
+
+/**
+ * Les éléments renvoyés en liste par une action serveur ont besoin d'une clé,
+ * comme toute liste React ; le rendu MDX en cache n'en porte pas.
+ */
+function cle(i: number) {
+  return function avecCle(el: ReactElement) {
+    return createElement(Fragment, { key: i }, el);
+  };
 }

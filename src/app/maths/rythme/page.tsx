@@ -3,7 +3,11 @@ import { loadGraph } from "@/lib/maths/graph/load";
 import { chargerDonnees, revisionsParJour } from "@/server/maths/data";
 import { bilan } from "@/server/maths/jeu";
 import { BAREME, JOKERS_PAR_SEMAINE, type Evenement } from "@/lib/maths/jeu";
-import { dateCourte } from "@/lib/maths/etat";
+/** « 16 oct. » : un jour de Paris, sans heure. */
+const jourCourt = (jour: string) =>
+  new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" }).format(
+    new Date(`${jour}T12:00:00Z`),
+  );
 
 /**
  * Rythme (décision D26) : XP, niveau, série, objectif du jour, badges.
@@ -71,7 +75,7 @@ export default async function RythmePage() {
             <li className="text-muted">
               joker : {b.serie.jokerDisponible ? "disponible cette semaine" : "utilisé cette semaine"}
               {b.serie.jokers.length > 0 &&
-                ` · a couvert ${b.serie.jokers.map((j) => dateCourte(`${j}T12:00:00Z`)).join(", ")}`}
+                ` · a couvert ${b.serie.jokers.map(jourCourt).join(", ")}`}
             </li>
           </ul>
         </div>
@@ -100,36 +104,26 @@ export default async function RythmePage() {
         {b.recents.every((r) => r.xp === 0) ? (
           <p className="chrome text-muted">aucun gain sur la période</p>
         ) : (
-          <>
-            <svg
-              viewBox={`0 0 ${b.recents.length * 10} 40`}
-              className="block h-24 w-full max-w-xl"
-              role="img"
-              aria-label="XP par jour sur quatorze jours"
-            >
-              {b.recents.map((r, i) => {
-                const h = (r.xp / maxJour) * 36;
-                return (
-                  <rect key={r.jour} x={i * 10 + 1.5} y={38 - h} width="7" height={Math.max(h, r.xp > 0 ? 0.8 : 0)} fill="var(--accent)" />
-                );
-              })}
-              <line x1="0" y1="38.25" x2={b.recents.length * 10} y2="38.25" stroke="var(--border)" strokeWidth="0.5" />
-            </svg>
-            <table className="chrome mt-2 w-full max-w-xl">
-              <tbody>
-                <tr className="text-muted">
-                  {b.recents.map((r) => (
-                    <td key={r.jour} className="text-center tabular-nums">{Number(r.jour.slice(8))}</td>
-                  ))}
-                </tr>
-                <tr>
-                  {b.recents.map((r) => (
-                    <td key={r.jour} className="text-center tabular-nums">{r.xp || "·"}</td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </>
+          // Une colonne par jour : barre, valeur et date restent alignées à
+          // toute largeur, et la valeur est lisible sans survol (D21).
+          <ol
+            className="chrome grid max-w-xl gap-x-1"
+            style={{ gridTemplateColumns: `repeat(${b.recents.length}, minmax(0, 1fr))` }}
+            aria-label="XP par jour sur quatorze jours"
+          >
+            {b.recents.map((r) => (
+              <li key={r.jour} className="flex flex-col items-center">
+                <div className="border-line flex h-20 w-full items-end border-b">
+                  <div
+                    className="w-full bg-accent"
+                    style={{ height: `${(r.xp / maxJour) * 100}%` }}
+                  />
+                </div>
+                <span className="mt-1 tabular-nums">{r.xp || "·"}</span>
+                <span className="text-muted tabular-nums">{Number(r.jour.slice(8))}</span>
+              </li>
+            ))}
+          </ol>
         )}
       </Panneau>
 
@@ -142,7 +136,7 @@ export default async function RythmePage() {
                 <div className={x.obtenu ? "font-medium" : "text-muted"}>{x.nom}</div>
                 <div className="chrome text-muted">
                   {x.description}
-                  {x.obtenu && x.jour && ` · ${dateCourte(`${x.jour}T12:00:00Z`)}`}
+                  {x.obtenu && x.jour && ` · ${jourCourt(x.jour)}`}
                   {!x.obtenu && x.progres && ` · ${x.progres.fait} / ${x.progres.but}`}
                 </div>
               </div>
@@ -159,7 +153,7 @@ export default async function RythmePage() {
             <tbody>
               {b.journal.map((e, i) => (
                 <tr key={i} className="border-line border-b">
-                  <td className="text-muted w-24 py-1 pr-3 whitespace-nowrap">{dateCourte(`${e.jour}T12:00:00Z`)}</td>
+                  <td className="text-muted w-20 py-1 pr-3 whitespace-nowrap">{jourCourt(e.jour)}</td>
                   <td className="py-1 pr-3">{libelle(e, titre)}</td>
                   <td className="py-1 text-right tabular-nums whitespace-nowrap">+{e.xp}</td>
                 </tr>
