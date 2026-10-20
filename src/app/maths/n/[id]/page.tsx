@@ -213,7 +213,16 @@ export default async function NodePage({ params }: PageProps<"/maths/n/[id]">) {
                 nodeId={node.id}
                 capsules={capsules}
                 avancement={avancement}
-                exercicesApres={exercicesParCapsule(capsules, exercises)}
+                exercicesApres={exercicesParCapsule(
+                  capsules,
+                  exercises.filter((e) => e.difficulty < SEUILS.difficulteHaute),
+                )}
+                boss={exercises.filter((e) => e.difficulty >= SEUILS.difficulteHaute)}
+                bossVaincu={(preuves?.exercises ?? []).some(
+                  (e) =>
+                    e.difficulty >= SEUILS.difficulteHaute &&
+                    (e.outcome === "resolu-seul" || e.outcome === "resolu-avec-indice"),
+                )}
                 numeros={numeros}
                 tentatives={tentatives}
               />

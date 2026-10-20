@@ -15,6 +15,7 @@ import {
 import { loadGraph } from "@/lib/maths/graph/load";
 import { cardKey, exerciseKey, loadExercises, loadModules } from "@/lib/maths/content";
 import { coursTermine, voisine } from "@/lib/maths/progression/capsules";
+import { corriger, graineQuestion, versFichier } from "@/lib/maths/checkpoint";
 import { compiler } from "@/lib/maths/mdx";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import {
@@ -55,10 +56,70 @@ export async function marquerCoursLu(nodeId: string, formData: FormData) {
  * progression, et elle reste acquise si l'on rouvre ensuite une capsule.
  */
 export async function terminerCapsule(nodeId: string, moduleId: string) {
-  const capsules = capsulesDe(nodeId);
-  if (!capsules.some((c) => c.id === moduleId))
-    throw new Error(`capsule inconnue : ${nodeId}/${moduleId}`);
-  await setModuleDone(nodeId, moduleId, true);
+  const { capsules, capsule } = capsuleDe(nodeId, moduleId);
+  // Une capsule à checkpoint ne se termine qu'en le réussissant (D26).
+  if (capsule.checkpoint.length > 0)
+    throw new Error(`la capsule ${moduleId} se termine en réussissant son checkpoint`);
+  await finir(nodeId, moduleId, capsules, null);
+}
+
+/**
+ * Corrige un checkpoint sans rien enregistrer. Renvoie, pour chaque question,
+ * si elle est juste, et l'explication des seules questions justes : une
+ * réponse fausse n'apprend pas la bonne, on peut réessayer.
+ */
+export async function corrigerCheckpoint(
+  nodeId: string,
+  moduleId: string,
+  reponses: unknown[],
+) {
+  const user = await userFromClaims(await createClient());
+  if (!user) throw new Error("Not authenticated");
+  const { capsule } = capsuleDe(nodeId, moduleId);
+  const questions = capsule.checkpoint;
+  const { justes, tout } = corriger(
+    questions,
+    versFichier(questions, Array.isArray(reponses) ? reponses : [], (i) =>
+      graineQuestion(nodeId, moduleId, i),
+    ),
+  );
+  const explications = await Promise.all(
+    questions.map((q, i) => (justes[i] ? compiler(q.explication) : null)),
+  );
+  return { justes, tout, explications };
+}
+
+/**
+ * Termine une capsule à checkpoint. Les réponses sont recorrigées ici : rien
+ * de ce que le navigateur affirme n'est cru, sauf le nombre d'essais, qui ne
+ * sert qu'au bonus du premier essai.
+ */
+export async function validerCapsule(
+  nodeId: string,
+  moduleId: string,
+  reponses: unknown[],
+  essais: number,
+) {
+  const { capsules, capsule } = capsuleDe(nodeId, moduleId);
+  const questions = capsule.checkpoint;
+  const { tout } = corriger(
+    questions,
+    versFichier(questions, Array.isArray(reponses) ? reponses : [], (i) =>
+      graineQuestion(nodeId, moduleId, i),
+    ),
+  );
+  if (!tout) throw new Error("checkpoint non réussi");
+  const n = Number.isFinite(essais) ? Math.min(99, Math.max(1, Math.round(essais))) : 1;
+  await finir(nodeId, moduleId, capsules, questions.length > 0 ? n : null);
+}
+
+async function finir(
+  nodeId: string,
+  moduleId: string,
+  capsules: { id: string }[],
+  essais: number | null,
+) {
+  await setModuleDone(nodeId, moduleId, true, essais);
   if (coursTermine(capsules, await modulesDoneOf(nodeId)))
     await setCourseRead(nodeId, true);
   revalidatePath(`/maths/n/${nodeId}`);
@@ -70,18 +131,19 @@ export async function terminerCapsule(nodeId: string, moduleId: string) {
 
 /** Rouvre une capsule terminée, pour la relire comme neuve. */
 export async function rouvrirCapsule(nodeId: string, moduleId: string) {
-  const capsules = capsulesDe(nodeId);
-  if (!capsules.some((c) => c.id === moduleId))
-    throw new Error(`capsule inconnue : ${nodeId}/${moduleId}`);
+  capsuleDe(nodeId, moduleId);
   await setModuleDone(nodeId, moduleId, false);
   revalidatePath(`/maths/n/${nodeId}`);
   revalidatePath(`/maths/n/${nodeId}/m/${moduleId}`);
   revalidatePath("/maths");
 }
 
-function capsulesDe(nodeId: string) {
+function capsuleDe(nodeId: string, moduleId: string) {
   assertConcept(nodeId);
-  return loadModules(loadGraph().byId.get(nodeId)!);
+  const capsules = loadModules(loadGraph().byId.get(nodeId)!);
+  const capsule = capsules.find((c) => c.id === moduleId);
+  if (!capsule) throw new Error(`capsule inconnue : ${nodeId}/${moduleId}`);
+  return { capsules, capsule };
 }
 
 export async function ajouterSession(nodeId: string, formData: FormData) {

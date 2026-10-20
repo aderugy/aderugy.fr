@@ -2,6 +2,24 @@
 title: Premières conséquences — unicité, bornes, inégalités
 minutes: 9
 rubrique: [construction, demonstrations, pieges]
+checkpoint:
+- type: vrai-faux
+  question: Si $u_n > 0$ pour tout $n$ et $u_n \to \ell$, alors $\ell > 0$.
+  reponse: false
+  explication: 'Faux : $u_n = 1/n > 0$ tend vers $0$. Les inégalités strictes deviennent larges par passage à la limite ; on peut seulement conclure $\ell \ge 0$.'
+- type: qcm
+  question: Pour démontrer l'unicité de la limite, quelle tolérance choisit-on ?
+  choix:
+  - $\varepsilon = 1$
+  - $\varepsilon = |\ell - \ell'|/2$
+  - $\varepsilon = |\ell - \ell'|$
+  - N'importe laquelle
+  reponse: 1
+  explication: Avec $\varepsilon = |\ell - \ell'|/2$, l'inégalité triangulaire donne $|\ell - \ell'| < 2\varepsilon = |\ell - \ell'|$, absurde. Avec $\varepsilon = |\ell - \ell'|$, on obtiendrait seulement $|\ell - \ell'| < 2|\ell - \ell'|$, qui n'a rien de contradictoire.
+- type: vrai-faux
+  question: Toute suite bornée converge.
+  reponse: false
+  explication: 'Faux : $(-1)^n$ est bornée et diverge. Seul le sens inverse est vrai — une suite convergente est bornée.'
 ---
 
 Le brief n'exige des démonstrations complètes qu'à partir du niveau 3. Elles

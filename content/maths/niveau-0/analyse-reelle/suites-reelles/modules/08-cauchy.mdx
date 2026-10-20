@@ -2,6 +2,24 @@
 title: Cauchy — converger sans connaître la limite
 minutes: 10
 rubrique: [construction, intuition, demonstrations, pieges]
+checkpoint:
+- type: vrai-faux
+  question: Si $u_{n+1} - u_n \to 0$, alors $(u_n)$ converge.
+  reponse: false
+  explication: 'Faux : $u_n = \sqrt{n}$ a des pas $\frac{1}{\sqrt{n+1} + \sqrt{n}} \to 0$ et tend vers $+\infty$. La condition de Cauchy contrôle tous les couples de rangs assez grands, pas seulement les pas consécutifs.'
+- type: vrai-faux
+  question: Une suite de Cauchy de rationnels converge toujours dans $\mathbb{Q}$.
+  reponse: false
+  explication: 'Faux : la suite de Héron est de Cauchy, faite de rationnels, et sa limite $\sqrt{2}$ n''est pas dans $\mathbb{Q}$. Le critère de Cauchy est une propriété de $\mathbb{R}$ — sa complétude.'
+- type: qcm
+  question: Dans la réciproque du critère de Cauchy, quel résultat fournit la limite candidate ?
+  choix:
+  - le théorème de la limite monotone, appliqué à la suite
+  - Bolzano-Weierstrass, appliqué à la suite (bornée)
+  - l'unicité de la limite
+  - le passage à la limite dans les inégalités
+  reponse: 1
+  explication: La suite de Cauchy est bornée ; Bolzano-Weierstrass en extrait une suite convergente vers un $\ell$, puis la condition de Cauchy et $\varphi(k) \ge k$ montrent que la suite entière tend vers ce $\ell$.
 ---
 
 ### Définition

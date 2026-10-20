@@ -2,6 +2,19 @@
 title: Converger — la définition ε-N comme un jeu
 minutes: 8
 rubrique: [construction, intuition, simulation]
+checkpoint:
+- type: qcm
+  question: Laquelle de ces phrases est la définition de $u_n \to \ell$ ?
+  choix:
+  - $\exists N,\ \forall \varepsilon > 0,\ \forall n \ge N,\ |u_n - \ell| < \varepsilon$
+  - $\forall \varepsilon > 0,\ \exists N,\ \forall n \ge N,\ |u_n - \ell| < \varepsilon$
+  - $\forall \varepsilon > 0,\ \forall n,\ \exists m \ge n,\ |u_m - \ell| < \varepsilon$
+  reponse: 1
+  explication: '$N$ dépend de $\varepsilon$ : l''adversaire parle en premier. La première phrase force $u_n = \ell$ à partir d''un rang (suite stationnaire) ; la troisième dit seulement que $\ell$ est approchée par une infinité de termes — c''est une valeur d''adhérence, notion de la capsule 6.'
+- type: nombre
+  question: Pour $u_n = 1/n$, $\ell = 0$ et $\varepsilon = 10^{-3}$, quel est le plus petit rang $N$ qui convient dans la définition ?
+  reponse: 1001
+  explication: 'Il faut $1/n < 10^{-3}$, soit $n > 1000$ : le plus petit rang est $N = \lfloor 1/\varepsilon \rfloor + 1 = 1001$. Avec $N = 1000$, $u_{1000} = 10^{-3}$ n''est pas strictement inférieur à $\varepsilon$.'
 ---
 
 ### La définition

@@ -2,6 +2,29 @@
 title: La borne supérieure, l'axiome qui fonde ℝ
 minutes: 7
 rubrique: [construction, intuition, pieges]
+checkpoint:
+- type: qcm
+  question: 'Quelle est la borne supérieure de $A = \{1 - 1/n : n \ge 1\}$ ?'
+  choix:
+  - $0$
+  - $1$
+  - $A$ n'a pas de borne supérieure
+  - $1 - 1/n$ pour $n$ assez grand
+  reponse: 1
+  explication: '$1$ majore $A$, et pour tout $\varepsilon > 0$ il existe $n$ avec $1 - 1/n > 1 - \varepsilon$ : c''est le plus petit majorant. Il n''appartient pas à $A$ — une borne supérieure n''est pas forcément un maximum.'
+- type: qcm
+  question: $s$ majore $A$. Que faut-il de plus pour que $s = \sup A$ ?
+  choix:
+  - $s \in A$
+  - Pour tout $\varepsilon > 0$, il existe $a \in A$ tel que $a > s - \varepsilon$.
+  - Pour tout $a \in A$, $a < s$.
+  - $s$ est rationnel.
+  reponse: 1
+  explication: 'C''est la caractérisation qui sert dans toutes les démonstrations : aucun nombre strictement plus petit que $s$ ne majore $A$. Exiger $s \in A$ serait demander un maximum.'
+- type: vrai-faux
+  question: 'La partie $\{q \in \mathbb{Q} : q^2 < 2\}$ admet une borne supérieure dans $\mathbb{Q}$.'
+  reponse: false
+  explication: Faux. Elle est majorée (par $2$, par exemple), mais son plus petit majorant serait $\sqrt{2}$, qui n'est pas rationnel. C'est exactement ce que $\mathbb{Q}$ ne vérifie pas et que l'axiome impose à $\mathbb{R}$.
 ---
 
 ### Définitions

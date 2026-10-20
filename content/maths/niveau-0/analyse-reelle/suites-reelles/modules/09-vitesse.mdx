@@ -2,6 +2,28 @@
 title: Converger n'est pas converger vite
 minutes: 8
 rubrique: [simulation]
+checkpoint:
+- type: qcm
+  question: Pour la moyenne empirique de $n$ tirages uniformes, multiplier $n$ par $100$ divise l'erreur moyenne par environ…
+  choix:
+  - $100$
+  - $10$
+  - $2$
+  - 'rien : elle ne change pas'
+  reponse: 1
+  explication: 'Par $\sqrt{100} = 10$ : l''erreur moyenne décroît en $1/\sqrt{n}$, régime que démontrera le théorème central limite.'
+- type: vrai-faux
+  question: Sur une seule trajectoire, l'erreur de la moyenne empirique diminue chaque fois que $n$ augmente.
+  reponse: false
+  explication: 'Faux : sur une trajectoire, l''erreur est aléatoire et peut augmenter. Le régime en $1/\sqrt{n}$ n''apparaît qu''en moyennant sur de nombreuses trajectoires.'
+- type: qcm
+  question: Pourquoi l'erreur de Héron reste-t-elle vers $2 \cdot 10^{-16}$ au lieu de passer à $10^{-24}$ ?
+  choix:
+  - la suite mathématique a cessé de converger
+  - on a atteint la précision des flottants sur 64 bits
+  - la méthode de Héron converge en $1/n$
+  reponse: 1
+  explication: La suite mathématique continue de converger ; c'est la suite calculée qui bute sur la précision machine, d'environ $2 \cdot 10^{-16}$ en double précision.
 ---
 
 La première capsule posait deux questions. Tout le nœud a répondu à la

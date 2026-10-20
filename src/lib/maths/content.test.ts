@@ -19,6 +19,7 @@ const capsule = (id: string, numero: number, body = "texte"): Capsule => ({
   title: `Titre ${id}`,
   minutes: 5,
   rubrique: [],
+  checkpoint: [],
   body,
 });
 
@@ -105,6 +106,13 @@ describe("nœuds découpés en capsules", () => {
         expect(c.minutes).toBeLessThanOrEqual(10);
         // Le niveau 2 est réservé au titre de capsule dans le cours composé.
         expect(/^## /m.test(c.body)).toBe(false);
+      }
+    });
+
+    it(`${node.id} : chaque capsule a un checkpoint de 2 à 4 questions`, () => {
+      for (const c of capsules) {
+        if (c.checkpoint.length < 2 || c.checkpoint.length > 4)
+          throw new Error(`capsule ${c.id} : ${c.checkpoint.length} question(s) au checkpoint`);
       }
     });
 

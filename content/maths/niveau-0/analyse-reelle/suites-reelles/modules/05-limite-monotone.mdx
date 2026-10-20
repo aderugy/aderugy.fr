@@ -2,6 +2,24 @@
 title: La limite monotone, là où l'axiome entre en scène
 minutes: 6
 rubrique: [construction, demonstrations]
+checkpoint:
+- type: qcm
+  question: Une suite croissante et majorée converge vers…
+  choix:
+  - son premier terme
+  - la borne supérieure de l'ensemble de ses termes
+  - n'importe lequel de ses majorants
+  - $0$
+  reponse: 1
+  explication: 'Vers $s = \sup_n u_n$ : pour $\varepsilon > 0$, $s - \varepsilon$ ne majore pas la suite, donc un terme $u_N$ le dépasse, et la croissance garde tous les termes suivants dans $]s - \varepsilon, s]$.'
+- type: vrai-faux
+  question: Une suite croissante non majorée tend vers $+\infty$.
+  reponse: true
+  explication: Vrai. Pour tout $A$, comme $A$ ne majore pas la suite, il existe $N$ avec $u_N > A$, et la croissance donne $u_n \ge u_N > A$ pour tout $n \ge N$.
+- type: vrai-faux
+  question: Dans ce nœud, l'axiome de la borne supérieure intervient directement dans la démonstration de Bolzano-Weierstrass.
+  reponse: false
+  explication: Faux. Il n'est utilisé directement qu'une fois, pour la limite monotone ; Bolzano-Weierstrass passe par la limite monotone, et le critère de Cauchy par Bolzano-Weierstrass.
 ---
 
 ### L'énoncé

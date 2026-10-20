@@ -2,6 +2,19 @@
 title: Le problème — approcher ce qu'on ne sait pas écrire
 minutes: 6
 rubrique: [position, probleme]
+checkpoint:
+- type: vrai-faux
+  question: La suite de Héron, partant de $u_0 = 1$, est faite de rationnels et converge dans $\mathbb{Q}$.
+  reponse: false
+  explication: 'Faux. Ses termes sont rationnels et se resserrent autant qu''on veut, mais leur limite est $\sqrt{2}$, qui n''est pas rationnel : la suite converge dans $\mathbb{R}$, pas dans $\mathbb{Q}$. C''est ce trou que bouche l''axiome de la borne supérieure.'
+- type: qcm
+  question: Que dit la définition de la convergence sur la vitesse à laquelle une suite approche sa limite ?
+  choix:
+  - Elle impose une erreur en $1/n$.
+  - 'Rien : deux suites convergentes peuvent avoir des coûts incomparables.'
+  - Elle impose que l'erreur diminue à chaque étape.
+  reponse: 1
+  explication: Rien. La méthode de Héron double le nombre de décimales exactes à chaque étape, la moyenne empirique gagne un chiffre pour cent fois plus de tirages ; les deux convergent au même sens. La vitesse est une information en plus, que la dernière capsule mesure.
 ---
 
 ### Position dans le graphe

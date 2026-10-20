@@ -36,8 +36,63 @@ export type Capsule = {
   minutes: number;
   /** Sections de la rubrique du §6 que la capsule couvre. */
   rubrique: RubriqueId[];
+  /**
+   * Questions de fin de capsule, corrigées par le serveur (décision D26). Il
+   * faut toutes les réussir pour terminer la capsule ; vide = pas de contrôle.
+   */
+  checkpoint: Question[];
   body: string;
 };
+
+/**
+ * Une question de checkpoint. Énoncés, choix et explications sont du
+ * Markdown avec KaTeX, comme les cartes.
+ *
+ * - `qcm` : `choix` (2 à 6), `reponse` = indice du bon choix, à partir de 0 ;
+ * - `vrai-faux` : `reponse` booléen ;
+ * - `nombre` : `reponse` numérique, `tolerance` absolue (0 par défaut).
+ */
+export type Question =
+  | { type: "qcm"; question: string; choix: string[]; reponse: number; explication: string }
+  | { type: "vrai-faux"; question: string; reponse: boolean; explication: string }
+  | { type: "nombre"; question: string; reponse: number; tolerance: number; explication: string };
+
+/** Lit et vérifie le checkpoint d'une capsule ; lève sur une question mal formée. */
+export function lireCheckpoint(brut: unknown, ou: string): Question[] {
+  if (brut === undefined || brut === null) return [];
+  if (!Array.isArray(brut)) throw new Error(`${ou} : checkpoint doit être une liste`);
+  return brut.map((q: Record<string, unknown>, i) => {
+    const ici = `${ou}, question ${i + 1}`;
+    const question = String(q.question ?? "");
+    const explication = String(q.explication ?? "");
+    if (!question) throw new Error(`${ici} : énoncé manquant`);
+    if (!explication) throw new Error(`${ici} : explication manquante`);
+    switch (q.type) {
+      case "qcm": {
+        const choix = Array.isArray(q.choix) ? q.choix.map(String) : [];
+        const reponse = Number(q.reponse);
+        if (choix.length < 2 || choix.length > 6)
+          throw new Error(`${ici} : un qcm a 2 à 6 choix`);
+        if (!Number.isInteger(reponse) || reponse < 0 || reponse >= choix.length)
+          throw new Error(`${ici} : reponse doit être l'indice d'un choix`);
+        return { type: "qcm", question, choix, reponse, explication };
+      }
+      case "vrai-faux":
+        if (typeof q.reponse !== "boolean")
+          throw new Error(`${ici} : reponse doit valoir true ou false`);
+        return { type: "vrai-faux", question, reponse: q.reponse, explication };
+      case "nombre": {
+        const reponse = Number(q.reponse);
+        const tolerance = Number(q.tolerance ?? 0);
+        if (!Number.isFinite(reponse) || !Number.isFinite(tolerance) || tolerance < 0)
+          throw new Error(`${ici} : reponse et tolerance doivent être des nombres`);
+        return { type: "nombre", question, reponse, tolerance, explication };
+      }
+      default:
+        throw new Error(`${ici} : type inconnu ${String(q.type)}`);
+    }
+  });
+}
 
 /** Dossier du contenu d'un concept : content/maths/<domain>/<topic>/<concept>/. */
 export function conceptDir(node: GraphNode): string {
@@ -106,6 +161,7 @@ export function loadModules(node: GraphNode): Capsule[] {
       title: String(data.title ?? nom.id),
       minutes: Number(data.minutes ?? 0),
       rubrique: (Array.isArray(data.rubrique) ? data.rubrique : []) as RubriqueId[],
+      checkpoint: lireCheckpoint(data.checkpoint, `${node.id}/${f}`),
       body: content.trim(),
     });
   }

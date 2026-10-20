@@ -24,13 +24,19 @@ export default function Parcours({
   capsules,
   avancement,
   exercicesApres,
+  boss,
+  bossVaincu,
   numeros,
   tentatives,
 }: {
   nodeId: string;
   capsules: Capsule[];
   avancement: Avancement;
+  /** Exercices ordinaires, rangés après leur capsule. */
   exercicesApres: Map<string | null, ExerciseFile[]>;
+  /** Exercices difficiles : le test de sortie, en fin de parcours. */
+  boss: ExerciseFile[];
+  bossVaincu: boolean;
   numeros: Map<string, number>;
   tentatives: AttemptRow[];
 }) {
@@ -82,9 +88,13 @@ export default function Parcours({
               {exos.length > 0 && (
                 <div className="mt-3 sm:pl-9">
                   <div className="chrome text-muted mb-1.5">
-                    {exos.length === 1
-                      ? "exercice faisable après cette capsule"
-                      : `${exos.length} exercices faisables après cette capsule`}
+                    {etat === "terminee"
+                      ? exos.length === 1
+                        ? "exercice faisable à ce stade"
+                        : `${exos.length} exercices faisables à ce stade`
+                      : exos.length === 1
+                        ? "exercice faisable une fois la capsule lue"
+                        : `${exos.length} exercices faisables une fois la capsule lue`}
                   </div>
                   <ListeExercices
                     nodeId={nodeId}
@@ -98,6 +108,29 @@ export default function Parcours({
           );
         })}
       </ol>
+
+      {boss.length > 0 && (
+        <div id="test-de-sortie" className="border-line mt-8 scroll-mt-24 border-t pt-4">
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <h2 className="text-lg font-semibold tracking-tight">Test de sortie</h2>
+            <span className="chrome text-muted">
+              {bossVaincu ? "✓ réussi" : "à réussir pour la maîtrise"}
+            </span>
+          </div>
+          <p className="chrome text-muted mt-1 mb-3 max-w-[70ch]">
+            Les exercices les plus difficiles du nœud. En réussir un, seul ou
+            avec indice, remplit la condition « exercice difficile » de la
+            maîtrise ; c&apos;est aussi le test qui permet de valider le nœud
+            sans le parcourir.
+          </p>
+          <ListeExercices
+            nodeId={nodeId}
+            exercices={boss}
+            numeros={numeros}
+            tentatives={tentatives}
+          />
+        </div>
+      )}
 
       {orphelins.length > 0 && (
         <div className="mt-6">

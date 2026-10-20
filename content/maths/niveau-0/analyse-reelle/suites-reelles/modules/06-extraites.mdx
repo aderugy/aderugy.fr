@@ -2,6 +2,19 @@
 title: Suites extraites et valeurs d'adhérence
 minutes: 6
 rubrique: [construction, pieges, simulation]
+checkpoint:
+- type: nombre
+  question: Combien de valeurs d'adhérence a la suite $u_n = (-1)^n$ ?
+  reponse: 2
+  explication: 'Deux : $1$, limite des termes de rang pair, et $-1$, limite des termes de rang impair. Deux valeurs d''adhérence distinctes suffisent à prouver que la suite diverge.'
+- type: vrai-faux
+  question: Une suite qui admet une suite extraite convergente converge.
+  reponse: false
+  explication: 'Faux : $(-1)^n$ admet la suite extraite constante $(u_{2n}) = (1)$, et diverge. Le sens vrai est l''inverse : si la suite converge, toutes ses suites extraites convergent vers la même limite.'
+- type: vrai-faux
+  question: Pour toute extraction $\varphi$, on a $\varphi(k) \ge k$ pour tout $k$.
+  reponse: true
+  explication: 'Vrai, par récurrence : $\varphi(0) \ge 0$, et $\varphi(k+1) > \varphi(k) \ge k$ donne $\varphi(k+1) \ge k + 1$. Le critère de Cauchy s''en sert.'
 ---
 
 ### Définitions

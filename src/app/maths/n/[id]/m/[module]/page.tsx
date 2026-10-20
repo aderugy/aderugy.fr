@@ -19,7 +19,10 @@ import {
 } from "@/lib/maths/progression/capsules";
 import { Mdx } from "@/lib/maths/mdx";
 import { rouvrirCapsule, terminerCapsule } from "@/server/actions/maths";
+import { graineQuestion, ordreChoix } from "@/lib/maths/checkpoint";
+import { SEUILS } from "@/lib/maths/progression/rules";
 import ListeExercices from "@/components/maths/ListeExercices";
+import Checkpoint, { type QuestionVue } from "@/components/maths/Checkpoint";
 import { jauge } from "@/components/maths/Parcours";
 
 const LIBELLE_RUBRIQUE = new Map<string, string>(
@@ -52,13 +55,35 @@ export default async function CapsulePage({
 
   const exercices = loadExercises(node);
   const numeros = new Map(exercices.map((e, i) => [e.id, i + 1]));
-  const apres = exercicesParCapsule(capsules, exercices).get(capsule.id) ?? [];
+  // Les exercices difficiles forment le test de sortie, en fin de parcours.
+  const boss = exercices.filter((e) => e.difficulty >= SEUILS.difficulteHaute);
+  const apres = (exercicesParCapsule(capsules, exercices).get(capsule.id) ?? []).filter(
+    (e) => e.difficulty < SEUILS.difficulteHaute,
+  );
   const cartes = loadCards(node).filter((c) => c.ref === capsule.id).length;
 
   const precedente = capsules.find((c) => c.id === voisine(capsules, capsule.id, -1));
   const suivante = capsules.find((c) => c.id === voisine(capsules, capsule.id, 1));
   const derniereALire =
     !lue && avancement.total - avancement.terminees === 1;
+  const libelleTerminer = derniereALire
+    ? "terminer la capsule et le cours"
+    : suivante
+      ? "terminer et passer à la suivante"
+      : "terminer la capsule";
+
+  // Énoncés et choix rendus ici : KaTeX n'a rien à faire dans le navigateur,
+  // et les bonnes réponses n'y vont jamais (correction côté serveur).
+  const questions: QuestionVue[] = capsule.checkpoint.map((q, i) => ({
+    type: q.type,
+    question: <Mdx source={q.question} />,
+    choix:
+      q.type === "qcm"
+        ? ordreChoix(q.choix.length, graineQuestion(node.id, capsule.id, i)).map((k) => (
+            <Mdx key={k} source={q.choix[k]} />
+          ))
+        : [],
+  }));
 
   return (
     <main>
@@ -111,6 +136,27 @@ export default async function CapsulePage({
           </section>
         )}
 
+        {questions.length > 0 && (
+          <Checkpoint
+            nodeId={node.id}
+            moduleId={capsule.id}
+            questions={questions}
+            lue={lue}
+            libelleTerminer={libelleTerminer}
+          />
+        )}
+
+        {!suivante && boss.length > 0 && (
+          <p className="chrome-15 border-line mt-10 border-l pl-4">
+            Dernière capsule. Le{" "}
+            <Link href={`/maths/n/${node.id}#test-de-sortie`} className="underline hover:text-accent">
+              test de sortie
+            </Link>{" "}
+            attend en fin de parcours : {boss.length === 1 ? "un exercice" : `${boss.length} exercices`} de
+            difficulté {SEUILS.difficulteHaute} ou plus.
+          </p>
+        )}
+
         {cartes > 0 && (
           <p className="chrome text-muted mt-8">
             {cartes === 1
@@ -159,14 +205,14 @@ export default async function CapsulePage({
                   : "retour au parcours"}
               </Link>
             </>
+          ) : questions.length > 0 ? (
+            <a href="#checkpoint" className="text-muted hover:text-foreground">
+              réussir le checkpoint pour terminer
+            </a>
           ) : (
             <form action={terminerCapsule.bind(null, node.id, capsule.id)}>
               <button type="submit" className="rounded bg-accent px-3 py-1 text-white">
-                {derniereALire
-                  ? "terminer la capsule et le cours"
-                  : suivante
-                    ? "terminer et passer à la suivante"
-                    : "terminer la capsule"}
+                {libelleTerminer}
               </button>
             </form>
           )}
