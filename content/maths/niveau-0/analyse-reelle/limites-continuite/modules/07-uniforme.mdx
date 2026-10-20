@@ -1,0 +1,129 @@
+---
+title: Continuité uniforme et théorème de Heine
+minutes: 9
+rubrique: [construction, intuition, demonstrations, pieges, simulation]
+checkpoint:
+- type: qcm
+  question: 'Où est la différence entre « continue sur $D$ » et « uniformément continue sur $D$ » ?'
+  choix:
+  - 'Dans la place de $\forall x$ : dans la continuité uniforme, $\delta$ est choisi avant $x$ et ne dépend que de $\varepsilon$.'
+  - 'Dans la place de $\forall \varepsilon$ : dans la continuité uniforme, $\varepsilon$ est choisi après $\delta$.'
+  - 'Il n''y en a pas sur un intervalle ouvert.'
+  reponse: 0
+  explication: 'Continuité : $\forall x\ \forall \varepsilon\ \exists \delta$ — $\delta$ peut dépendre de $x$. Uniforme : $\forall \varepsilon\ \exists \delta\ \forall x$ — un seul $\delta$ pour tous les points. Sur $]0, 1]$, $1/x$ est continue sans être uniformément continue.'
+- type: vrai-faux
+  question: '$x \mapsto x^2$ est uniformément continue sur $\mathbb{R}$.'
+  reponse: false
+  explication: 'Faux : $(x + \delta)^2 - x^2 = 2x\delta + \delta^2$ dépasse $1$ dès que $x > 1/(2\delta)$, quel que soit $\delta > 0$. Elle l''est en revanche sur tout segment $[-A, A]$, par Heine.'
+- type: vrai-faux
+  question: '$x \mapsto \sqrt{x}$ est uniformément continue sur $[0, +\infty[$, bien que sa pente soit infinie en $0$.'
+  reponse: true
+  explication: 'Vrai : $|\sqrt{x} - \sqrt{y}| \le \sqrt{|x - y|}$ pour $x, y \ge 0$, donc $\delta = \varepsilon^2$ convient partout. Une pente non bornée n''empêche pas la continuité uniforme ; c''est une pente qui croît **sans fin sur un domaine non borné**, ou une oscillation, qui l''empêche.'
+---
+
+### Le problème
+
+Dans la définition de la continuité sur $D$, l'ordre des quantificateurs est
+
+$$
+\forall x \in D,\ \forall \varepsilon > 0,\ \exists \delta > 0,\ \forall y \in D,\quad
+|x - y| < \delta \Rightarrow |f(x) - f(y)| < \varepsilon :
+$$
+
+$\delta$ peut dépendre du point $x$. Pour $f(x) = 1/x$ sur $]0, 1]$, c'est
+inévitable : plus $x$ est proche de $0$, plus la fonction varie vite, et plus
+$\delta$ doit être petit. Or certains raisonnements demandent **un seul**
+$\delta$ valable partout — en premier lieu la construction de l'intégrale de
+Riemann, où l'on découpe un segment en morceaux de même longueur $\delta$ sur
+chacun desquels $f$ varie de moins de $\varepsilon$.
+
+### Définition
+
+$f : D \to \mathbb{R}$ est **uniformément continue** sur $D$ si
+
+$$
+\forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x, y \in D,\quad
+|x - y| < \delta \Rightarrow |f(x) - f(y)| < \varepsilon .
+$$
+
+Seul $\forall x$ a changé de place : il passe derrière $\exists \delta$. Une
+fonction uniformément continue est continue ; la réciproque est fausse.
+
+**Exemple fondamental.** Une fonction **lipschitzienne**, c'est-à-dire telle
+que $|f(x) - f(y)| \le K |x - y|$ pour un $K$ fixé, est uniformément continue
+avec $\delta = \varepsilon / K$.
+
+### Intuition : un gabarit qu'on fait glisser
+
+On fabrique un rectangle de largeur $2\delta$ et de hauteur $2\varepsilon$ et on
+le fait glisser le long du graphe, centré sur chaque point : la continuité
+uniforme dit que le graphe ne sort jamais par le haut ou par le bas. Pour $1/x$
+près de $0$, ou pour $x^2$ loin de l'origine, le graphe devient trop raide et
+finit par percer le rectangle, quelle que soit sa largeur.
+
+### Le théorème de Heine
+
+> **Théorème de Heine.** Une fonction continue sur un segment $[a, b]$ y est
+> uniformément continue.
+
+*Démonstration.* Par l'absurde. Si $f$ n'est pas uniformément continue, on nie
+la définition : il existe $\varepsilon > 0$ tel que pour tout $\delta > 0$, il
+existe $x, y \in [a, b]$ avec $|x - y| < \delta$ et
+$|f(x) - f(y)| \ge \varepsilon$. Avec $\delta = 1/(n+1)$, on obtient des suites
+$(x_n)$, $(y_n)$ de $[a, b]$ telles que $|x_n - y_n| < 1/(n+1)$ et
+$|f(x_n) - f(y_n)| \ge \varepsilon$.
+
+Par Bolzano-Weierstrass, on extrait $x_{\varphi(n)} \to c$, et $c \in [a, b]$
+puisque le segment est fermé. Alors
+$|y_{\varphi(n)} - c| \le |y_{\varphi(n)} - x_{\varphi(n)}| + |x_{\varphi(n)} - c| \to 0$ :
+la **même** extraction fait converger $(y_{\varphi(n)})$ vers $c$. Par continuité
+de $f$ en $c$, $f(x_{\varphi(n)}) - f(y_{\varphi(n)}) \to f(c) - f(c) = 0$, ce qui
+contredit $|f(x_{\varphi(n)}) - f(y_{\varphi(n)})| \ge \varepsilon$. $\square$
+
+Le point délicat est d'utiliser la même extraction $\varphi$ pour les deux
+suites : en extrayant séparément, on obtiendrait deux limites sans lien.
+
+### Piège : deux façons de ne pas être uniformément continue
+
+- **Un domaine non borné** : $x^2$ sur $\mathbb{R}$. Avec $x_n = n$ et
+  $y_n = n + 1/n$, on a $|x_n - y_n| \to 0$ mais
+  $y_n^2 - x_n^2 = 2 + 1/n^2 \ge 2$.
+- **Un domaine non fermé** : $\sin(1/x)$ sur $]0, 1]$. Elle est continue et
+  bornée, et oscille de plus en plus vite près de $0$.
+
+Dans les deux cas, c'est une hypothèse du théorème de Heine qui manque.
+
+```python
+import numpy as np
+
+def module(f, a, b, delta, n=200_001):
+    """sup |f(x) - f(y)| pour |x - y| <= delta, estime sur une grille."""
+    x = np.linspace(a, b, n)
+    pas = x[1] - x[0]
+    k = int(delta / pas)
+    return np.abs(f(x[k:]) - f(x[:-k])).max()
+
+for delta in (1e-1, 1e-2, 1e-3):
+    print(f"delta={delta:.0e}"
+          f"   x^2 sur [0,1]: {module(np.square, 0, 1, delta):.4f}"
+          f"   x^2 sur [0,100]: {module(np.square, 0, 100, delta):8.4f}"
+          f"   sin(1/x) sur [1e-3,1]: {module(lambda t: np.sin(1/t), 1e-3, 1, delta):.4f}")
+```
+
+Sortie obtenue :
+
+```
+delta=1e-01   x^2 sur [0,1]: 0.1900   x^2 sur [0,100]:  19.9900   sin(1/x) sur [1e-3,1]: 1.9998
+delta=1e-02   x^2 sur [0,1]: 0.0199   x^2 sur [0,100]:   1.9999   sin(1/x) sur [1e-3,1]: 1.9994
+delta=1e-03   x^2 sur [0,1]: 0.0020   x^2 sur [0,100]:   0.2000   sin(1/x) sur [1e-3,1]: 1.9997
+```
+
+La quantité calculée est le **module de continuité** :
+$\omega(\delta) = \sup_{|x - y| \le \delta} |f(x) - f(y)|$, et $f$ est
+uniformément continue si et seulement si $\omega(\delta) \to 0$ quand
+$\delta \to 0$. Sur $[0, 1]$, $\omega(\delta) \approx 2\delta$ pour $x^2$. Sur
+$[0, 100]$, il est cent fois plus grand : sur $\mathbb{R}$ tout entier, il serait
+infini. Pour $\sin(1/x)$, le domaine de la grille s'arrête à $10^{-3}$, et le
+module reste proche de $2$ tant que $\delta$ est plus grand que la période
+locale, de l'ordre de $2\pi x^2$ près de $x = 10^{-3}$ : rapprocher la borne
+de $0$ le maintiendrait à $2$ pour des $\delta$ toujours plus petits.

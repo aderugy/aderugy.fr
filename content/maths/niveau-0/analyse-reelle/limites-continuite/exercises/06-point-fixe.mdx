@@ -1,0 +1,32 @@
+---
+kind: preuve
+difficulty: 3
+after: tvi
+---
+1. Soit $f : [0, 1] \to [0, 1]$ continue. Montrer que $f$ a un **point fixe** :
+   il existe $c \in [0, 1]$ tel que $f(c) = c$.
+2. Montrer par des contre-exemples que la conclusion tombe si l'on remplace
+   $[0, 1]$ par $[0, 1[$, ou si l'on retire la continuité.
+3. Montrer que l'équation $\cos x = x$ a une solution dans $[0, 1]$.
+
+<!-- indice -->
+Appliquer le théorème des valeurs intermédiaires à $g(x) = f(x) - x$.
+
+<!-- indice -->
+Que valent les signes de $g(0)$ et de $g(1)$, sachant que $f$ est à valeurs
+dans $[0, 1]$ ?
+
+<!-- solution -->
+1. Soit $g(x) = f(x) - x$, continue sur $[0, 1]$. Comme $f(0) \ge 0$,
+   $g(0) \ge 0$ ; comme $f(1) \le 1$, $g(1) \le 0$. Par le théorème des valeurs
+   intermédiaires, $g$ s'annule en un $c \in [0, 1]$ : $f(c) = c$.
+2. Sur $[0, 1[$ : $f(x) = (1 + x)/2$ envoie $[0, 1[$ dans $[1/2, 1[ \subseteq [0, 1[$,
+   et $f(x) = x$ équivaut à $x = 1$, exclu. Sans continuité : $f = \mathbf{1}_{[0, 1/2]}$
+   sur $[0, 1]$ prend les valeurs $1$ sur $[0, 1/2]$ et $0$ sur $]1/2, 1]$, et
+   n'a pas de point fixe.
+3. $\cos$ est continue et envoie $[0, 1]$ dans $[\cos 1, 1] \subseteq [0, 1]$,
+   car $\cos$ décroît sur $[0, \pi]$ et $\cos 1 > 0$. La question 1 s'applique.
+   (La solution est $\approx 0{,}739$.)
+
+C'est le cas de dimension $1$ du théorème du point fixe de Brouwer ; en
+dimension supérieure, la démonstration est beaucoup plus difficile.

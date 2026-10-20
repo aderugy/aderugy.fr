@@ -1,0 +1,35 @@
+---
+kind: preuve
+difficulty: 3
+after: bornes-atteintes
+---
+Soit $f : \mathbb{R} \to \mathbb{R}$ continue, telle que
+$\lim_{x \to -\infty} f(x) = \lim_{x \to +\infty} f(x) = 0$.
+
+1. Montrer que $f$ est bornée.
+2. On suppose qu'il existe $x_0$ avec $f(x_0) > 0$. Montrer que $f$ atteint sa
+   borne supérieure.
+3. Donner un exemple d'une telle fonction qui n'atteint pas sa borne
+   inférieure.
+
+<!-- indice -->
+Il existe $A > 0$ tel que $|f(x)| \le 1$ pour $|x| > A$. Sur $[-A, A]$,
+appliquer le théorème des bornes atteintes.
+
+<!-- indice -->
+Pour 2, choisir $A$ tel que $|f(x)| < f(x_0)$ pour $|x| > A$ : le maximum
+sur $[-A, A]$ est alors un maximum sur $\mathbb{R}$.
+
+<!-- solution -->
+1. Par définition des limites en $\pm\infty$ avec $\varepsilon = 1$, il existe
+   $A > 0$ tel que $|f(x)| < 1$ pour $|x| > A$. Sur le segment $[-A, A]$, $f$
+   est continue donc bornée par un $M$. Alors $|f| \le \max(1, M)$ sur
+   $\mathbb{R}$.
+2. Avec $\varepsilon = f(x_0) > 0$, il existe $A$ tel que $f(x) < f(x_0)$
+   pour $|x| > A$ ; quitte à augmenter $A$, on suppose $|x_0| \le A$. Sur
+   $[-A, A]$, $f$ atteint son maximum en un point $d$, et $f(d) \ge f(x_0)$.
+   Pour $|x| > A$, $f(x) < f(x_0) \le f(d)$. Donc $f(d) = \sup_{\mathbb{R}} f$.
+3. $f(x) = \mathrm{e}^{-x^2}$ : elle tend vers $0$ en $\pm\infty$, est
+   strictement positive, et $\inf f = 0$ n'est pas atteint. L'hypothèse
+   $f(x_0) > 0$ de la question 2 donnait un point « au-dessus des bords » ;
+   pour l'inf, il n'y a ici aucun point en dessous.

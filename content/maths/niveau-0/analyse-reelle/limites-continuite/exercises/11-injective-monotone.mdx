@@ -1,0 +1,59 @@
+---
+kind: preuve
+difficulty: 5
+after: monotones
+---
+Soit $I$ un intervalle et $f : I \to \mathbb{R}$ continue et injective.
+
+1. Montrer que $f$ est strictement monotone.
+2. Montrer que $J = f(I)$ est un intervalle et que la réciproque
+   $f^{-1} : J \to I$ est continue.
+3. Montrer par un exemple que la conclusion de 2 tombe si $I$ n'est pas un
+   intervalle.
+
+<!-- indice -->
+Pour 1, montrer d'abord que pour $a < b < c$ dans $I$, $f(b)$ est strictement
+entre $f(a)$ et $f(c)$ : sinon, le théorème des valeurs intermédiaires
+fabrique deux antécédents à une même valeur.
+
+<!-- indice -->
+Pour passer de « trois points » à la monotonie stricte, considérer
+$\varphi(t) = f\big((1-t)y + t y'\big) - f\big((1-t)x + t x'\big)$ pour deux
+couples $x < y$ et $x' < y'$ : elle ne s'annule pas sur $[0, 1]$.
+
+<!-- indice -->
+Pour 2, $f^{-1}$ est strictement monotone, et son image $I$ est un
+intervalle ; une fonction monotone dont l'image est un intervalle ne peut pas
+avoir de saut.
+
+<!-- solution -->
+1. Soient $x < y$ et $x' < y'$ dans $I$. Pour $t \in [0, 1]$, posons
+   $u(t) = (1 - t)x + t x'$ et $v(t) = (1 - t)y + t y'$ ; comme $x < y$ et
+   $x' < y'$, on a $u(t) < v(t)$, et $u(t), v(t) \in I$ car $I$ est un
+   intervalle. La fonction $\varphi(t) = f(v(t)) - f(u(t))$ est continue sur
+   $[0, 1]$ et ne s'annule jamais : $\varphi(t) = 0$ voudrait dire
+   $f(u(t)) = f(v(t))$ avec $u(t) \ne v(t)$, contraire à l'injectivité. Par
+   le théorème des valeurs intermédiaires, $\varphi$ garde un signe constant :
+   $f(y) - f(x)$ et $f(y') - f(x')$ sont de même signe. Ce signe commun à tous
+   les couples $x < y$ fait de $f$ une fonction strictement croissante ou
+   strictement décroissante.
+
+2. $J = f(I)$ est un intervalle : c'est la forme « image d'intervalle » du
+   théorème des valeurs intermédiaires. Supposons $f$ croissante (sinon,
+   passer à $-f$). Alors $f^{-1}$ est strictement croissante sur $J$. Si elle
+   était discontinue en $y_0 \in J$, elle y aurait un saut (capsule 8) :
+   $f^{-1}(y_0^-) < f^{-1}(y_0^+)$ (ou bien, si $y_0$ est une borne de $J$, un
+   saut d'un seul côté). L'image de $f^{-1}$ éviterait alors l'intervalle
+   ouvert $]f^{-1}(y_0^-), f^{-1}(y_0)[$ ou $]f^{-1}(y_0), f^{-1}(y_0^+)[$,
+   dont l'un au moins est non vide — alors que cette image est $I$, un
+   intervalle contenant des points de part et d'autre. Contradiction :
+   $f^{-1}$ est continue.
+
+   L'argument « une fonction monotone dont l'image est un intervalle est
+   continue » est la clé ; il demande la description des discontinuités des
+   fonctions monotones par des sauts.
+
+3. Sur $I = [0, 1] \cup\, ]2, 3]$, soit $f(x) = x$ sur $[0, 1]$ et
+   $f(x) = x - 1$ sur $]2, 3]$. $f$ est continue, injective et strictement
+   croissante, $f(I) = [0, 2]$, et $f^{-1}$ saute de $1$ à $2$ en $y = 1^+$ : elle
+   est discontinue en $1$.

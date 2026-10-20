@@ -1,0 +1,92 @@
+---
+title: La caractérisation séquentielle — tout ramener aux suites
+minutes: 9
+rubrique: [construction, demonstrations, pieges, simulation]
+checkpoint:
+- type: qcm
+  question: 'Pour montrer que $\lim_{x \to 0} \sin(1/x)$ n''existe pas, il suffit de :'
+  choix:
+  - 'trouver une suite $x_n \to 0$ telle que $\sin(1/x_n)$ ne tende pas vers $0$ ;'
+  - 'trouver deux suites $x_n \to 0$ et $y_n \to 0$ telles que $\sin(1/x_n)$ et $\sin(1/y_n)$ convergent vers deux limites différentes ;'
+  - 'vérifier que $\sin(1/x)$ ne s''annule pas au voisinage de $0$.'
+  reponse: 1
+  explication: 'Si la limite $\ell$ existait, toute suite $x_n \to 0$ donnerait $f(x_n) \to \ell$ ; deux limites différentes sont donc contradictoires. La première option ne prouve que « la limite, si elle existe, n''est pas $0$ ». La troisième est fausse : $\sin(1/x)$ s''annule en $1/(k\pi)$.'
+- type: vrai-faux
+  question: 'Si $f(1/n) \to \ell$ quand $n \to \infty$, alors $\lim_{x \to 0^+} f(x) = \ell$.'
+  reponse: false
+  explication: 'Faux : une seule suite ne suffit pas, il les faut **toutes**. $f(x) = \sin(\pi / x)$ vaut $\sin(n\pi) = 0$ en $x = 1/n$, et n''a pourtant pas de limite en $0^+$.'
+---
+
+### L'énoncé
+
+> **Caractérisation séquentielle.** Soit $f : D \to \mathbb{R}$ et $a$ adhérent
+> à $D$. Les deux propriétés suivantes sont équivalentes :
+>
+> 1. $\lim_{x \to a} f(x) = \ell$ ;
+> 2. pour **toute** suite $(x_n)$ d'éléments de $D$ qui converge vers $a$,
+>    $f(x_n) \to \ell$.
+
+L'intérêt est double. Dans le sens direct, il transporte aux fonctions tout ce
+qu'on sait des suites : somme, produit, quotient de limites, passage à la limite
+dans les inégalités, théorème des gendarmes. Dans le sens réciproque, il donne
+la manière la plus courte de montrer qu'une limite **n'existe pas** : exhiber
+deux suites qui donnent deux limites différentes.
+
+### Démonstration
+
+*(1) ⇒ (2).* Soit $x_n \to a$ dans $D$, et $\varepsilon > 0$. Il existe
+$\delta > 0$ tel que $|x - a| < \delta$ entraîne $|f(x) - \ell| < \varepsilon$.
+Comme $x_n \to a$, il existe $N$ tel que $|x_n - a| < \delta$ pour $n \ge N$ ;
+alors $|f(x_n) - \ell| < \varepsilon$ pour ces $n$.
+
+*(2) ⇒ (1).* Par contraposée. Supposons que $f$ ne tende pas vers $\ell$ en
+$a$ : il existe $\varepsilon > 0$ tel que, **pour tout** $\delta > 0$, on trouve
+$x \in D$ avec $|x - a| < \delta$ et $|f(x) - \ell| \ge \varepsilon$. On applique
+cela avec $\delta = 1/(n+1)$ pour chaque $n$, et on note $x_n$ le point obtenu.
+Alors $|x_n - a| < 1/(n+1)$, donc $x_n \to a$, et $|f(x_n) - \ell| \ge \varepsilon$
+pour tout $n$, donc $f(x_n) \not\to \ell$. La propriété 2 est en défaut. $\square$
+
+L'étape non triviale est la négation de la définition : « non
+($\forall \varepsilon\ \exists \delta\ \forall x$…) » devient
+« $\exists \varepsilon\ \forall \delta\ \exists x$… ». Chaque quantificateur
+s'échange avec son dual, et l'implication
+$|x - a| < \delta \Rightarrow |f(x) - \ell| < \varepsilon$ devient la
+conjonction « $|x - a| < \delta$ **et** $|f(x) - \ell| \ge \varepsilon$ ». La
+suite $(x_n)$ est ensuite fabriquée en choisissant un point pour chaque
+$\delta = 1/(n+1)$.
+
+### Piège : une suite ne suffit pas
+
+Soit $f(x) = \sin(\pi/x)$ sur $]0, 1]$. Sur la suite $x_n = 1/n$, on a
+$f(x_n) = \sin(n\pi) = 0$ : $f(x_n) \to 0$. Sur la suite
+$y_n = 2/(4n + 1)$, on a $f(y_n) = \sin(2n\pi + \pi/2) = 1$ : $f(y_n) \to 1$.
+Deux limites différentes, donc **pas** de limite en $0^+$ — alors qu'un
+programme qui n'évaluerait $f$ qu'aux points $1/n$ verrait une fonction
+« qui tend vers $0$ ».
+
+```python
+import numpy as np
+
+f = lambda x: np.sin(np.pi / x)
+n = np.array([10, 100, 1000, 10_000])
+print("x = 1/n      :", " ".join(f"{v:+.1e}" for v in f(1 / n)))
+print("x = 2/(4n+1) :", " ".join(f"{v:+.1e}" for v in f(2 / (4 * n + 1))))
+# Echantillonnage regulier pres de 0 : les valeurs couvrent tout [-1, 1]
+x = np.linspace(1e-4, 1e-3, 100_001)
+print(f"sur [1e-4, 1e-3] : min = {f(x).min():.4f}, max = {f(x).max():.4f}")
+```
+
+Sortie obtenue :
+
+```
+x = 1/n      : -1.2e-15 +2.0e-15 -3.2e-13 -4.1e-12
+x = 2/(4n+1) : +1.0e+00 +1.0e+00 +1.0e+00 +1.0e+00
+sur [1e-4, 1e-3] : min = -1.0000, max = 1.0000
+```
+
+La première ligne ne vaut pas exactement $0$ : $\pi$ et $1/n$ ne sont
+représentés qu'à $10^{-16}$ près en relatif, et l'erreur absolue sur
+l'argument $n\pi$ croît avec $n$ — d'où des résidus de $10^{-15}$ à
+$10^{-12}$. C'est une limite de la machine, pas de la suite. La troisième
+ligne montre ce que les deux suites suggèrent : près de $0$, la fonction
+oscille indéfiniment entre $-1$ et $1$.

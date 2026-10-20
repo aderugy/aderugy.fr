@@ -1,0 +1,91 @@
+# Cartes de révision du nœud. L'état FSRS vit en base ; `ref` pointe vers la
+# capsule d'origine (décisions D1 et D25).
+
+cards:
+  - id: definition-limite
+    ref: limite
+    front: "Écrire la définition de $\\lim_{x \\to a} f(x) = \\ell$, quantificateurs dans l'ordre."
+    back: |
+      $\forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x \in D,\
+      |x - a| < \delta \Rightarrow |f(x) - \ell| < \varepsilon$.
+
+      $\delta$ dépend de $\varepsilon$ (et en général de $a$).
+
+  - id: convention-epointee
+    ref: limite
+    front: "Deux conventions de limite en $a$ : laquelle suit ce corpus, et qu'est-ce que ça change ?"
+    back: |
+      La convention française : $x = a$ est permis. Si $f$ est définie en $a$,
+      sa limite en $a$ ne peut être que $f(a)$. La limite épointée
+      ($x \ne a$, convention anglophone) s'écrit explicitement.
+
+  - id: sequentielle
+    ref: sequentielle
+    front: "Caractérisation séquentielle de la limite, et son usage pour montrer qu'une limite n'existe pas."
+    back: |
+      $\lim_{x \to a} f(x) = \ell$ ssi pour **toute** suite $x_n \to a$ de
+      $D$, $f(x_n) \to \ell$. Deux suites $x_n, y_n \to a$ avec
+      $\lim f(x_n) \ne \lim f(y_n)$ prouvent l'absence de limite.
+
+  - id: une-suite-ne-suffit-pas
+    ref: sequentielle
+    front: "$f(1/n) \\to \\ell$ suffit-il à conclure $\\lim_{x \\to 0^+} f(x) = \\ell$ ?"
+    back: |
+      Non. $f(x) = \sin(\pi/x)$ vaut $0$ en $x = 1/n$, et $1$ en
+      $x = 2/(4n+1)$ : pas de limite.
+
+  - id: indicatrice-rationnels
+    ref: continuite
+    front: "Une fonction continue en exactement un point ?"
+    back: |
+      $x\,\mathbf{1}_{\mathbb{Q}}(x)$ : continue en $0$ (majorée par $|x|$),
+      discontinue ailleurs (suites rationnelles et irrationnelles).
+
+  - id: tvi
+    ref: tvi
+    front: "Théorème des valeurs intermédiaires : énoncé, et l'axiome qu'il utilise."
+    back: |
+      $f$ continue sur $[a, b]$ prend toute valeur entre $f(a)$ et $f(b)$.
+      Preuve par $c = \sup\{x : f(x) \le 0\}$ : axiome de la borne
+      supérieure. Faux sur $\mathbb{Q}$ ($x^2 - 2$).
+
+  - id: dichotomie
+    ref: tvi
+    front: "Dichotomie sur $[a, b]$ : précision après $n$ itérations, et ce qu'elle exige de $f$."
+    back: |
+      $(b - a)/2^n$. Elle exige seulement la continuité et un changement de
+      signe aux bornes ; elle ne peut pas diverger, mais ne gagne qu'un bit
+      par itération.
+
+  - id: bornes-atteintes
+    ref: bornes-atteintes
+    front: "Bornes atteintes : énoncé, et les trois ingrédients de la preuve."
+    back: |
+      Continue sur un segment ⇒ bornée et atteint ses bornes. Ingrédients :
+      Bolzano-Weierstrass (segment **borné**), passage à la limite dans les
+      inégalités larges (segment **fermé**), continuité.
+
+  - id: uniforme
+    ref: uniforme
+    front: "Continuité contre continuité uniforme : où est la différence ?"
+    back: |
+      Continuité : $\forall x\ \forall \varepsilon\ \exists \delta$.
+      Uniforme : $\forall \varepsilon\ \exists \delta\ \forall x, y$ — un seul
+      $\delta$ pour tous les points. $1/x$ sur $]0, 1]$, $x^2$ sur
+      $\mathbb{R}$ : continues, pas uniformément.
+
+  - id: heine
+    ref: uniforme
+    front: "Théorème de Heine, et le point délicat de sa preuve."
+    back: |
+      Continue sur un segment ⇒ uniformément continue. On extrait par
+      Bolzano-Weierstrass une seule fois, $x_{\varphi(n)} \to c$, et la
+      **même** extraction fait converger $(y_{\varphi(n)})$ vers $c$.
+
+  - id: monotones-sauts
+    ref: monotones
+    front: "Discontinuités d'une fonction monotone : de quel type, et combien ?"
+    back: |
+      Uniquement des sauts ($f(a^-)$ et $f(a^+)$ existent toujours), et au
+      plus une infinité dénombrable : chaque saut contient un rationnel
+      distinct. Elles peuvent être denses (toutes les $q_n$).

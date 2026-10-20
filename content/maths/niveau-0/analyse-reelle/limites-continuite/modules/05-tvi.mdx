@@ -1,0 +1,119 @@
+---
+title: Les valeurs intermédiaires, et la dichotomie qui calcule les quantiles
+minutes: 10
+rubrique: [construction, demonstrations, pieges, simulation]
+checkpoint:
+- type: nombre
+  question: 'On cherche un zéro de $f$ continue sur $[0, 1]$ par dichotomie. Combien d''itérations au minimum pour garantir un encadrement de longueur inférieure à $10^{-6}$ ?'
+  reponse: 20
+  explication: 'Après $n$ itérations l''intervalle mesure $2^{-n}$. Il faut $2^{-n} < 10^{-6}$, soit $n > 6 \log_2 10 \approx 19{,}93$ : $n = 20$. Chaque itération gagne un bit, et un chiffre décimal coûte environ $3{,}3$ itérations.'
+- type: vrai-faux
+  question: 'Le théorème des valeurs intermédiaires reste vrai pour une fonction continue sur $\mathbb{Q} \cap [0, 2]$ à valeurs rationnelles.'
+  reponse: false
+  explication: 'Faux : $f(x) = x^2 - 2$ est continue sur $\mathbb{Q} \cap [0, 2]$, vaut $-2$ en $0$ et $2$ en $2$, et ne s''annule en aucun rationnel. La preuve utilise l''axiome de la borne supérieure, que $\mathbb{Q}$ ne vérifie pas.'
+- type: qcm
+  question: 'Une fonction $f : [a, b] \to \mathbb{R}$ vérifie la propriété des valeurs intermédiaires (toute valeur entre $f(u)$ et $f(v)$ est atteinte entre $u$ et $v$). Est-elle continue ?'
+  choix:
+  - 'Oui, c''est la réciproque du théorème.'
+  - 'Non : $f(x) = \sin(1/x)$ pour $x \ne 0$, $f(0) = 0$, a cette propriété sur $[-1, 1]$ sans être continue en $0$.'
+  - 'Oui si elle est bornée.'
+  reponse: 1
+  explication: 'Tout intervalle contenant $0$ voit $\sin(1/x)$ parcourir $[-1, 1]$, donc toute valeur intermédiaire est atteinte ; et la fonction n''a pas de limite en $0$. La réciproque du théorème est fausse, même pour une fonction bornée.'
+---
+
+### L'énoncé
+
+> **Théorème des valeurs intermédiaires.** Soit $f : [a, b] \to \mathbb{R}$
+> continue. Pour tout $y$ compris entre $f(a)$ et $f(b)$, il existe
+> $c \in [a, b]$ tel que $f(c) = y$.
+
+Forme équivalente : **l'image d'un intervalle par une fonction continue est un
+intervalle.**
+
+### Démonstration par la borne supérieure
+
+Quitte à remplacer $f$ par $f - y$, puis éventuellement par $-f$, on suppose
+$f(a) \le 0 \le f(b)$ et on cherche $c$ avec $f(c) = 0$.
+
+Soit $A = \{x \in [a, b] : f(x) \le 0\}$. Il est non vide ($a \in A$) et majoré
+par $b$ ; soit $c = \sup A$, qui existe par l'axiome de la borne supérieure, et
+$c \in [a, b]$. Montrons $f(c) = 0$ en excluant les deux autres cas.
+
+- *$f(c) > 0$ est impossible.* Par continuité en $c$ avec
+  $\varepsilon = f(c)$, il existe $\delta > 0$ tel que $f(x) > 0$ pour
+  $x \in [a, b]$, $|x - c| < \delta$. Aucun point de $]c - \delta, c]$ n'est
+  donc dans $A$ ; et aucun point $> c$ non plus, puisque $c$ majore $A$. Alors
+  $c - \delta$ majore $A$, ce qui contredit le fait que $c$ est le **plus
+  petit** majorant. (Ce cas impose aussi $c > a$, puisque $f(a) \le 0$.)
+- *$f(c) < 0$ est impossible.* Alors $c \ne b$, puisque $f(b) \ge 0$. Par
+  continuité, il existe $\delta > 0$ tel que $f(x) < 0$ pour
+  $|x - c| < \delta$ ; en particulier un point $x \in\, ]c, \min(c + \delta, b)[$
+  vérifie $f(x) < 0$, donc $x \in A$ et $x > c$ : contradiction avec
+  « $c$ majore $A$ ».
+
+Donc $f(c) = 0$. $\square$
+
+L'axiome de la borne supérieure est utilisé une fois, pour l'existence de $c$.
+C'est le même mouvement que pour la limite monotone : sans cet axiome, le
+théorème est faux.
+
+### Piège : sans complétude, le théorème tombe
+
+Sur $\mathbb{Q} \cap [0, 2]$, la fonction $f(x) = x^2 - 2$ est continue (c'est
+un polynôme), $f(0) = -2 < 0 < 2 = f(2)$, et elle ne s'annule en aucun
+rationnel, puisque $\sqrt{2} \notin \mathbb{Q}$. Ce n'est pas la fonction qui
+fait défaut, c'est l'ensemble de départ.
+
+### Piège : l'hypothèse « intervalle »
+
+$f(x) = 1/x$ est continue sur $[-1, 0[\, \cup\, ]0, 1]$, vaut $-1$ en $-1$ et
+$1$ en $1$, et ne s'annule pas. Le domaine n'est pas un intervalle : la preuve
+ne s'applique pas, et le théorème non plus.
+
+### La dichotomie
+
+La démonstration ci-dessus n'est pas constructive : elle ne dit pas comment
+trouver $c$. La **dichotomie** le fait. On part de $[a_0, b_0] = [a, b]$ avec
+$f(a_0) \le 0 \le f(b_0)$ ; à chaque étape on calcule $m = (a_n + b_n)/2$ et on
+garde $[a_n, m]$ si $f(m) \ge 0$, $[m, b_n]$ sinon. Les suites $(a_n)$ et
+$(b_n)$ sont adjacentes (exercice 6 du nœud
+[suites-reelles](/maths/n/suites-reelles)), de limite commune $c$, et en
+passant à la limite dans $f(a_n) \le 0 \le f(b_n)$ grâce à la continuité :
+$f(c) \le 0 \le f(c)$. C'est une **seconde démonstration** du théorème, et
+elle donne $c$ à $(b - a)/2^n$ près.
+
+Application : le quantile à $97{,}5\,\%$ de la loi normale centrée réduite,
+la valeur $1{,}96$ des intervalles de confiance.
+
+```python
+from math import erf, sqrt
+
+def F(t):  # fonction de repartition de N(0, 1)
+    return 0.5 * (1 + erf(t / sqrt(2)))
+
+def dichotomie(g, a, b, n):
+    assert g(a) <= 0 <= g(b)
+    for _ in range(n):
+        m = (a + b) / 2
+        a, b = (a, m) if g(m) >= 0 else (m, b)
+    return a, b
+
+for n in (10, 20, 40):
+    a, b = dichotomie(lambda t: F(t) - 0.975, 0.0, 4.0, n)
+    print(f"n={n:>2}  q dans [{a:.12f}, {b:.12f}]  longueur {b - a:.1e}")
+```
+
+Sortie obtenue :
+
+```
+n=10  q dans [1.957031250000, 1.960937500000]  longueur 3.9e-03
+n=20  q dans [1.959960937500, 1.959964752197]  longueur 3.8e-06
+n=40  q dans [1.959963984536, 1.959963984540]  longueur 3.6e-12
+```
+
+Chaque itération divise la longueur par deux : $40$ itérations donnent onze
+décimales exactes, et il en faudrait une cinquantaine pour atteindre la
+précision des flottants, vers $10^{-16}$. La valeur $1{,}959964$ est celle que donnent les tables. La dichotomie
+est lente comparée à la méthode de Newton, qui double le nombre de décimales
+à chaque pas comme la suite de Héron ; mais elle ne demande que la continuité
+et un changement de signe, et elle ne peut pas diverger.

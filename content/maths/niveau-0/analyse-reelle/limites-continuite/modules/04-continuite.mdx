@@ -1,0 +1,89 @@
+---
+title: Continuité — en un point, puis partout
+minutes: 8
+rubrique: [construction, intuition, pieges]
+checkpoint:
+- type: vrai-faux
+  question: 'La fonction indicatrice de $\mathbb{Q}$, $\mathbf{1}_{\mathbb{Q}}$, est continue en tout point irrationnel.'
+  reponse: false
+  explication: 'Faux : elle n''est continue nulle part. Tout intervalle contient des rationnels et des irrationnels, donc près de tout point $a$ on trouve des $x$ avec $\mathbf{1}_{\mathbb{Q}}(x) = 0$ et d''autres avec $\mathbf{1}_{\mathbb{Q}}(x) = 1$ : aucune bande de demi-largeur $1/2$ ne les contient tous.'
+- type: qcm
+  question: 'La fonction de répartition de $X \sim \mathrm{Ber}(1/2)$ est $F(t) = 0$ pour $t < 0$, $1/2$ pour $0 \le t < 1$, $1$ pour $t \ge 1$. En $t = 0$, $F$ est :'
+  choix:
+  - 'continue ;'
+  - 'continue à droite mais pas à gauche ;'
+  - 'continue à gauche mais pas à droite.'
+  reponse: 1
+  explication: '$F(0^+) = 1/2 = F(0)$ mais $F(0^-) = 0$. Toute fonction de répartition est continue à droite (parce que $\mathbb{P}(X \le t)$ inclut $t$) ; le saut en $t$ vaut $\mathbb{P}(X = t)$, ici $1/2$.'
+- type: qcm
+  question: 'Quelle est la fonction $g$ qui prolonge par continuité $x \mapsto \dfrac{\sin x}{x}$ en $0$ ?'
+  choix:
+  - '$g(0) = 0$'
+  - '$g(0) = 1$'
+  - 'Aucune : $\sin x / x$ n''a pas de limite en $0$.'
+  reponse: 1
+  explication: '$\sin x / x \to 1$ en $0$ (c''est le taux d''accroissement de $\sin$ en $0$, qui vaut $\cos 0 = 1$). Poser $g(0) = 1$ rend la fonction continue en $0$, et c''est la seule valeur possible.'
+---
+
+### Définition
+
+$f : D \to \mathbb{R}$ est **continue en $a \in D$** si
+$\lim_{x \to a} f(x) = f(a)$, c'est-à-dire
+
+$$
+\forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x \in D,\quad
+|x - a| < \delta \ \Longrightarrow\ |f(x) - f(a)| < \varepsilon .
+$$
+
+Elle est **continue sur $D$** si elle l'est en tout point de $D$. Par la
+caractérisation séquentielle, $f$ est continue en $a$ si et seulement si
+$x_n \to a$ entraîne $f(x_n) \to f(a)$ : **une fonction continue commute avec
+les limites de suites**, $f(\lim x_n) = \lim f(x_n)$. C'est la forme sous
+laquelle la continuité sert le plus souvent.
+
+### Ce qui reste continu
+
+La somme, le produit, le quotient (là où le dénominateur ne s'annule pas) et la
+composée de fonctions continues sont continus. Les trois premiers se déduisent
+des opérations sur les limites de suites par la caractérisation séquentielle.
+Pour la composée : si $f$ est continue en $a$ et $g$ continue en $f(a)$, et si
+$x_n \to a$, alors $f(x_n) \to f(a)$, puis $g(f(x_n)) \to g(f(a))$.
+
+Les polynômes, les fractions rationnelles, $\exp$, $\log$, $\sin$, $\cos$ et
+$x \mapsto |x|$ sont continus sur leur domaine. Pour $\exp$, $\sin$ et $\cos$,
+cela dépend de leur définition, qui est l'objet des
+[séries numériques](/maths/n/series-numeriques) et des séries entières ; on
+l'admet ici.
+
+**Continuité à droite, à gauche.** $f$ est continue à droite en $a$ si
+$f(a^+) = f(a)$, c'est-à-dire si la restriction de $f$ à $D \cap [a, +\infty[$ est
+continue en $a$.
+
+### Intuition : on peut tracer le graphe sans lever le crayon — presque
+
+L'image du crayon est une bonne intuition sur un intervalle, et elle est fausse
+dès qu'on s'en éloigne. La fonction $x \mapsto 1/x$ est continue sur
+$\mathbb{R}^*$, alors que son graphe est fait de deux morceaux : son domaine
+n'est pas un intervalle. Et la continuité est une propriété **locale**, point
+par point : la fonction $x \mapsto x\,\mathbf{1}_{\mathbb{Q}}(x)$ est continue
+en $0$ (elle est majorée en valeur absolue par $|x|$) et en aucun autre point.
+Aucun crayon ne trace ce graphe.
+
+### Piège : prolonger par continuité n'est pas toujours possible
+
+$x \mapsto \sin x / x$ n'est pas définie en $0$ mais y a une limite, $1$ ; poser
+la valeur $1$ en $0$ donne une fonction continue sur $\mathbb{R}$ : c'est le
+prolongement par continuité. En revanche $x \mapsto \sin(1/x)$ n'a pas de limite
+en $0$ (capsule précédente) : **aucune** valeur en $0$ ne la rend continue. Et
+$x \mapsto 1/x$ n'a pas de limite finie en $0$ : même conclusion, pour une
+autre raison.
+
+### Pourquoi la continuité à droite intéresse les probabilités
+
+Une fonction de répartition $F(t) = \mathbb{P}(X \le t)$ est croissante,
+continue à droite, et ses discontinuités sont des **sauts** : en $t$, le saut
+$F(t) - F(t^-)$ vaut $\mathbb{P}(X = t)$. Une variable à densité a une fonction
+de répartition continue, une variable discrète une fonction en escalier. Ce
+nœud ne démontre pas ces propriétés — elles demandent la continuité monotone
+d'une probabilité, au niveau 1 —, mais la dernière capsule montre qu'une
+fonction croissante n'a **que** des sauts, et au plus une infinité dénombrable.

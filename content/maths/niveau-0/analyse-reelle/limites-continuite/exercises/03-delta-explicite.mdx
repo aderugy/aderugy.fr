@@ -1,0 +1,32 @@
+---
+kind: calcul
+difficulty: 2
+after: limite
+---
+On veut montrer, par la définition, que $f(x) = x^2$ est continue en $a = 3$.
+
+1. Montrer que si $|x - 3| < 1$, alors $|x^2 - 9| < 7\,|x - 3|$.
+2. En déduire un $\delta$ explicite en fonction de $\varepsilon$, et la valeur
+   obtenue pour $\varepsilon = 10^{-2}$.
+3. Le même raisonnement en $a$ quelconque donne-t-il un $\delta$ indépendant de
+   $a$ ? Qu'en conclure ?
+
+<!-- indice -->
+Écrire $x^2 - 9 = (x - 3)(x + 3)$, et majorer $|x + 3|$ quand $x$ est à
+distance moins de $1$ de $3$.
+
+<!-- indice -->
+Il y a deux contraintes sur $\delta$ : $\delta \le 1$ pour que la majoration de
+1 s'applique, et $7\delta \le \varepsilon$. Prendre le minimum.
+
+<!-- solution -->
+1. Si $|x - 3| < 1$, alors $2 < x < 4$, donc $5 < x + 3 < 7$, et
+   $|x^2 - 9| = |x - 3|\,|x + 3| < 7\,|x - 3|$.
+2. Posons $\delta = \min(1, \varepsilon/7)$. Si $|x - 3| < \delta$, alors la
+   question 1 s'applique et $|x^2 - 9| < 7\delta \le \varepsilon$. Pour
+   $\varepsilon = 10^{-2}$, $\delta = 1/700 \approx 1{,}43 \cdot 10^{-3}$.
+3. En $a$, le même calcul donne $|x + a| < 2|a| + 1$ pour $|x - a| < 1$, et
+   $\delta = \min\big(1, \varepsilon / (2|a| + 1)\big)$, qui tend vers $0$
+   quand $|a| \to \infty$. Ce n'est pas une preuve qu'aucun $\delta$ uniforme
+   n'existe, mais un indice — et en effet $x^2$ n'est pas uniformément continue
+   sur $\mathbb{R}$ (capsule 7).

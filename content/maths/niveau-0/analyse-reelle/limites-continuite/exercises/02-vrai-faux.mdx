@@ -1,0 +1,37 @@
+---
+kind: qcm
+difficulty: 1
+after: continuite
+---
+Vrai ou faux ? Justifier par une démonstration courte ou un contre-exemple.
+
+1. Si $f$ et $g$ sont discontinues en $a$, alors $f + g$ est discontinue en $a$.
+2. Si $f$ est continue en $a$ et $g$ discontinue en $a$, alors $f + g$ est
+   discontinue en $a$.
+3. Si $|f|$ est continue, alors $f$ est continue.
+4. Si $f$ est continue et $f(x) > 0$ pour tout $x \in [0, 1]$, alors il existe
+   $m > 0$ tel que $f(x) \ge m$ pour tout $x \in [0, 1]$.
+5. Si $f$ est continue en $a$ et $f(a) > 0$, alors $f > 0$ sur un intervalle
+   ouvert contenant $a$.
+
+<!-- indice -->
+Pour 1, chercher $g = -f$. Pour 2, raisonner par l'absurde en écrivant
+$g = (f + g) - f$.
+
+<!-- indice -->
+Pour 4, penser au théorème des bornes atteintes ; pour 5, appliquer la
+définition avec $\varepsilon = f(a)$.
+
+<!-- solution -->
+1. **Faux.** $f = \mathbf{1}_{[0, +\infty[}$ et $g = -f$ sont discontinues en
+   $0$, et $f + g = 0$ est continue.
+2. **Vrai.** Si $f + g$ était continue en $a$, alors $g = (f + g) - f$ le
+   serait aussi, comme différence de fonctions continues en $a$.
+3. **Faux.** $f = 2\,\mathbf{1}_{\mathbb{Q}} - 1$ vaut $\pm 1$, donc
+   $|f| = 1$ est continue, et $f$ n'est continue nulle part.
+4. **Vrai.** $f$ atteint sa borne inférieure en un point $c \in [0, 1]$, et
+   $m = f(c) > 0$. Sur $]0, 1]$, c'est faux : $f(x) = x$.
+5. **Vrai.** Avec $\varepsilon = f(a) > 0$, il existe $\delta > 0$ tel que
+   $|x - a| < \delta$ entraîne $f(x) > f(a) - \varepsilon = 0$. C'est la
+   **conservation locale du signe**, utilisée dans la preuve du théorème des
+   valeurs intermédiaires.

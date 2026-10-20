@@ -1,0 +1,31 @@
+---
+kind: preuve
+difficulty: 2
+after: sequentielle
+---
+1. Montrer par la définition $\varepsilon$-$\delta$ que
+   $\lim_{x \to 0,\, x \ne 0} x \sin(1/x) = 0$.
+2. Montrer par la caractérisation séquentielle que
+   $\lim_{x \to 0^+} \cos(1/x)$ n'existe pas.
+3. La fonction $g$ définie par $g(x) = x\sin(1/x)$ pour $x \ne 0$ et
+   $g(0) = 0$ est-elle continue sur $\mathbb{R}$ ?
+
+<!-- indice -->
+Pour 1, $|\sin| \le 1$ : majorer $|x \sin(1/x)|$ par une quantité simple.
+
+<!-- indice -->
+Pour 2, chercher deux suites $x_n \to 0^+$ telles que $1/x_n$ vaille
+$2n\pi$ pour l'une et $(2n+1)\pi$ pour l'autre.
+
+<!-- solution -->
+1. Pour $x \ne 0$, $|x \sin(1/x) - 0| \le |x|$. Soit $\varepsilon > 0$ ; avec
+   $\delta = \varepsilon$, $0 < |x| < \delta$ entraîne
+   $|x \sin(1/x)| < \varepsilon$. C'est le théorème des gendarmes : une
+   fonction bornée multipliée par une fonction qui tend vers $0$ tend vers $0$.
+2. Avec $x_n = 1/(2n\pi)$, $\cos(1/x_n) = 1$ ; avec $y_n = 1/((2n+1)\pi)$,
+   $\cos(1/y_n) = -1$. Les deux suites tendent vers $0^+$ et donnent deux
+   limites différentes : il n'y a pas de limite.
+3. Oui. En $x \ne 0$, $g$ est un produit et une composée de fonctions
+   continues ; en $0$, la question 1 donne $\lim_{x \to 0,\, x\ne 0} g(x) = 0 = g(0)$.
+   Le facteur $x$ « écrase » l'oscillation, que rien n'écrase dans
+   $\cos(1/x)$.
