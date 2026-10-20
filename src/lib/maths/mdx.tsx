@@ -1,5 +1,5 @@
-import { isValidElement, type ReactNode } from "react";
-import { MDXRemote } from "next-mdx-remote/rsc";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
+import { compileMDX } from "next-mdx-remote/rsc";
 import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
@@ -47,26 +47,54 @@ function Pre(props: React.ComponentPropsWithoutRef<"pre">) {
   return <pre {...props} />;
 }
 
-export function Mdx({ source }: { source: string }) {
-  return (
-    <MDXRemote
-      source={extraireAncres(source)}
-      // Les widgets sont utilisables directement dans un .mdx :
-      // `<Convergence loiInitiale="cauchy" />`.
-      //
-      // next-mdx-remote ≥ 6 bloque par défaut toute expression JavaScript
-      // (`blockJS`) : un attribut `trajectoires={30}` est retiré à la
-      // compilation. Les props de widget s'écrivent donc en chaînes, ou
-      // gardent leur valeur par défaut. Le contenu est versionné et n'exécute
-      // rien : on laisse ce garde-fou en place plutôt que de le désactiver.
-      components={{ pre: Pre, Convergence }}
-      options={{
-        parseFrontmatter: true,
-        mdxOptions: {
-          remarkPlugins: [remarkMath, remarkGfm],
-          rehypePlugins: [rehypeSlug, [rehypeKatex, { strict: false }]],
-        },
-      }}
-    />
-  );
+// Les widgets sont utilisables directement dans un .mdx :
+// `<Convergence loiInitiale="cauchy" />`.
+//
+// next-mdx-remote ≥ 6 bloque par défaut toute expression JavaScript
+// (`blockJS`) : un attribut `trajectoires={30}` est retiré à la
+// compilation. Les props de widget s'écrivent donc en chaînes, ou
+// gardent leur valeur par défaut. Le contenu est versionné et n'exécute
+// rien : on laisse ce garde-fou en place plutôt que de le désactiver.
+const COMPOSANTS = { pre: Pre, Convergence };
+
+const OPTIONS = {
+  parseFrontmatter: true,
+  mdxOptions: {
+    remarkPlugins: [remarkMath, remarkGfm],
+    rehypePlugins: [rehypeSlug, [rehypeKatex, { strict: false }]],
+  },
+} satisfies NonNullable<Parameters<typeof compileMDX>[0]["options"]>;
+
+/**
+ * Rendus déjà compilés, par source. Compiler est cher — remark, rehype et
+ * KaTeX coûtent ~15 ms par fragment, et une page de nœud en compte une
+ * cinquantaine — alors que le contenu est versionné : la même source donne
+ * toujours le même arbre. On garde donc l'élément React produit (immuable,
+ * sans rien de propre à la requête) pour toute la vie de l'instance.
+ *
+ * C'est la promesse qui est gardée, pour que deux requêtes simultanées ne
+ * compilent pas deux fois. En développement, pas de cache : on veut voir
+ * tout de suite la modification d'un .mdx, comme pour `loadGraph`.
+ */
+const compilees = new Map<string, Promise<ReactElement>>();
+
+export function compiler(source: string): Promise<ReactElement> {
+  const prod = process.env.NODE_ENV === "production";
+  const deja = prod ? compilees.get(source) : undefined;
+  if (deja) return deja;
+  const rendu = compileMDX({
+    source: extraireAncres(source),
+    components: COMPOSANTS,
+    options: OPTIONS,
+  }).then((r) => r.content);
+  if (prod) {
+    compilees.set(source, rendu);
+    // Un échec ne doit pas rester en cache.
+    rendu.catch(() => compilees.delete(source));
+  }
+  return rendu;
+}
+
+export async function Mdx({ source }: { source: string }) {
+  return compiler(source);
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { enregistrerTentative } from "@/server/actions/maths";
+import { useState, useTransition } from "react";
+import { contenuExercice, enregistrerTentative } from "@/server/actions/maths";
 
 export type TentativeVue = {
   outcome: string;
@@ -9,6 +9,8 @@ export type TentativeVue = {
   note: string;
   createdAt: string;
 };
+
+type Contenu = Awaited<ReturnType<typeof contenuExercice>>;
 
 const ISSUES = [
   { valeur: "resolu-seul", libelle: "résolu seul" },
@@ -22,6 +24,9 @@ const ISSUES = [
  * révélée en dernier. Le formulaire de tentative n'apparaît qu'une fois la
  * correction ouverte — enregistrer une issue avant de l'avoir lue n'a pas de
  * sens, et le champ « ce qui a bloqué » se remplit à ce moment-là.
+ *
+ * Le contenu n'est demandé au serveur qu'à la première ouverture : la page
+ * n'embarque que l'en-tête de chaque exercice.
  */
 export default function Exercice({
   numero,
@@ -29,9 +34,6 @@ export default function Exercice({
   exerciseId,
   kind,
   difficulty,
-  statement,
-  hints,
-  solution,
   tentatives,
 }: {
   numero: number;
@@ -39,14 +41,31 @@ export default function Exercice({
   exerciseId: string;
   kind: string;
   difficulty: number;
-  statement: React.ReactNode;
-  hints: React.ReactNode[];
-  solution: React.ReactNode;
   tentatives: TentativeVue[];
 }) {
   const [indicesOuverts, setIndicesOuverts] = useState(0);
   const [correction, setCorrection] = useState(false);
   const [ouvert, setOuvert] = useState(false);
+  const [contenu, setContenu] = useState<Contenu | null>(null);
+  const [erreur, setErreur] = useState(false);
+  const [chargement, demarrer] = useTransition();
+
+  function charger() {
+    setErreur(false);
+    demarrer(async () => {
+      try {
+        setContenu(await contenuExercice(nodeId, exerciseId));
+      } catch {
+        setErreur(true);
+      }
+    });
+  }
+
+  function basculer() {
+    const ouvrir = !ouvert;
+    setOuvert(ouvrir);
+    if (ouvrir && !contenu && !chargement) charger();
+  }
 
   const meilleure = tentatives[0];
 
@@ -67,7 +86,7 @@ export default function Exercice({
           </span>
         )}
         <button
-          onClick={() => setOuvert((o) => !o)}
+          onClick={basculer}
           className="rounded border border-line px-2 hover:border-accent"
           aria-expanded={ouvert}
         >
@@ -77,92 +96,110 @@ export default function Exercice({
 
       {ouvert && (
         <div className="mt-3">
-          <div className="prose-cours">{statement}</div>
-
-          {hints.slice(0, indicesOuverts).map((h, k) => (
-            <div key={k} className="border-line mt-3 border-l pl-4">
-              <div className="chrome text-muted">indice {k + 1}</div>
-              <div className="prose-cours">{h}</div>
-            </div>
-          ))}
-
-          <div className="chrome mt-4 flex gap-2">
-            {indicesOuverts < hints.length && (
-              <button
-                onClick={() => setIndicesOuverts((n) => n + 1)}
-                className="rounded border border-line bg-surface hover:border-accent px-2 py-1"
-              >
-                indice {indicesOuverts + 1} sur {hints.length}
-              </button>
-            )}
-            {!correction && (
-              <button
-                onClick={() => setCorrection(true)}
-                className="rounded border border-line bg-surface hover:border-accent px-2 py-1"
-              >
-                afficher la correction
-              </button>
-            )}
-          </div>
-
-          {correction && (
+          {!contenu ? (
+            <p className="chrome text-muted">
+              {erreur ? (
+                <>
+                  chargement impossible ·{" "}
+                  <button onClick={charger} className="underline hover:text-foreground">
+                    réessayer
+                  </button>
+                </>
+              ) : (
+                "chargement…"
+              )}
+            </p>
+          ) : (
             <>
-              <div className="border-line mt-4 border-t pt-4">
-                <div className="chrome text-muted mb-1">correction</div>
-                <div className="prose-cours">{solution}</div>
+              <div className="prose-cours">{contenu.statement}</div>
+
+              {contenu.hints.slice(0, indicesOuverts).map((h, k) => (
+                <div key={k} className="border-line mt-3 border-l pl-4">
+                  <div className="chrome text-muted">indice {k + 1}</div>
+                  <div className="prose-cours">{h}</div>
+                </div>
+              ))}
+
+              <div className="chrome mt-4 flex gap-2">
+                {indicesOuverts < contenu.hints.length && (
+                  <button
+                    onClick={() => setIndicesOuverts((n) => n + 1)}
+                    className="rounded border border-line bg-surface hover:border-accent px-2 py-1"
+                  >
+                    indice {indicesOuverts + 1} sur {contenu.hints.length}
+                  </button>
+                )}
+                {!correction && (
+                  <button
+                    onClick={() => setCorrection(true)}
+                    className="rounded border border-line bg-surface hover:border-accent px-2 py-1"
+                  >
+                    afficher la correction
+                  </button>
+                )}
               </div>
 
-              <form
-                action={enregistrerTentative.bind(
-                  null,
-                  nodeId,
-                  exerciseId,
-                  difficulty,
-                )}
-                className="chrome border-line mt-4 flex flex-wrap items-end gap-3 border-t pt-4"
-              >
-                <label className="flex flex-col gap-1">
-                  <span className="text-muted">issue</span>
-                  <select
-                    name="outcome"
-                    defaultValue={
-                      indicesOuverts > 0 ? "resolu-avec-indice" : "resolu-seul"
-                    }
-                    className="rounded border border-line bg-surface px-2 py-1 focus:border-accent focus:outline-none"
+              {correction && (
+                <>
+                  <div className="border-line mt-4 border-t pt-4">
+                    <div className="chrome text-muted mb-1">correction</div>
+                    <div className="prose-cours">{contenu.solution}</div>
+                  </div>
+
+                  <form
+                    action={enregistrerTentative.bind(
+                      null,
+                      nodeId,
+                      exerciseId,
+                      difficulty,
+                    )}
+                    className="chrome border-line mt-4 flex flex-wrap items-end gap-3 border-t pt-4"
                   >
-                    {ISSUES.map((i) => (
-                      <option key={i.valeur} value={i.valeur}>
-                        {i.libelle}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-muted">minutes</span>
-                  <input
-                    name="minutes"
-                    type="number"
-                    min={0}
-                    max={1440}
-                    defaultValue={15}
-                    className="w-20 rounded border border-line bg-surface px-2 py-1 focus:border-accent focus:outline-none"
-                  />
-                </label>
-                <label className="flex grow flex-col gap-1">
-                  <span className="text-muted">ce qui a bloqué</span>
-                  <input
-                    name="note"
-                    type="text"
-                    className="rounded border border-line bg-surface px-2 py-1 focus:border-accent focus:outline-none"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  className="rounded bg-accent px-3 py-1 text-white"
-                >
-                  enregistrer la tentative
-                </button>
-              </form>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-muted">issue</span>
+                      <select
+                        name="outcome"
+                        defaultValue={
+                          indicesOuverts > 0 ? "resolu-avec-indice" : "resolu-seul"
+                        }
+                        className="rounded border border-line bg-surface px-2 py-1 focus:border-accent focus:outline-none"
+                      >
+                        {ISSUES.map((i) => (
+                          <option key={i.valeur} value={i.valeur}>
+                            {i.libelle}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-muted">minutes</span>
+                      <input
+                        name="minutes"
+                        type="number"
+                        min={0}
+                        max={1440}
+                        defaultValue={15}
+                        className="w-20 rounded border border-line bg-surface px-2 py-1 focus:border-accent focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex grow flex-col gap-1">
+                      <span className="text-muted">ce qui a bloqué</span>
+                      <input
+                        name="note"
+                        type="text"
+                        className="rounded border border-line bg-surface px-2 py-1 focus:border-accent focus:outline-none"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="rounded bg-accent px-3 py-1 text-white"
+                    >
+                      enregistrer la tentative
+                    </button>
+                  </form>
+                </>
+              )}
+
             </>
           )}
 
