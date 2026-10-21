@@ -9,6 +9,7 @@ import { canUnschedule, isMissed, sessionMinutes } from "@/lib/agenda/sessions";
 import { fmtDuration, fmtTime, fromISODate, minutesOfDay, toISODate } from "@/lib/time";
 import type { Category, SessionStatus, TaskSession } from "@/lib/types";
 import {
+  abandonSlot,
   deleteSlot,
   moveScheduled,
   rescheduleSession,
@@ -240,26 +241,41 @@ export function SessionDetail({ session, categories, now, onClose }: Props) {
 
       {/* What can happen to this slot depends on where the clock is. */}
       {session.status === "planned" && (
-        <div className="grid grid-cols-2 gap-1">
+        <div className="space-y-1">
           <button
             onClick={() => run(() => setSlotStatus({ id: session.id, status: "done" }))}
             disabled={pending || temp}
-            className="rounded bg-accent px-2 py-1.5 font-medium text-white disabled:opacity-60"
+            className="w-full rounded bg-accent px-2 py-1.5 font-medium text-white disabled:opacity-60"
           >
             ✓ Done
           </button>
-          <button
-            onClick={() => run(() => slotToBacklog(session.id), notStarted ? onClose : undefined)}
-            disabled={pending || temp}
-            title={
-              notStarted
-                ? "Take it off the grid. It has not started, so nothing is kept."
-                : "Skip it: the slot stays here as history, and the task goes back to the backlog."
-            }
-            className="rounded border border-line px-2 py-1.5 hover:border-accent disabled:opacity-60"
-          >
-            {notStarted ? "Back to backlog" : "Skip → backlog"}
-          </button>
+          {!notStarted && <p className="pt-1 text-[10px] text-muted">Skip it — the slot stays here as history:</p>}
+          <div className="grid grid-cols-2 gap-1">
+            <button
+              onClick={() => run(() => slotToBacklog(session.id), notStarted ? onClose : undefined)}
+              disabled={pending || temp}
+              title={
+                notStarted
+                  ? "Take it off the grid. It has not started, so nothing is kept."
+                  : "Skip it and put the task back in the backlog, to plan it again later."
+              }
+              className="rounded border border-line px-2 py-1.5 hover:border-accent disabled:opacity-60"
+            >
+              {notStarted ? "Back to backlog" : "→ Backlog"}
+            </button>
+            <button
+              onClick={() => run(() => abandonSlot(task.id), notStarted ? onClose : undefined)}
+              disabled={pending || temp}
+              title={
+                notStarted
+                  ? "Drop the task: it leaves the grid and is not kept in the backlog."
+                  : "Skip it and drop the task: it does not go back to the backlog."
+              }
+              className="rounded border border-line px-2 py-1.5 text-muted hover:border-red-500 hover:text-red-500 disabled:opacity-60"
+            >
+              {notStarted ? "Abandon task" : "✕ Abandon"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -276,8 +292,26 @@ export function SessionDetail({ session, categories, now, onClose }: Props) {
 
       {session.status === "skipped" && (
         <p className="text-muted">
-          Skipped: kept here as history. The task is back in the backlog
-          {task.status === "scheduled" ? " — and already planned again." : "."}
+          {task.status === "dropped" ? (
+            "Skipped and abandoned: kept here as history. The task was dropped."
+          ) : (
+            <>
+              Skipped: kept here as history. The task is back in the backlog
+              {task.status === "scheduled" ? " — and already planned again." : "."}
+              {task.status === "backlog" && (
+                <>
+                  {" "}
+                  <button
+                    onClick={() => run(() => abandonSlot(task.id))}
+                    disabled={pending}
+                    className="underline underline-offset-2 hover:text-red-500 disabled:opacity-60"
+                  >
+                    Abandon it instead
+                  </button>
+                </>
+              )}
+            </>
+          )}
         </p>
       )}
 

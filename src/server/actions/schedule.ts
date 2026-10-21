@@ -13,6 +13,7 @@ import {
   sendToBacklog,
   setSessionStatus,
 } from "@/server/agenda/schedule";
+import { patchTask } from "@/server/agenda/tasks";
 import type { SessionStatus } from "@/lib/types";
 
 // Thin wrappers: the rules live in server/agenda/schedule.ts, shared with the
@@ -125,6 +126,24 @@ export async function slotToBacklog(id: string): Promise<ActionResult> {
   try {
     const { supabase, user } = await requireUser();
     const r = await sendToBacklog(supabase, user.id, { id });
+    if (!r.ok) return r;
+    await queuePush(supabase);
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * Give up on the slot's task: the task is dropped instead of going back to the
+ * backlog. A slot already started stays as skipped (history); one still to
+ * come leaves the grid (closeLiveSession, through patchTask).
+ */
+export async function abandonSlot(taskId: string): Promise<ActionResult> {
+  try {
+    const { supabase, user } = await requireUser();
+    const r = await patchTask(supabase, user.id, taskId, { status: "dropped" });
     if (!r.ok) return r;
     await queuePush(supabase);
     refresh();

@@ -123,7 +123,7 @@ function itemTitle(item: GridItem, startMin: number, endMin: number) {
     : item.status === "skipped"
       ? "\nSkipped — kept as history; the task went back to the backlog."
       : item.missed
-        ? "\nMissed — its time is over. Mark it done, skip it, or drag it to reschedule."
+        ? "\nMissed — its time is over. Mark it done, skip it (back to the backlog or abandoned), or drag it to reschedule."
         : item.status === "done"
           ? "\nDone."
           : "";
