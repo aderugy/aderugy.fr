@@ -28,6 +28,11 @@ export type Queue = {
   fresh: Card[];
   /** What the limits held back today, for the header. */
   heldBack: { review: number; fresh: number };
+  /**
+   * The cards behind those counts, in queue order. The limits are soft: the
+   * session offers them once its own queue is done, after a warning.
+   */
+  extra: { review: Card[]; fresh: Card[] };
 };
 
 export function buildQueue({ cards, today, settings, now }: QueueInput): Queue {
@@ -56,13 +61,13 @@ export function buildQueue({ cards, today, settings, now }: QueueInput): Queue {
     .map((x) => x.c);
 
   const review: Card[] = [];
-  let reviewHeld = 0;
+  const reviewHeld: Card[] = [];
   for (const c of dueReviews) {
     if (seenNotes.has(c.note_id)) continue;
     if (review.length >= reviewRoom) {
-      // Counted once per note: a held card's siblings would wait anyway.
+      // One per note: a held card's siblings would wait anyway.
       seenNotes.add(c.note_id);
-      reviewHeld++;
+      reviewHeld.push(c);
       continue;
     }
     seenNotes.add(c.note_id);
@@ -74,19 +79,25 @@ export function buildQueue({ cards, today, settings, now }: QueueInput): Queue {
     .sort((a, b) => a.note_created_at.localeCompare(b.note_created_at) || a.note_id.localeCompare(b.note_id) || a.ord - b.ord);
 
   const fresh: Card[] = [];
-  let freshHeld = 0;
+  const freshHeld: Card[] = [];
   for (const c of newCards) {
     if (seenNotes.has(c.note_id)) continue;
     if (fresh.length >= freshRoom) {
       seenNotes.add(c.note_id);
-      freshHeld++;
+      freshHeld.push(c);
       continue;
     }
     seenNotes.add(c.note_id);
     fresh.push(c);
   }
 
-  return { learning, review, fresh, heldBack: { review: reviewHeld, fresh: freshHeld } };
+  return {
+    learning,
+    review,
+    fresh,
+    heldBack: { review: reviewHeld.length, fresh: freshHeld.length },
+    extra: { review: reviewHeld, fresh: freshHeld },
+  };
 }
 
 export type Pick<T> = { card: T; from: "learning" | "review" | "fresh" } | null;

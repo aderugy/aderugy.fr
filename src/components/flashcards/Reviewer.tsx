@@ -20,6 +20,9 @@ import type { QueueItem } from "@/server/flashcards/data";
  * steps come back into the queue here, with the due time the server
  * confirms. Undo waits for the saves in flight, then restores the last card.
  *
+ * The daily limits are soft: what they held back comes with the session, and
+ * once its own cards are done it offers them, with a word on what it costs.
+ *
  * Keys: Space/Enter reveal · 1–4 rate · E edit · Z undo.
  * Touch: tap reveals · hold opens the card menu · swipe left Again, right Good.
  */
@@ -56,6 +59,7 @@ export function Reviewer({
   deckId,
   deckName,
   heldBack,
+  extra: extraInitial,
   decks,
   startedAt,
 }: {
@@ -65,6 +69,8 @@ export function Reviewer({
   deckId: string | null;
   deckName: string | null;
   heldBack: { review: number; fresh: number };
+  /** Cards past today's limits, in queue order. */
+  extra: { review: QueueItem[]; fresh: QueueItem[] };
   decks: { id: string; path: string; depth: number }[];
   /** Server time when the queue was built: the first card is picked at it, on both sides. */
   startedAt: string;
@@ -84,6 +90,7 @@ export function Reviewer({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [tomorrow, setTomorrow] = useState<number | null>(null);
   const [clock, setClock] = useState(() => Date.now());
+  const [extra, setExtra] = useState(extraInitial);
 
   const shownAt = useRef(0);
   const chain = useRef<Promise<void>>(Promise.resolve());
@@ -111,6 +118,18 @@ export function Reviewer({
   useEffect(() => {
     shownAt.current = Date.now();
   }, []);
+
+  /** Go past the daily limits: bring `n` held cards of one kind into the session. */
+  const goPast = useCallback(
+    (kind: "review" | "fresh", n: number) => {
+      const taken = extra[kind].slice(0, n);
+      if (!taken.length) return;
+      setExtra((e) => ({ ...e, [kind]: e[kind].slice(taken.length) }));
+      setTomorrow(null);
+      advance({ ...lists, [kind]: [...lists[kind], ...taken] });
+    },
+    [extra, lists, advance],
+  );
 
   // While waiting for a card still in its steps, tick so it appears when due.
   const waitingFor = !current ? lists.learning.map((i) => Date.parse(i.card.due)).sort((a, b) => a - b)[0] : undefined;
@@ -329,7 +348,7 @@ export function Reviewer({
     const minutes = Math.round(elapsedMs / 60_000);
     return (
       <main className="mx-auto w-full max-w-lg px-5 py-14 text-sm">
-        <h1 className="text-xl font-semibold tracking-tight">{history.length ? "Session done" : "Nothing to study"}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{history.length ? "Session done" : extra.review.length + extra.fresh.length > 0 && !cram ? "Today’s limits are reached" : "Nothing to study"}</h1>
         {history.length > 0 ? (
           <>
             <p className="mt-2 text-muted">
@@ -346,7 +365,7 @@ export function Reviewer({
               ))}
             </div>
           </>
-        ) : (
+        ) : extra.review.length + extra.fresh.length > 0 && !cram ? null : (
           <p className="mt-2 text-muted">
             {cram ? "This selection has no cards to cram." : "No card is due in this deck right now."}
           </p>
@@ -356,12 +375,55 @@ export function Reviewer({
             Tomorrow: <span className="text-foreground">{tomorrow}</span> card{tomorrow === 1 ? "" : "s"} due.
           </p>
         )}
-        {!cram && heldBack.fresh + heldBack.review > 0 && (
-          <p className="mt-2 text-muted">
-            The daily limits held back {heldBack.fresh ? `${heldBack.fresh} new` : ""}
-            {heldBack.fresh && heldBack.review ? " and " : ""}
-            {heldBack.review ? `${heldBack.review} due` : ""} card{heldBack.fresh + heldBack.review > 1 ? "s" : ""}.
-          </p>
+        {!cram && extra.review.length + extra.fresh.length > 0 && (
+          <div className="mt-6 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+            <p className="font-medium text-amber-700 dark:text-amber-400">Today’s limits are reached</p>
+            <p className="mt-1 text-muted">
+              {[extra.review.length ? `${extra.review.length} due` : "", extra.fresh.length ? `${extra.fresh.length} new` : ""]
+                .filter(Boolean)
+                .join(" and ")}{" "}
+              card{extra.review.length + extra.fresh.length > 1 ? "s are" : " is"} still waiting. You can keep going:
+              {extra.review.length > 0 && " overdue reviews are fine to catch up on,"}
+              {extra.fresh.length > 0 && " but every new card adds reviews to the coming days."}
+              {extra.fresh.length === 0 && " nothing is lost by stopping here either."}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {extra.review.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => goPast("review", extra.review.length)}
+                  className="rounded-md border border-line bg-surface px-3 py-1.5 hover:border-accent"
+                >
+                  Review {extra.review.length} more due
+                </button>
+              )}
+              {extra.fresh.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => goPast("fresh", 10)}
+                  className="rounded-md border border-line bg-surface px-3 py-1.5 hover:border-accent"
+                >
+                  Learn {Math.min(10, extra.fresh.length)} more new
+                </button>
+              )}
+              {extra.fresh.length > 10 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Add all ${extra.fresh.length} new cards to this session? They will all come back for review in the next days.`)) {
+                      goPast("fresh", extra.fresh.length);
+                    }
+                  }}
+                  className="rounded-md border border-line bg-surface px-3 py-1.5 hover:border-accent"
+                >
+                  All {extra.fresh.length} new
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {!cram && extra.review.length + extra.fresh.length === 0 && heldBack.fresh + heldBack.review > 0 && (
+          <p className="mt-2 text-muted">You went past today’s limits.</p>
         )}
         {notice && <p className="mt-4 text-xs text-muted">{notice}</p>}
         <div className="mt-8 flex flex-wrap gap-3">

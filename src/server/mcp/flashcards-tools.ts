@@ -124,13 +124,17 @@ export function registerFlashcardsTools(server: McpServer) {
     },
     async (_input, ctx) => {
       const { db, userId } = callerOf(ctx.http?.authInfo);
-      const { decks, total } = await decksWithCounts(db, userId);
+      const { decks, total, beyond } = await decksWithCounts(db, userId);
       if (decks.length === 0) return ok("No deck yet. Create one with create_deck.");
       const lines = decks.map(
         (d) =>
-          `${"  ".repeat(d.depth)}- ${d.path} — ${d.counts.cards} cards · today ${d.counts.newCards} new, ${d.counts.learningDue} learning, ${d.counts.reviewDue} due (id ${d.id})`,
+          `${"  ".repeat(d.depth)}- ${d.path} — ${d.counts.cards} cards · today ${d.counts.newCards} new, ${d.counts.learningDue} learning, ${d.counts.reviewDue} due${d.beyond ? ` (+${d.beyond} past the limits)` : ""} (id ${d.id})`,
       );
-      return ok(`Today in all decks: ${total.newCards} new, ${total.learningDue} learning, ${total.reviewDue} due.\n${lines.join("\n")}`);
+      const past = beyond.newCards + beyond.reviewDue;
+      const extra = past
+        ? ` Past the daily limits (soft: Arthur can still study them): ${beyond.newCards} new, ${beyond.reviewDue} due.`
+        : "";
+      return ok(`Today in all decks: ${total.newCards} new, ${total.learningDue} learning, ${total.reviewDue} due.${extra}\n${lines.join("\n")}`);
     },
   );
 
