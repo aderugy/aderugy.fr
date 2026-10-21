@@ -64,6 +64,7 @@ export function SettingsForm({ settings, tags }: { settings: Settings; tags: { t
           <label className="block">
             <span className="text-xs text-muted">Maximum reviews per day</span>
             <input type="number" min={0} max={99999} value={s.reviewsPerDay} onChange={num("reviewsPerDay")} className={field} />
+            <span className="mt-1 block text-xs text-muted">Both limits are soft: past them, a session warns you and lets you keep going.</span>
           </label>
           <label className="block">
             <span className="text-xs text-muted">Learning steps (minutes)</span>

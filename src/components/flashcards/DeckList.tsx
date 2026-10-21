@@ -10,15 +10,19 @@ import type { DeckCounts, DeckWithCounts } from "@/server/flashcards/data";
 /**
  * The deck tree with today's counts — new, in steps, due — rolled up over
  * each subtree and capped by the daily limits, as a session would show them.
+ * The limits are soft: what they hold back is shown apart, and a session
+ * offers it once its own cards are done.
  */
 export function DeckList({
   decks,
   total,
+  beyond,
   doneToday,
   inbox,
 }: {
   decks: DeckWithCounts[];
   total: DeckCounts;
+  beyond: { newCards: number; reviewDue: number };
   doneToday: { reviews: number; fresh: number };
   inbox: number;
 }) {
@@ -26,7 +30,9 @@ export function DeckList({
   const [editing, setEditing] = useState<DeckWithCounts | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
+  const past = beyond.newCards + beyond.reviewDue;
   const anything = total.newCards + total.learningDue + total.reviewDue > 0;
+  const studiable = anything || past > 0;
 
   const hidden = (d: DeckWithCounts): boolean => {
     let p = d.parent_id;
@@ -60,6 +66,8 @@ export function DeckList({
               <>
                 <Counts fresh={total.newCards} learning={total.learningDue} due={total.reviewDue} /> to study
               </>
+            ) : past > 0 ? (
+              "Today’s limits are reached"
             ) : decks.length ? (
               "Nothing due. Come back tomorrow, or cram a deck."
             ) : (
@@ -68,11 +76,23 @@ export function DeckList({
             {doneToday.reviews + doneToday.fresh > 0 && (
               <span> · {doneToday.reviews + doneToday.fresh} done today</span>
             )}
+            {past > 0 && (
+              <span title="The daily limits are soft: a session offers these once its own cards are done.">
+                {" "}· {[beyond.reviewDue ? `${beyond.reviewDue} due` : "", beyond.newCards ? `${beyond.newCards} new` : ""].filter(Boolean).join(" and ")} past the limits
+              </span>
+            )}
           </p>
         </div>
-        {anything && (
-          <Link href="/flashcards/review" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90">
-            Study all
+        {studiable && (
+          <Link
+            href="/flashcards/review"
+            className={
+              anything
+                ? "rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                : "rounded-md border border-line bg-surface px-4 py-2 text-sm hover:border-accent"
+            }
+          >
+            {anything ? "Study all" : "Study past the limits"}
           </Link>
         )}
         <Link
@@ -95,7 +115,7 @@ export function DeckList({
         <ul>
           {decks.filter((d) => !hidden(d)).map((d) => {
             const c = d.counts;
-            const busy = c.newCards + c.learningDue + c.reviewDue > 0;
+            const busy = c.newCards + c.learningDue + c.reviewDue + d.beyond > 0;
             return (
               <li key={d.id} className="flex items-center border-b border-line px-3 last:border-b-0 hover:bg-background/60">
                 <div className="flex min-w-0 flex-1 items-center py-2.5" style={{ paddingLeft: `${d.depth * 1.1}rem` }}>
@@ -126,6 +146,11 @@ export function DeckList({
                     {d.name}
                   </Link>
                   <span className="ml-2 shrink-0 text-xs text-muted">{c.cards ? c.cards : ""}</span>
+                  {d.beyond > 0 && (
+                    <span className="ml-2 shrink-0 text-xs text-muted" title="New and due cards past today’s limits">
+                      +{d.beyond}
+                    </span>
+                  )}
                 </div>
                 <Num value={c.newCards} className="text-sky-600 dark:text-sky-400" />
                 <Num value={c.learningDue} className="text-amber-600 dark:text-amber-400" />

@@ -274,6 +274,8 @@ export type DeckWithCounts = Deck & {
   depth: number;
   /** This deck and its sub-decks. */
   counts: DeckCounts;
+  /** New and due cards past today's limits in this subtree. */
+  beyond: number;
 };
 
 /**
@@ -288,6 +290,8 @@ export async function decksWithCounts(
 ): Promise<{
   decks: DeckWithCounts[];
   total: DeckCounts;
+  /** What today's limits hold back over every deck: still studiable, after a warning. */
+  beyond: { newCards: number; reviewDue: number };
   settings: Settings;
   doneToday: { reviews: number; fresh: number };
 }> {
@@ -345,6 +349,7 @@ export async function decksWithCounts(
       path: d.path,
       depth: d.depth,
       counts: { ...sum, newCards: Math.min(sum.newCards, freshRoom), reviewDue: Math.min(sum.reviewDue, reviewRoom) },
+      beyond: Math.max(0, sum.newCards - freshRoom) + Math.max(0, sum.reviewDue - reviewRoom),
     };
   });
   const total: DeckCounts = { cards: 0, newCards: 0, learningDue: 0, reviewDue: 0, suspended: 0 };
@@ -355,9 +360,13 @@ export async function decksWithCounts(
     total.reviewDue += c.reviewDue;
     total.suspended += c.suspended;
   }
+  const beyond = {
+    newCards: Math.max(0, total.newCards - freshRoom),
+    reviewDue: Math.max(0, total.reviewDue - reviewRoom),
+  };
   total.newCards = Math.min(total.newCards, freshRoom);
   total.reviewDue = Math.min(total.reviewDue, reviewRoom);
-  return { decks: out, total, settings, doneToday: { reviews: reviewsDone, fresh: freshDone } };
+  return { decks: out, total, beyond, settings, doneToday: { reviews: reviewsDone, fresh: freshDone } };
 }
 
 /* ------------------------------------------------------------------- notes */
@@ -700,6 +709,8 @@ export type Session = {
   settings: Settings;
   queue: { learning: QueueItem[]; review: QueueItem[]; fresh: QueueItem[] };
   heldBack: Queue["heldBack"];
+  /** Cards past today's limits, offered at the end of the session (never in cram). */
+  extra: { review: QueueItem[]; fresh: QueueItem[] };
   deckName: string | null;
   today: string;
 };
@@ -759,6 +770,7 @@ export async function loadSession(
     settings,
     queue: { learning: q.learning.map(item), review: q.review.map(item), fresh: q.fresh.map(item) },
     heldBack: q.heldBack,
+    extra: { review: q.extra.review.map(item), fresh: q.extra.fresh.map(item) },
     deckName: opts.deckId ? (paths.get(opts.deckId) ?? null) : null,
     today,
   };
@@ -800,6 +812,7 @@ export async function loadCram(
     settings,
     queue: { learning: [], review: items, fresh: [] },
     heldBack: { review: 0, fresh: 0 },
+    extra: { review: [], fresh: [] },
     deckName: label || null,
     today: reviewDay(now, settings),
   };

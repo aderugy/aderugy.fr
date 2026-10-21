@@ -9,8 +9,8 @@ export default async function FlashcardsPage() {
 
   let loaded;
   try {
-    const [{ decks, total, doneToday }, inbox] = await Promise.all([decksWithCounts(supabase, user.id), loadInbox(supabase, user.id)]);
-    loaded = { decks, total, doneToday, inbox: inbox.length };
+    const [{ decks, total, beyond, doneToday }, inbox] = await Promise.all([decksWithCounts(supabase, user.id), loadInbox(supabase, user.id)]);
+    loaded = { decks, total, beyond, doneToday, inbox: inbox.length };
   } catch (e) {
     return (
       <main className="mx-auto max-w-lg px-5 py-16 text-sm sm:px-6 sm:py-20">
@@ -23,5 +23,5 @@ export default async function FlashcardsPage() {
     );
   }
 
-  return <DeckList decks={loaded.decks} total={loaded.total} doneToday={loaded.doneToday} inbox={loaded.inbox} />;
+  return <DeckList decks={loaded.decks} total={loaded.total} beyond={loaded.beyond} doneToday={loaded.doneToday} inbox={loaded.inbox} />;
 }

@@ -95,6 +95,9 @@ test("the queue: steps first, reviews most at risk first, new within the limit, 
   // One introduced today already → room for one more; oldest note first; siblings held.
   assert.deepEqual(q.fresh.map((c) => c.id), ["new-old"]);
   assert.equal(q.heldBack.fresh, 2);
+  // The limit is soft: what it held back is still there to study, in order.
+  assert.deepEqual(q.extra.fresh.map((c) => c.id), ["new-a0", "new-c"]);
+  assert.deepEqual(q.extra.review, []);
 });
 
 test("the next card: a due step, then reviews, then new, then a step due soon", () => {
