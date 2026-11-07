@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
+import { Suspense } from "react";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
+import { FocusChip } from "@/components/projects/FocusChip";
 
 const nav = [
   { href: "/agenda", label: "Week" },
@@ -50,7 +52,11 @@ export default async function AgendaLayout({ children }: LayoutProps<"/agenda">)
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-muted">
+        <div className="ml-auto flex min-w-0 items-center gap-3 text-xs text-muted">
+          {/* The research focus (/projects): streamed, so it never holds the grid up. */}
+          <Suspense fallback={null}>
+            <FocusChip db={supabase} userId={user.id} />
+          </Suspense>
           <span className="hidden lg:inline">{user.email}</span>
           <SignOutButton />
         </div>

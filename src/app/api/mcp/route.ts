@@ -6,10 +6,11 @@ import { JOBS_INSTRUCTIONS, registerJobsTools } from "@/server/mcp/jobs-tools";
 import { LIVE_INSTRUCTIONS, registerLiveTools } from "@/server/mcp/live-tools";
 import { FLASHCARDS_INSTRUCTIONS, registerFlashcardsTools } from "@/server/mcp/flashcards-tools";
 import { MATHS_INSTRUCTIONS, registerMathsTools } from "@/server/mcp/maths-tools";
+import { PROJECTS_INSTRUCTIONS, registerProjectsTools } from "@/server/mcp/projects-tools";
 
 /**
  * The Claude connector for the /agenda backlog and week grid, the /jobs internship search,
- * /poker/live sessions, /flashcards and /maths — one remote MCP server over
+ * /poker/live sessions, /flashcards, /maths and /projects — one remote MCP server over
  * Streamable HTTP, stateless (mcp-handler v2: no Redis, no sessions).
  *
  * Unauthenticated requests get a 401 whose WWW-Authenticate header points at
@@ -27,11 +28,12 @@ const handler = createMcpHandler(
     registerLiveTools(server);
     registerFlashcardsTools(server);
     registerMathsTools(server);
+    registerProjectsTools(server);
   },
   {
     // The name stays: it is what the connector was registered under.
-    serverInfo: { name: "aderugy-agenda", version: "1.5.0" },
-    instructions: `${SERVER_INSTRUCTIONS}\n\n${CALENDAR_INSTRUCTIONS}\n\n${JOBS_INSTRUCTIONS}\n\n${LIVE_INSTRUCTIONS}\n\n${FLASHCARDS_INSTRUCTIONS}\n\n${MATHS_INSTRUCTIONS}`,
+    serverInfo: { name: "aderugy-agenda", version: "1.6.0" },
+    instructions: `${SERVER_INSTRUCTIONS}\n\n${CALENDAR_INSTRUCTIONS}\n\n${JOBS_INSTRUCTIONS}\n\n${LIVE_INSTRUCTIONS}\n\n${FLASHCARDS_INSTRUCTIONS}\n\n${MATHS_INSTRUCTIONS}\n\n${PROJECTS_INSTRUCTIONS}`,
   },
 );
 

@@ -23,6 +23,11 @@ const tools = [
     description: "Spaced-repetition cards: decks, Markdown and maths, FSRS reviews, stats, Claude-written cards to approve.",
   },
   {
+    href: "/projects",
+    name: "Projects",
+    description: "Research projects on a budget: contract, steps with a cut line, one open step, parking lot, notes with Claude.",
+  },
+  {
     href: "/jobs",
     name: "Jobs",
     description: "The internship search: applications, companies, interviews on the agenda, offers kept.",
