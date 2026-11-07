@@ -1,22 +1,23 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { CardGrid } from "./CardGrid";
 import { FeltCenter, LiveTable, type BoardStreet, type SeatView } from "./LiveTable";
 import { INPUT, Sheet } from "./ui";
 import { PlayingCard } from "@/components/poker/trainer/Cards";
 import {
+  applyAction,
   behind,
   describeStep,
   foldsUntil,
   options,
   playHand,
   positions,
-  potRaiseTo,
   settle,
   type HandState,
   type PlayResult,
 } from "@/lib/live/hand";
+import { bestScore, categoryName, showdownWinners } from "@/lib/live/eval";
 import {
   BOARD_SIZE,
   STREET_LABELS,
@@ -33,13 +34,13 @@ import { computedHeroNet } from "@/lib/live/validate";
 /** Who sits in a seat, for the editor; `known: false` for an unknown player. */
 export type SeatName = { playerId: string | null; name: string | null; colors?: string[]; known?: boolean };
 
-type Phase = "setup" | "action" | "result";
-const PHASE_LABELS: Record<Phase, string> = { setup: "Setup", action: "Action", result: "Result" };
+/**
+ * A new hand opens on the button, then Arthur's cards, then the table. An
+ * existing hand opens on the table.
+ */
+type Step = "button" | "cards" | "play";
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
-
-/** What a tap on a card opens: a street of the board, or a seat's two cards. */
-type CardTarget = { kind: "board"; street: BoardStreet } | { kind: "seat"; seat: number };
 
 /** Where each street's cards sit on the board, and how many. */
 const STREET_SLICE: Record<BoardStreet, [number, number]> = { flop: [0, 3], turn: [3, 1], river: [4, 1] };
@@ -47,15 +48,33 @@ const STREET_SLICE: Record<BoardStreet, [number, number]> = { flop: [0, 3], turn
 /** A blind bought back: the big blind live, or the big blind live and the small blind dead. */
 type PostMode = "bb" | "both";
 
+/** An opponent's cards: seen at showdown, or only what he said he had. */
+type Held = { cards: string[]; how: "shown" | "said" };
+
 function postModes(posts: HandPost[] | undefined): Record<number, PostMode> {
   return Object.fromEntries((posts ?? []).map((p) => [p.seat, p.dead > 0 ? "both" : "bb"]));
 }
 
+function heldFrom(initial: HandInput): Record<number, Held> {
+  const out: Record<number, Held> = {};
+  for (const [k, v] of Object.entries(initial.said ?? {})) {
+    const c = splitCards(v);
+    if (c) out[Number(k)] = { cards: c, how: "said" };
+  }
+  for (const [k, v] of Object.entries(initial.shown)) {
+    const c = splitCards(v);
+    if (c) out[Number(k)] = { cards: c, how: "shown" };
+  }
+  return out;
+}
+
 /**
- * Enter a hand action by action, full screen. Setup (who is dealt in, the
- * button, blinds, your cards, stacks if known), then the action in turn
- * order with the board between streets, then the result: cards shown, who
- * took each pot, your net. Nothing is saved until Save.
+ * Enter a hand on one screen that does not scroll: the table on top, one
+ * panel at the bottom that asks for what comes next — the button, your cards,
+ * the action of the seat to act, a street's cards, who won. A tap on a seat
+ * edits it (stack, cards, dealt in or not), a tap on the board edits a street,
+ * at any point. The result works itself out: from the folds, or from the
+ * cards when they are known. Nothing is saved until Save.
  */
 export function HandEditor({
   title,
@@ -76,10 +95,10 @@ export function HandEditor({
   onSave: (input: HandInput) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
 }) {
-  const [phase, setPhase] = useState<Phase>(initial.actions.length ? "result" : "setup");
+  const fresh = initial.actions.length === 0 && !initial.hero_cards;
+  const [step, setStep] = useState<Step>(fresh ? "button" : "play");
   const [dealt, setDealt] = useState<number[]>(initial.seats.map((s) => s.seat).sort((a, b) => a - b));
   const [button, setButton] = useState(initial.button_seat);
-  const [tapMode, setTapMode] = useState<"deal" | "button">("deal");
   const [sb, setSb] = useState(fmtChips(initial.small_blind));
   const [bb, setBb] = useState(fmtChips(initial.big_blind));
   const [straddle, setStraddle] = useState(initial.straddle ? fmtChips(initial.straddle) : "");
@@ -90,19 +109,17 @@ export function HandEditor({
   const [heroCards, setHeroCards] = useState<string[]>(splitCards(initial.hero_cards) ?? []);
   const [actions, setActions] = useState<HandAction[]>(initial.actions);
   const [board, setBoard] = useState<string[]>(initial.board);
+  /** Streets whose cards were not noted: not asked for again. */
   const [skipped, setSkipped] = useState<Set<Street>>(new Set());
-  /** Seats whose cards were not shown at showdown (mucked), so they are not asked for. */
-  const [mucked, setMucked] = useState<Set<number>>(new Set());
-  /** In the result: the board or a seat's shown cards being picked. */
-  const [resultEditing, setResultEditing] = useState<"board" | number | null>(null);
-  const [cardTarget, setCardTarget] = useState<CardTarget | null>(null);
-  const [shown, setShown] = useState<Record<number, string[]>>(
-    Object.fromEntries(Object.entries(initial.shown).map(([k, v]) => [Number(k), splitCards(v) ?? []])),
-  );
-  const [winners, setWinners] = useState<number[][]>(initial.winners);
-  const [netOverride, setNetOverride] = useState<string>(initial.hero_net != null ? fmtChips(initial.hero_net) : "");
+  const [held, setHeld] = useState<Record<number, Held>>(heldFrom(initial));
+  /** Winners picked by hand; null while they come from the cards. */
+  const [manualWinners, setManualWinners] = useState<number[][] | null>(fresh ? null : initial.winners);
+  const [netOverride, setNetOverride] = useState<string>(initial.hero_net != null && !fresh ? fmtChips(initial.hero_net) : "");
   const [starred, setStarred] = useState(initial.starred);
   const [notes, setNotes] = useState(initial.notes ?? "");
+  const [seatSheet, setSeatSheet] = useState<number | null>(null);
+  const [boardSheet, setBoardSheet] = useState<BoardStreet | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
 
@@ -110,14 +127,14 @@ export function HandEditor({
 
   /* ------------------------------------------------------------ derived */
 
-  const setupNums = {
+  const nums = {
     sb: parseAmount(sb),
     bb: parseAmount(bb),
     straddle: straddle.trim() ? parseAmount(straddle) : null,
   };
   const posts: HandPost[] = dealt
     .filter((seat) => postsBy[seat])
-    .map((seat) => ({ seat, live: setupNums.bb ?? 0, dead: postsBy[seat] === "both" ? (setupNums.sb ?? 0) : 0 }));
+    .map((seat) => ({ seat, live: nums.bb ?? 0, dead: postsBy[seat] === "both" ? (nums.sb ?? 0) : 0 }));
   const seats = dealt.map((seat) => {
     const st = parseAmount(stacks[seat] ?? "");
     return { seat, player_id: names.get(seat)?.playerId ?? null, stack: st && st > 0 ? st : null };
@@ -126,9 +143,9 @@ export function HandEditor({
   // Replayed on every render: a hand is a few dozen actions at most.
   const play = ((): { result: PlayResult; error: null } | { result: null; error: string } => {
     try {
-      if (!(setupNums.sb! > 0) || !(setupNums.bb! > 0)) return { result: null, error: "Set the blinds." };
+      if (!(nums.sb! > 0) || !(nums.bb! > 0)) return { result: null, error: "Set the blinds (⋯)." };
       return {
-        result: playHand({ seats, button, sb: setupNums.sb!, bb: setupNums.bb!, straddle: setupNums.straddle, posts }, actions),
+        result: playHand({ seats, button, sb: nums.sb!, bb: nums.bb!, straddle: nums.straddle, posts }, actions),
         error: null,
       };
     } catch (e) {
@@ -139,22 +156,73 @@ export function HandEditor({
   const result = play.result;
   const state: HandState | null = result?.state ?? null;
   const pos = useMemo(() => positions(dealt, button), [dealt, button]);
+  const label = (s: number) => seatLabel(s, pos, names, hero);
+  const short = (s: number) => (s === hero ? "You" : (names.get(s)?.name ?? `Seat ${s}`));
+
+  // Everyone's cards, for the showdown: yours, then what was shown or said.
+  const cardsBySeat = new Map<number, string[]>();
+  if (hero !== null && heroCards.length === 2) cardsBySeat.set(hero, heroCards);
+  for (const [k, v] of Object.entries(held)) if (v.cards.length === 2 && Number(k) !== hero) cardsBySeat.set(Number(k), v.cards);
+
+  const atShowdown = state?.end?.reason === "showdown";
+  const bare = state ? settle(state, []) : null;
+  const autoWinners = bare && atShowdown ? showdownWinners(bare.pots, board, cardsBySeat) : [];
+  const winners = manualWinners ?? autoWinners;
   const settlement = state ? settle(state, winners) : null;
   const autoNet = settlement && hero !== null ? computedHeroNet({ settlement }, hero) : null;
+  const typedNet = netOverride.trim() ? parseAmount(netOverride) : null;
+  const net = typedNet !== null && !Number.isNaN(typedNet) ? typedNet : autoNet;
 
-  const usedCards = new Set<string>([...heroCards, ...board, ...Object.values(shown).flat()]);
+  const usedCards = new Set<string>([...heroCards, ...board, ...Object.values(held).flatMap((h) => h.cards)]);
 
+  // A street just reached asks for its cards — not when an all-in runs the
+  // board out: then only who won matters, the board is optional.
   const needBoard =
-    state && !state.end && board.length < BOARD_SIZE[state.street] && !skipped.has(state.street) ? state.street : null;
-
-  // At showdown — on the river, or an all-in that runs the board out — ask
-  // for the rest of the board, then the cards of each opponent still in.
-  const atShowdown = state?.end?.reason === "showdown";
-  const needRunout = atShowdown && board.length < 5 && !skipped.has("river");
-  const needShown =
-    atShowdown && !needRunout
-      ? (state!.seats.find((x) => !x.folded && x.seat !== hero && (shown[x.seat]?.length ?? 0) < 2 && !mucked.has(x.seat))?.seat ?? null)
+    step === "play" && state && !state.end && state.street !== "preflop" && board.length < BOARD_SIZE[state.street] && !skipped.has(state.street)
+      ? state.street
       : null;
+
+  /** Whose cards a seat sheet edits, and so whether a change clears the auto winners. */
+  function setCards(seat: number, cards: string[], how: Held["how"] = "shown") {
+    setError(null);
+    setManualWinners(null);
+    if (seat === hero) return setHeroCards(cards);
+    setHeld((x) => {
+      const next = { ...x };
+      if (cards.length) next[seat] = { cards, how };
+      else delete next[seat];
+      return next;
+    });
+  }
+
+  function setStreet(street: BoardStreet, cards: string[]) {
+    setError(null);
+    setManualWinners(null);
+    const [at, n] = STREET_SLICE[street];
+    // Clearing a street clears the ones after it: a board has no holes.
+    if (cards.length === 0) return setBoard((b) => b.slice(0, at));
+    setBoard((b) => [...b.slice(0, at), ...cards.slice(0, n), ...b.slice(at + n)]);
+  }
+
+  /** Apply an action if it fits; say why not otherwise. */
+  function act(a: HandAction | HandAction[]) {
+    if (!state) return;
+    const list = Array.isArray(a) ? a : [a];
+    try {
+      let s = state;
+      for (const x of list) s = applyAction(s, x).state;
+    } catch (e) {
+      return setError(e instanceof Error ? e.message : String(e));
+    }
+    setError(null);
+    setActions((xs) => [...xs, ...list]);
+  }
+
+  function undo() {
+    setError(null);
+    setManualWinners(null);
+    setActions((a) => a.slice(0, -1));
+  }
 
   /* -------------------------------------------------------------- seats */
 
@@ -163,24 +231,28 @@ export function HandEditor({
     for (let n = 1; n <= size; n++) {
       const nm = names.get(n);
       const isDealt = dealt.includes(n);
-      const kind: SeatView["kind"] = n === hero || (!isDealt && n === heroSeat) ? "hero" : nm ? (nm.playerId && nm.known !== false ? "player" : "unknown") : isDealt ? "unknown" : "empty";
+      const kind: SeatView["kind"] =
+        n === hero || (!isDealt && n === heroSeat) ? "hero" : nm ? (nm.playerId && nm.known !== false ? "player" : "unknown") : isDealt ? "unknown" : "empty";
       const v: SeatView = { seat: n, kind, name: nm?.name ?? undefined, colors: nm?.colors, position: isDealt ? pos.get(n) : undefined };
+      const h = held[n];
       if (!isDealt) {
         v.out = true;
-      } else if (phase === "setup" || !state) {
-        if (n === hero) v.addCards = true;
+      } else if (!state) {
         const st = parseAmount(stacks[n] ?? "");
-        v.sub = postsBy[n] ? (postsBy[n] === "both" ? "posts BB+SB" : "posts BB") : st ? fmtChips(st) : undefined;
-        v.cards = n === hero && heroCards.length === 2 ? heroCards.join("") : null;
+        v.sub = st ? fmtChips(st) : undefined;
       } else {
         const s = state.seats.find((x) => x.seat === n)!;
         v.bet = s.street;
         v.out = s.folded;
         const left = behind(s);
-        v.sub = s.allIn ? "all-in" : s.folded ? "folded" : left !== null ? fmtChips(left) : undefined;
-        if (n === hero && heroCards.length === 2) v.cards = heroCards.join("");
-        else if (shown[n]?.length === 2) v.cards = shown[n].join("");
-        else v.hidden = !s.folded;
+        v.sub = postsBy[n] && actions.length === 0 ? "posts" : s.allIn ? "all-in" : s.folded ? "folded" : left !== null ? fmtChips(left) : undefined;
+        if (n === hero) {
+          if (heroCards.length === 2) v.cards = heroCards.join("");
+          else v.addCards = true;
+        } else if (h?.cards.length === 2) {
+          v.cards = h.cards.join("");
+          v.said = h.how === "said";
+        } else v.hidden = !s.folded;
       }
       out.push(v);
     }
@@ -189,59 +261,38 @@ export function HandEditor({
 
   function tapSeat(n: number) {
     setError(null);
-    if (phase === "setup") {
-      if (tapMode === "button") return setButton(n);
-      setDealt((d) => (d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort((a, b) => a - b)));
+    if (step === "button") {
+      setButton(n);
+      setStep(hero === null ? "play" : "cards");
       return;
     }
-    if (phase === "result" && state) {
-      const s = state.seats.find((x) => x.seat === n);
-      if (s && !s.folded && n !== hero) setResultEditing((e) => (e === n ? null : n));
-      return;
-    }
-    if (phase === "action" && state && !needBoard && state.toAct !== null && n !== state.toAct) {
-      const folds = foldsUntil(state, n);
-      if (folds) setActions((a) => [...a, ...folds]);
-      else setError(`Seat ${n} does not act before the street ends.`);
-    }
-  }
-
-  /** Put picked cards in place: a street of the board, or a seat's hand. */
-  function applyCards(target: CardTarget, cards: string[]) {
-    setError(null);
-    if (target.kind === "board") {
-      const [at, n] = STREET_SLICE[target.street];
-      // Clearing a street clears the ones after it: a board has no holes.
-      if (cards.length === 0) return setBoard((b) => b.slice(0, at));
-      setBoard((b) => [...b.slice(0, at), ...cards.slice(0, n), ...b.slice(at + n)]);
-      return;
-    }
-    if (target.seat === hero) return setHeroCards(cards);
-    setShown((x) => ({ ...x, [target.seat]: cards }));
-    if (cards.length) setMucked((m) => new Set([...m].filter((s) => s !== target.seat)));
-  }
-
-  function push(a: HandAction) {
-    setError(null);
-    setActions((xs) => [...xs, a]);
+    if (step === "cards") return;
+    if (!dealt.includes(n) && actions.length > 0) return;
+    setSeatSheet(n);
   }
 
   function build(): HandInput {
-    const heroNet = netOverride.trim() ? parseAmount(netOverride) : autoNet;
+    const pick = (how: Held["how"]) =>
+      Object.fromEntries(
+        Object.entries(held)
+          .filter(([k, v]) => v.how === how && v.cards.length === 2 && Number(k) !== hero && dealt.includes(Number(k)))
+          .map(([k, v]) => [k, v.cards.join("")]),
+      );
     return {
       button_seat: button,
       hero_seat: hero,
-      small_blind: setupNums.sb ?? 0,
-      big_blind: setupNums.bb ?? 0,
-      straddle: setupNums.straddle,
+      small_blind: nums.sb ?? 0,
+      big_blind: nums.bb ?? 0,
+      straddle: nums.straddle,
       posts,
       seats,
       actions,
       hero_cards: heroCards.length === 2 ? heroCards.join("") : null,
       board,
-      shown: Object.fromEntries(Object.entries(shown).filter(([, v]) => v.length === 2).map(([k, v]) => [k, v.join("")])),
-      winners: settlement ? settlement.pots.map((p, i) => (p.eligible.length === 1 ? p.eligible : (winners[i] ?? []).filter((s) => p.eligible.includes(s)))) : [],
-      hero_net: heroNet === null || Number.isNaN(heroNet) ? null : heroNet,
+      shown: pick("shown"),
+      said: pick("said"),
+      winners: settlement ? settlement.pots.map((p) => p.takers) : [],
+      hero_net: net === null || Number.isNaN(net) ? null : net,
       starred,
       notes: notes.trim() || null,
     };
@@ -249,7 +300,7 @@ export function HandEditor({
 
   function save() {
     setError(null);
-    if (!result) return setError(play.error ?? "Check the setup.");
+    if (!result) return setError(play.error ?? "Check the hand.");
     if (!result.ok) return setError(result.error ?? "An action does not fit.");
     startSaving(async () => {
       const r = await onSave(build());
@@ -260,24 +311,19 @@ export function HandEditor({
 
   /* ------------------------------------------------------------- render */
 
+  // At the end, what is won: an uncalled bet goes back and is not in the pot.
+  const pot = state ? (state.end && settlement ? settlement.total : r2(state.pot + state.seats.reduce((t, s) => t + s.street, 0))) : null;
+  const slots = state ? (atShowdown ? 5 : Math.max(BOARD_SIZE[state.street], board.length)) : 0;
   const center =
-    phase === "setup" ? (
-      <FeltCenter board={[]} note={tapMode === "button" ? "Tap the button's seat" : "Tap seats to deal them in or out"} />
+    step === "button" ? (
+      <FeltCenter board={[]} note="Tap the button" />
     ) : (
       <FeltCenter
         board={board}
-        slots={state ? (state.end?.reason === "showdown" ? 5 : BOARD_SIZE[state.street]) : 0}
-        onBoard={(street) => setCardTarget({ kind: "board", street })}
-        pot={state ? r2(state.pot + state.seats.reduce((t, s) => t + s.street, 0)) : null}
-        note={
-          state
-            ? state.end
-              ? state.end.reason === "fold"
-                ? `${seatLabel(state.end.winner, pos, names, hero)} wins`
-                : "Showdown"
-              : STREET_LABELS[state.street]
-            : null
-        }
+        slots={slots}
+        onBoard={step === "play" ? (street) => setBoardSheet(street) : undefined}
+        pot={pot}
+        note={state && !state.end ? STREET_LABELS[state.street] : null}
       />
     );
 
@@ -287,253 +333,204 @@ export function HandEditor({
         <button type="button" onClick={onClose} className="text-sm text-muted hover:text-foreground">
           Cancel
         </button>
-        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold">{title}</div>
+        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold">
+          {title}
+          {starred ? " ★" : ""}
+        </div>
+        <button type="button" onClick={() => setMoreOpen(true)} className="px-2 text-lg leading-none text-muted" aria-label="More">
+          ⋯
+        </button>
         <button
           type="button"
           onClick={save}
-          disabled={saving}
+          disabled={saving || step !== "play"}
           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>
       </header>
-      <div className="flex shrink-0 border-b border-line text-xs">
-        {(["setup", "action", "result"] as Phase[]).map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setPhase(p)}
-            aria-pressed={phase === p}
-            className={`flex-1 py-2 ${phase === p ? "border-b-2 border-accent font-semibold" : "text-muted"}`}
-          >
-            {PHASE_LABELS[p]}
-          </button>
-        ))}
+
+      <div className="flex min-h-0 flex-1 items-center justify-center px-1 py-1 [container-type:size]">
+        <LiveTable
+          fit
+          size={size}
+          seats={seatViews()}
+          button={button}
+          toAct={step === "play" && !needBoard ? (state?.toAct ?? null) : null}
+          selected={step === "button" ? new Set([button]) : undefined}
+          center={center}
+          onSeat={tapSeat}
+          onCards={step === "play" ? (n) => dealt.includes(n) && setSeatSheet(n) : undefined}
+        />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="px-2 pt-2">
-          <LiveTable
-            size={size}
-            seats={seatViews()}
-            button={button}
-            toAct={phase === "action" && !needBoard ? (state?.toAct ?? null) : null}
-            center={center}
-            onSeat={tapSeat}
-            onCards={(n) => dealt.includes(n) && setCardTarget({ kind: "seat", seat: n })}
+      <div className="shrink-0 space-y-2 border-t border-line bg-background px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        {error && <p className="text-xs text-red-500">{error}</p>}
+
+        {step === "button" ? (
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-sm">Where is the button?</span>
+            <button
+              type="button"
+              onClick={() => setStep(hero === null ? "play" : "cards")}
+              className="h-11 rounded-lg border border-accent px-4 text-sm font-medium"
+            >
+              Seat {button} ✓
+            </button>
+          </div>
+        ) : step === "cards" ? (
+          <CardsPanel
+            title="Your cards"
+            current={heroCards}
+            used={usedCards}
+            onPick={(cards) => {
+              setHeroCards(cards);
+              setStep("play");
+            }}
+            onSkip={() => setStep("play")}
           />
-        </div>
-
-        <div className="mx-auto max-w-xl space-y-4 px-4 pb-8 pt-2">
-          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
-          {play.error && phase !== "setup" && <p className="text-sm text-red-500">{play.error}</p>}
-          {result && !result.ok && <p className="text-sm text-red-500">Action {result.failedAt! + 1}: {result.error} — undo it or fix the setup.</p>}
-
-          {phase === "setup" && (
-            <SetupPanel
-              tapMode={tapMode}
-              setTapMode={setTapMode}
-              dealt={dealt}
-              pos={pos}
-              names={names}
-              hero={hero}
-              sb={sb}
-              bb={bb}
-              straddle={straddle}
-              setSb={setSb}
-              setBb={setBb}
-              setStraddle={setStraddle}
-              postsBy={postsBy}
-              setPostsBy={setPostsBy}
-              stacks={stacks}
-              setStacks={setStacks}
-              heroCards={heroCards}
-              setHeroCards={setHeroCards}
-              used={usedCards}
-              setupError={play.error}
-              onNext={() => setPhase("action")}
-            />
-          )}
-
-          {phase === "action" && state && (
-            <>
-              {needBoard ? (
-                <BoardPrompt
-                  key={needBoard}
-                  street={needBoard}
-                  board={board}
-                  used={usedCards}
-                  onChange={setBoard}
-                  onSkip={() => setSkipped((s) => new Set(s).add(needBoard))}
-                />
-              ) : needRunout ? (
-                <BoardPrompt
-                  key={`runout-${board.length}`}
-                  street="river"
-                  title={board.length ? "Rest of the board" : "The board"}
-                  from={board.length}
-                  board={board}
-                  used={usedCards}
-                  onChange={setBoard}
-                  onSkip={() => setSkipped((s) => new Set(s).add("river"))}
-                />
-              ) : needShown !== null ? (
-                <ShownPrompt
-                  key={`shown-${needShown}`}
-                  label={seatLabel(needShown, pos, names, hero)}
-                  used={usedCards}
-                  onPick={(cards) => setShown((x) => ({ ...x, [needShown]: cards }))}
-                  onMuck={() => setMucked((m) => new Set(m).add(needShown))}
-                />
-              ) : state.end ? (
-                <div className="rounded-lg border border-line bg-surface p-3 text-sm">
-                  <p className="font-medium">
-                    {state.end.reason === "fold"
-                      ? `Everyone else folded: ${seatLabel(state.end.winner, pos, names, hero)} takes it.`
-                      : state.end.runout
-                        ? "All-in: the board runs out."
-                        : "Showdown."}
-                  </p>
-                  <button type="button" onClick={() => setPhase("result")} className="mt-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white">
-                    Result →
-                  </button>
-                </div>
-              ) : (
-                <ActionPanel
-                  key={`${actions.length}`}
-                  state={state}
-                  label={(s) => seatLabel(s, pos, names, hero)}
-                  currency={currency}
-                  onAct={push}
-                />
-              )}
-              <ActionLog
-                result={result!}
-                label={(s) => seatLabel(s, pos, names, hero)}
-                onUndo={actions.length ? () => setActions((a) => a.slice(0, -1)) : undefined}
-              />
-            </>
-          )}
-
-          {phase === "result" && state && settlement && (
-            <ResultPanel
-              editing={resultEditing}
-              setEditing={setResultEditing}
-              state={state}
-              settlement={settlement}
-              winners={winners}
-              setWinners={setWinners}
-              board={board}
-              setBoard={setBoard}
-              shown={shown}
-              setShown={setShown}
-              hero={hero}
-              used={usedCards}
-              label={(s) => seatLabel(s, pos, names, hero)}
-              autoNet={autoNet}
-              netOverride={netOverride}
-              setNetOverride={setNetOverride}
-              currency={currency}
-              starred={starred}
-              setStarred={setStarred}
-              notes={notes}
-              setNotes={setNotes}
-            />
-          )}
-        </div>
+        ) : !result ? (
+          <p className="text-sm text-red-500">{play.error}</p>
+        ) : !result.ok ? (
+          <div className="flex items-center gap-2">
+            <p className="flex-1 text-sm text-red-500">
+              Action {result.failedAt! + 1}: {result.error}
+            </p>
+            <UndoButton onClick={undo} />
+          </div>
+        ) : needBoard ? (
+          <CardsPanel
+            key={needBoard}
+            title={STREET_LABELS[needBoard]}
+            count={BOARD_SIZE[needBoard] - (needBoard === "flop" ? 0 : BOARD_SIZE[needBoard] - 1)}
+            current={board.slice(needBoard === "flop" ? 0 : BOARD_SIZE[needBoard] - 1, BOARD_SIZE[needBoard])}
+            used={usedCards}
+            onPick={(cards) => setStreet(needBoard, cards)}
+            onSkip={() => setSkipped((s) => new Set(s).add(needBoard))}
+            onUndo={actions.length ? undo : undefined}
+          />
+        ) : state && !state.end ? (
+          <ActionBar
+            key={actions.length}
+            state={state}
+            label={label}
+            lastLine={lastLine(result, short)}
+            preflopStart={actions.length === 0}
+            straddle={nums.straddle}
+            canStraddle={dealt.length >= 3}
+            onStraddle={() => {
+              setError(null);
+              setStraddle(nums.straddle ? "" : fmtChips(r2((nums.bb ?? 0) * 2)));
+            }}
+            onAct={act}
+            onUndo={actions.length ? undo : undefined}
+          />
+        ) : state && settlement ? (
+          <ResultBar
+            state={state}
+            settlement={settlement}
+            auto={manualWinners === null}
+            board={board}
+            cards={cardsBySeat}
+            hero={hero}
+            label={label}
+            short={short}
+            net={net}
+            currency={currency}
+            saving={saving}
+            onToggle={(potIndex, seat) => {
+              const next = settlement.pots.map((p) => [...p.takers]);
+              const cur = next[potIndex];
+              next[potIndex] = cur.includes(seat) ? cur.filter((s) => s !== seat) : [...cur, seat];
+              setManualWinners(next);
+            }}
+            onCards={(seat) => setSeatSheet(seat)}
+            onUndo={undo}
+            onSave={save}
+          />
+        ) : null}
       </div>
-      {cardTarget && (
-        <CardSheet
-          key={cardTarget.kind === "board" ? cardTarget.street : `seat-${cardTarget.seat}`}
-          title={
-            cardTarget.kind === "board"
-              ? STREET_LABELS[cardTarget.street]
-              : cardTarget.seat === hero
-                ? "Your cards"
-                : `${seatLabel(cardTarget.seat, pos, names, hero)} — cards`
-          }
-          count={cardTarget.kind === "board" ? STREET_SLICE[cardTarget.street][1] : 2}
-          current={
-            cardTarget.kind === "board"
-              ? board.slice(STREET_SLICE[cardTarget.street][0], STREET_SLICE[cardTarget.street][0] + STREET_SLICE[cardTarget.street][1])
-              : cardTarget.seat === hero
-                ? heroCards
-                : (shown[cardTarget.seat] ?? [])
-          }
+
+      {seatSheet !== null && (
+        <SeatSheet
+          key={seatSheet}
+          seat={seatSheet}
+          title={dealt.includes(seatSheet) ? label(seatSheet) : `${short(seatSheet)} · seat ${seatSheet}`}
+          isHero={seatSheet === hero || seatSheet === heroSeat}
+          dealt={dealt.includes(seatSheet)}
+          beforeAction={actions.length === 0}
+          isButton={button === seatSheet}
+          blind={pos.get(seatSheet) === "SB" || pos.get(seatSheet) === "BB"}
+          post={postsBy[seatSheet] ?? null}
+          stack={stacks[seatSheet] ?? ""}
+          held={seatSheet === hero ? { cards: heroCards, how: "shown" } : (held[seatSheet] ?? { cards: [], how: "shown" })}
           used={usedCards}
-          clearLabel={cardTarget.kind === "board" && cardTarget.street !== "river" ? `Clear from the ${cardTarget.street} on` : "Clear"}
-          onApply={(cards) => applyCards(cardTarget, cards)}
-          onClose={() => setCardTarget(null)}
+          foldTo={state && !state.end && !needBoard && state.toAct !== null && state.toAct !== seatSheet ? foldsUntil(state, seatSheet) : null}
+          onDeal={(on) => {
+            setError(null);
+            setDealt((d) => (on ? [...d, seatSheet].sort((a, b) => a - b) : d.filter((x) => x !== seatSheet)));
+          }}
+          onButton={() => setButton(seatSheet)}
+          onPost={(m) =>
+            setPostsBy((p) => {
+              const next = { ...p };
+              if (m) next[seatSheet] = m;
+              else delete next[seatSheet];
+              return next;
+            })
+          }
+          onStack={(v) => setStacks((x) => ({ ...x, [seatSheet]: v }))}
+          onCards={(cards, how) => setCards(seatSheet, cards, how)}
+          onFoldTo={(folds) => {
+            act(folds);
+            setSeatSheet(null);
+          }}
+          onClose={() => setSeatSheet(null)}
         />
       )}
-    </div>
-  );
-}
 
-/**
- * Change cards by tapping them: the street's or the seat's cards come
- * selected; tap one to take it off, tap another to put it in. Saved as soon
- * as the count is right; Clear removes them.
- */
-function CardSheet({
-  title,
-  count,
-  current,
-  used,
-  clearLabel,
-  onApply,
-  onClose,
-}: {
-  title: string;
-  count: number;
-  current: string[];
-  used: Set<string>;
-  clearLabel: string;
-  onApply: (cards: string[]) => void;
-  onClose: () => void;
-}) {
-  const [picks, setPicks] = useState<string[]>(current);
-  const dead = new Set([...used].filter((c) => !picks.includes(c) && !current.includes(c)));
-  return (
-    <Sheet open onClose={onClose} title={title}>
-      <div className="mb-2 flex items-center gap-2 text-sm">
-        <span className="flex min-h-5 gap-0.5">
-          {picks.map((c) => (
-            <PlayingCard key={c} card={c} size="sm" />
-          ))}
-        </span>
-        <span className="text-xs text-muted">
-          {picks.length < count ? `pick ${count - picks.length} more` : "tap one to take it off, then pick the new one"}
-        </span>
-      </div>
-      <CardGrid
-        count={count}
-        selected={picks}
-        dead={dead}
-        onChange={(next) => {
-          setPicks(next);
-          if (next.length === count) {
-            onApply(next);
-            onClose();
-          }
-        }}
-      />
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            onApply([]);
-            onClose();
-          }}
-          className="flex-1 rounded-lg border border-line py-2.5 text-sm text-muted"
-        >
-          {clearLabel}
-        </button>
-        <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-line py-2.5 text-sm">
-          Done
-        </button>
-      </div>
-    </Sheet>
+      {boardSheet && (
+        <Sheet open onClose={() => setBoardSheet(null)} title={STREET_LABELS[boardSheet]}>
+          <CardsPanel
+            title={STREET_LABELS[boardSheet]}
+            count={STREET_SLICE[boardSheet][1]}
+            current={board.slice(STREET_SLICE[boardSheet][0], STREET_SLICE[boardSheet][0] + STREET_SLICE[boardSheet][1])}
+            used={usedCards}
+            onPick={(cards) => {
+              setStreet(boardSheet, cards);
+              setBoardSheet(null);
+            }}
+            clearLabel="Clear"
+            onClear={() => {
+              setStreet(boardSheet, []);
+              setBoardSheet(null);
+            }}
+          />
+        </Sheet>
+      )}
+
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Hand">
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <Amount label="SB" value={sb} onChange={setSb} />
+            <Amount label="BB" value={bb} onChange={setBb} />
+            <Amount label="Straddle" value={straddle} onChange={setStraddle} placeholder="—" />
+          </div>
+          {hero !== null && (
+            <Amount
+              label={`Your net (${currency}, before rake)`}
+              value={netOverride}
+              onChange={setNetOverride}
+              placeholder={autoNet !== null ? `${fmtChips(autoNet)} — from the pots` : "?"}
+            />
+          )}
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={starred} onChange={(e) => setStarred(e.target.checked)} /> ★ Review later
+          </label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Notes on the hand" className={INPUT} />
+        </div>
+      </Sheet>
+    </div>
   );
 }
 
@@ -543,252 +540,114 @@ function seatLabel(seat: number, pos: Map<number, string>, names: Map<number, Se
   return p ? `${who} (${p})` : who;
 }
 
-/* --------------------------------------------------------------- setup */
-
-function SetupPanel(props: {
-  tapMode: "deal" | "button";
-  setTapMode: (m: "deal" | "button") => void;
-  dealt: number[];
-  pos: Map<number, string>;
-  names: Map<number, SeatName>;
-  hero: number | null;
-  sb: string;
-  bb: string;
-  straddle: string;
-  setSb: (v: string) => void;
-  setBb: (v: string) => void;
-  setStraddle: (v: string) => void;
-  postsBy: Record<number, PostMode>;
-  setPostsBy: (f: (p: Record<number, PostMode>) => Record<number, PostMode>) => void;
-  stacks: Record<number, string>;
-  setStacks: (f: (s: Record<number, string>) => Record<number, string>) => void;
-  heroCards: string[];
-  setHeroCards: (c: string[]) => void;
-  used: Set<string>;
-  setupError: string | null;
-  onNext: () => void;
-}) {
-  // Open by default: stacks matter (all-ins, effective stacks) and come prefilled from the table.
-  const [showStacks, setShowStacks] = useState(true);
-  const [showPosts, setShowPosts] = useState(Object.keys(props.postsBy).length > 0);
-  // Anyone dealt in but the blinds may be buying them back.
-  // (A seat already marked stays listed, so a mark that no longer fits can be cleared.)
-  const canPost = props.dealt.filter((s) => (props.pos.get(s) !== "SB" && props.pos.get(s) !== "BB") || props.postsBy[s]);
-  const cyclePost = (seat: number) =>
-    props.setPostsBy((p) => {
-      const next = { ...p };
-      if (!p[seat]) next[seat] = "bb";
-      else if (p[seat] === "bb") next[seat] = "both";
-      else delete next[seat];
-      return next;
-    });
-  return (
-    <>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-muted">Tap a seat to</span>
-        {(["deal", "button"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => props.setTapMode(m)}
-            className={`rounded-full border px-2.5 py-1 ${props.tapMode === m ? "border-accent bg-accent text-white" : "border-line"}`}
-          >
-            {m === "deal" ? "deal in / out" : "move the button"}
-          </button>
-        ))}
-      </div>
-      <p className="text-xs text-muted">
-        {props.dealt.length} dealt in · {props.dealt.map((s) => `${s}${props.pos.get(s) ? ` ${props.pos.get(s)}` : ""}`).join(" · ")}
-      </p>
-
-      <section>
-        <h3 className="mb-1 flex items-center gap-2 text-xs font-medium tracking-wide text-muted uppercase">
-          Your cards
-          <span className="flex gap-0.5 normal-case">
-            {props.heroCards.map((c) => (
-              <PlayingCard key={c} card={c} size="xs" />
-            ))}
-          </span>
-          {props.heroCards.length > 0 && (
-            <button type="button" onClick={() => props.setHeroCards([])} className="ml-auto text-[11px] normal-case">
-              clear
-            </button>
-          )}
-        </h3>
-        {props.hero === null ? (
-          <p className="text-xs text-muted">You are not dealt in.</p>
-        ) : (
-          <CardGrid count={2} selected={props.heroCards} dead={props.used} onChange={props.setHeroCards} />
-        )}
-      </section>
-
-      <section className="grid grid-cols-3 gap-2">
-        <label className="text-xs text-muted">
-          SB
-          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={props.sb} onChange={(e) => props.setSb(e.target.value)} className={INPUT} />
-        </label>
-        <label className="text-xs text-muted">
-          BB
-          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={props.bb} onChange={(e) => props.setBb(e.target.value)} className={INPUT} />
-        </label>
-        <label className="text-xs text-muted">
-          Straddle
-          <input inputMode="decimal" onFocus={(e) => e.currentTarget.select()} value={props.straddle} placeholder="—" onChange={(e) => props.setStraddle(e.target.value)} className={INPUT} />
-        </label>
-      </section>
-
-      <section>
-        <button type="button" onClick={() => setShowStacks((s) => !s)} className="text-xs text-muted">
-          {showStacks ? "▾" : "▸"} Stacks — from the table, change them if needed
-        </button>
-        {showStacks && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {props.dealt.map((s) => (
-              <label key={s} className="text-xs text-muted">
-                {s === props.hero ? "You" : (props.names.get(s)?.name ?? `Seat ${s}`)} · {s}
-                <input
-                  inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
-                  value={props.stacks[s] ?? ""}
-                  placeholder="?"
-                  onChange={(e) => props.setStacks((x) => ({ ...x, [s]: e.target.value }))}
-                  className={INPUT}
-                />
-              </label>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <button type="button" onClick={() => setShowPosts((s) => !s)} className="text-xs text-muted">
-          {showPosts ? "▾" : "▸"} Blinds bought back
-          {Object.keys(props.postsBy).length > 0 ? ` · ${Object.keys(props.postsBy).length}` : ""}
-        </button>
-        {showPosts && (
-          <>
-            <p className="mt-1 text-[11px] text-muted">
-              Back from missing the blinds? Tap their seat: posts the big blind (live, they keep the option), tap again for big blind + small blind
-              dead, again to clear.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {canPost.map((s) => {
-                const mode = props.postsBy[s];
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => cyclePost(s)}
-                    aria-pressed={Boolean(mode)}
-                    className={`rounded-full border px-2.5 py-1 text-xs ${mode ? "border-accent bg-accent text-white" : "border-line"}`}
-                  >
-                    {s === props.hero ? "You" : (props.names.get(s)?.name ?? `Seat ${s}`)} · {s}
-                    {mode ? ` · ${mode === "both" ? "BB + SB dead" : "BB"}` : ""}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </section>
-
-      {props.setupError && <p className="text-sm text-red-500">{props.setupError}</p>}
-      <button
-        type="button"
-        onClick={props.onNext}
-        disabled={Boolean(props.setupError)}
-        className="w-full rounded-lg bg-accent py-3 text-sm font-medium text-white disabled:opacity-40"
-      >
-        Action →
-      </button>
-    </>
-  );
+/** The current street so far, in one line: "Marco raises to 15 · You call 15". */
+function lastLine(result: PlayResult, short: (s: number) => string): string {
+  const steps = result.steps.filter((s) => s.street === result.state.street && s.action.kind !== "fold");
+  const folds = result.steps.filter((s) => s.street === result.state.street && s.action.kind === "fold").length;
+  const parts = steps.map((s) => {
+    const who = short(s.action.seat);
+    const text = describeStep(s);
+    // "You raise", not "You raises".
+    return `${who} ${who === "You" ? text.replace(/^(\w+)s\b/, "$1") : text}`;
+  });
+  if (folds) parts.unshift(`${folds} fold${folds > 1 ? "s" : ""}`);
+  return parts.join(" · ");
 }
 
-/* --------------------------------------------------------------- board */
-
-function BoardPrompt({
-  street,
-  board,
-  used,
-  onChange,
-  onSkip,
-  from,
-  title,
-}: {
-  street: Street;
-  board: string[];
-  used: Set<string>;
-  onChange: (b: string[]) => void;
-  onSkip: () => void;
-  /** Cards already on the board that stay; by default the street's own cards are picked. */
-  from?: number;
-  title?: string;
-}) {
-  const before = board.slice(0, from ?? (BOARD_SIZE[street] === 3 ? 0 : BOARD_SIZE[street] - 1));
-  const need = BOARD_SIZE[street] - before.length;
-  const [picks, setPicks] = useState<string[]>(board.slice(before.length, BOARD_SIZE[street]));
-  const dead = new Set([...used].filter((c) => !picks.includes(c)));
+function Amount({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div className="rounded-lg border border-line bg-surface p-3">
-      <div className="mb-2 flex items-center gap-2 text-sm">
-        <span className="font-medium">{title ?? STREET_LABELS[street]}</span>
-        <span className="text-xs text-muted">pick {need}</span>
-        <span className="flex gap-0.5">
-          {picks.map((c) => (
-            <PlayingCard key={c} card={c} size="xs" />
-          ))}
-        </span>
-        <button type="button" onClick={onSkip} className="ml-auto text-xs text-muted">
-          Skip
-        </button>
-      </div>
-      <CardGrid
-        count={need}
-        selected={picks}
-        dead={dead}
-        onChange={(next) => {
-          setPicks(next);
-          if (next.length === need) onChange([...before, ...next]);
-        }}
+    <label className="block text-xs text-muted">
+      {label}
+      <input
+        inputMode="decimal"
+        onFocus={(e) => e.currentTarget.select()}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={INPUT}
       />
-    </div>
+    </label>
   );
 }
 
-/** The cards an opponent showed down: pick two, or say they were not shown. */
-function ShownPrompt({
-  label,
+function UndoButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="h-9 shrink-0 rounded-lg border border-line px-3 text-sm" aria-label="Undo">
+      ↶
+    </button>
+  );
+}
+
+/* --------------------------------------------------------------- cards */
+
+/**
+ * Pick cards from the grid; done as soon as the count is reached. The cards
+ * already there come selected: tap one off, tap the new one.
+ */
+function CardsPanel({
+  title,
+  count = 2,
+  current,
   used,
   onPick,
-  onMuck,
+  onSkip,
+  onUndo,
+  clearLabel,
+  onClear,
 }: {
-  label: string;
+  title: string;
+  count?: number;
+  current: string[];
   used: Set<string>;
   onPick: (cards: string[]) => void;
-  onMuck: () => void;
+  onSkip?: () => void;
+  onUndo?: () => void;
+  clearLabel?: string;
+  onClear?: () => void;
 }) {
-  const [picks, setPicks] = useState<string[]>([]);
-  const dead = new Set([...used].filter((c) => !picks.includes(c)));
+  const [picks, setPicks] = useState<string[]>(current);
+  const dead = new Set([...used].filter((c) => !picks.includes(c) && !current.includes(c)));
   return (
-    <div className="rounded-lg border border-line bg-surface p-3">
-      <div className="mb-2 flex items-center gap-2 text-sm">
-        <span className="min-w-0 truncate font-medium">{label} shows</span>
+    <div>
+      <div className="mb-1.5 flex h-7 items-center gap-2 text-sm">
+        <span className="font-medium">{title}</span>
         <span className="flex gap-0.5">
           {picks.map((c) => (
             <PlayingCard key={c} card={c} size="xs" />
           ))}
         </span>
-        <button type="button" onClick={onMuck} className="ml-auto shrink-0 rounded-full border border-line px-2.5 py-1 text-xs text-muted">
-          Not shown
-        </button>
+        <span className="ml-auto flex gap-2">
+          {onClear && current.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setPicks([]);
+                onClear();
+              }}
+              className="text-xs text-muted"
+            >
+              {clearLabel ?? "Clear"}
+            </button>
+          )}
+          {onSkip && (
+            <button type="button" onClick={onSkip} className="rounded-full border border-line px-3 py-1 text-xs text-muted">
+              Skip
+            </button>
+          )}
+          {onUndo && (
+            <button type="button" onClick={onUndo} className="rounded-full border border-line px-2.5 py-1 text-xs" aria-label="Undo">
+              ↶
+            </button>
+          )}
+        </span>
       </div>
       <CardGrid
-        count={2}
+        count={count}
         selected={picks}
         dead={dead}
         onChange={(next) => {
           setPicks(next);
-          if (next.length === 2) onPick(next);
+          if (next.length === count) onPick(next);
         }}
       />
     </div>
@@ -797,362 +656,364 @@ function ShownPrompt({
 
 /* -------------------------------------------------------------- action */
 
-function ActionPanel({
+/**
+ * The seat to act: check or fold, call, all-in in one tap; a raise is the
+ * amount typed, then one tap (or Enter). Bet or raise is worked out.
+ */
+function ActionBar({
   state,
   label,
-  currency,
+  lastLine,
+  preflopStart,
+  straddle,
+  canStraddle,
+  onStraddle,
   onAct,
+  onUndo,
 }: {
   state: HandState;
   label: (seat: number) => string;
-  currency: string;
+  lastLine: string;
+  preflopStart: boolean;
+  straddle: number | null;
+  canStraddle: boolean;
+  onStraddle: () => void;
   onAct: (a: HandAction) => void;
+  onUndo?: () => void;
 }) {
   const o = options(state)!;
-  const [sizing, setSizing] = useState(false);
   const [amount, setAmount] = useState("");
-  const [allIn, setAllIn] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const shoveTo = o.maxTo;
 
-  const bet = state.currentBet;
-  const presets: { label: string; to: number }[] = [];
-  if (o.aggressive === "bet") {
-    for (const [l, f] of [["⅓", 1 / 3], ["½", 0.5], ["⅔", 2 / 3], ["¾", 0.75], ["pot", 1]] as const) {
-      presets.push({ label: l, to: r2(o.pot * f) });
-    }
-  } else if (o.aggressive === "raise") {
-    if (state.street === "preflop" && bet === state.bb) {
-      for (const m of [2.5, 3, 4]) presets.push({ label: `${m} bb`, to: r2(m * state.bb) });
-    } else {
-      for (const m of [2.5, 3]) presets.push({ label: `${m}×`, to: r2(m * bet) });
-    }
-    presets.push({ label: "pot", to: potRaiseTo(state) });
-  }
-  const usable = presets.filter((p) => p.to >= o.minTo && (o.maxTo === null || p.to <= o.maxTo));
+  const raise = (allIn = false) => {
+    const typed = parseAmount(amount);
+    if (!o.aggressive) return;
+    if (allIn && shoveTo !== null) return onAct({ seat: o.seat, kind: o.aggressive, to: shoveTo, all_in: true });
+    if (!typed || Number.isNaN(typed)) return input.current?.focus();
+    const to = shoveTo !== null && typed >= shoveTo ? shoveTo : typed;
+    onAct({ seat: o.seat, kind: o.aggressive, to, ...(allIn || to === shoveTo ? { all_in: true } : {}) });
+  };
 
-  const submitSize = () => {
-    const to = o.maxTo !== null && allIn ? o.maxTo : parseAmount(amount);
-    if (!to || Number.isNaN(to)) return;
-    onAct({ seat: o.seat, kind: o.aggressive!, to, ...(allIn ? { all_in: true } : {}) });
+  const allIn = () => {
+    // Known stack: shove it, or call it off when a raise is not possible.
+    if (o.behind !== null) {
+      if (o.aggressive && shoveTo !== null && shoveTo > state.currentBet) return raise(true);
+      return onAct({ seat: o.seat, kind: "call" });
+    }
+    // Unknown stack: the amount typed is the shove; with none, an all-in call.
+    if (amount.trim() && o.aggressive) return raise(true);
+    if (o.canCall) return onAct({ seat: o.seat, kind: "call", all_in: true });
+    input.current?.focus();
   };
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-3">
-      <p className="text-sm">
-        <span className="font-semibold">{label(o.seat)}</span>
-        <span className="text-muted">
-          {" "}
-          · {o.toCall > 0 ? `${fmtChips(o.toCall)} to call` : "nothing to call"} · pot {fmtChips(o.pot)}
-          {o.behind !== null ? ` · ${fmtChips(o.behind)} behind` : ""}
+    <div className="space-y-2">
+      <div className="flex h-6 items-center gap-2 text-sm">
+        <span className="shrink-0 font-semibold">{label(o.seat)}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-muted">
+          {lastLine || (o.behind !== null ? `${fmtChips(o.behind)} behind` : "")}
         </span>
-      </p>
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <button type="button" onClick={() => onAct({ seat: o.seat, kind: "fold" })} className="h-12 rounded-lg border border-line text-sm font-medium">
-          Fold
-        </button>
-        {o.canCheck ? (
-          <button type="button" onClick={() => onAct({ seat: o.seat, kind: "check" })} className="h-12 rounded-lg border border-line text-sm font-medium">
-            Check
-          </button>
-        ) : (
-          <button type="button" onClick={() => onAct({ seat: o.seat, kind: "call" })} className="h-12 rounded-lg border border-sky-500/50 bg-sky-500/10 text-sm font-medium">
-            Call {fmtChips(o.callAmount)}
-          </button>
-        )}
-        <button
-          type="button"
-          disabled={!o.aggressive}
-          onClick={() => {
-            setSizing((s) => !s);
-            // Empty, not the minimum: typed digits must not land after a default.
-            setAmount("");
-          }}
-          className="h-12 rounded-lg border border-rose-500/50 bg-rose-500/10 text-sm font-medium capitalize disabled:opacity-40"
-        >
-          {o.aggressive ?? "Raise"}…
-        </button>
-      </div>
-      {sizing && o.aggressive && (
-        <div className="mt-3 space-y-2">
-          <div className="flex flex-wrap gap-1.5">
-            {usable.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => {
-                  setAmount(fmtChips(p.to));
-                  setAllIn(false);
-                }}
-                className="rounded-full border border-line px-2.5 py-1 text-xs"
-              >
-                {p.label} · {fmtChips(p.to)}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted">{o.aggressive === "bet" ? "Bet" : "Raise to"}</span>
-            <input
-              autoFocus
-              inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
-              value={o.maxTo !== null && allIn ? fmtChips(o.maxTo) : amount}
-              placeholder={`min ${fmtChips(o.minTo)}`}
-              onChange={(e) => {
-                setAmount(e.target.value);
-                setAllIn(false);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && submitSize()}
-              className={`${INPUT} w-28`}
-            />
-            <span className="text-xs text-muted">{currency}</span>
-            <label className="ml-auto flex items-center gap-1 text-xs">
-              <input type="checkbox" checked={allIn} onChange={(e) => setAllIn(e.target.checked)} /> all-in
-            </label>
-          </div>
-          <p className="text-[11px] text-muted">
-            Min {fmtChips(o.minTo)}
-            {o.maxTo !== null ? ` · max ${fmtChips(o.maxTo)}` : ""} — the total in front of them on this street.
-          </p>
+        {preflopStart && canStraddle && (
           <button
             type="button"
-            onClick={submitSize}
-            disabled={!(o.maxTo !== null && allIn) && !amount.trim()}
-            className="w-full rounded-lg bg-rose-600 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+            onClick={onStraddle}
+            aria-pressed={straddle !== null}
+            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${straddle !== null ? "border-accent bg-accent text-white" : "border-line"}`}
           >
-            {o.aggressive === "bet" ? "Bet" : "Raise to"} {o.maxTo !== null && allIn ? fmtChips(o.maxTo) : amount || "…"}
-            {allIn ? " (all-in)" : ""}
+            Straddle{straddle !== null ? ` ${fmtChips(straddle)}` : ""}
           </button>
-        </div>
-      )}
-      {o.canCall && o.behind === null && (
-        <button type="button" onClick={() => onAct({ seat: o.seat, kind: "call", all_in: true })} className="mt-2 text-xs text-muted underline">
-          Calls all-in
-        </button>
-      )}
-      <p className="mt-2 text-[11px] text-muted">Tap a later seat on the table to fold everyone before it.</p>
-    </div>
-  );
-}
-
-function ActionLog({
-  result,
-  label,
-  onUndo,
-}: {
-  result: PlayResult;
-  label: (seat: number) => string;
-  onUndo?: () => void;
-}) {
-  if (!result.steps.length) return <p className="text-xs text-muted">Blinds are in. First action above.</p>;
-  // Folds to an unraised pot are most of the log and say little: they are counted.
-  const lines: { street: Street; text: (string | { folds: number })[] }[] = [];
-  let opened = false;
-  for (const s of result.steps) {
-    let line = lines[lines.length - 1];
-    if (!line || line.street !== s.street) {
-      line = { street: s.street, text: [] };
-      lines.push(line);
-    }
-    if (s.action.kind === "raise" && s.street === "preflop") opened = true;
-    if (s.action.kind === "fold" && s.street === "preflop" && !opened) {
-      const last = line.text[line.text.length - 1];
-      if (last && typeof last === "object") last.folds++;
-      else line.text.push({ folds: 1 });
-    } else {
-      line.text.push(`${label(s.action.seat)} ${describeStep(s)}`);
-    }
-  }
-  return (
-    <div className="rounded-lg border border-line p-3 text-xs">
-      <div className="mb-1 flex items-center">
-        <span className="font-medium text-muted uppercase tracking-wide">So far</span>
+        )}
         {onUndo && (
-          <button type="button" onClick={onUndo} className="ml-auto rounded border border-line px-2 py-1 text-xs">
-            ↶ Undo
+          <button type="button" onClick={onUndo} className="shrink-0 rounded-full border border-line px-2.5 py-0.5 text-xs" aria-label="Undo">
+            ↶
           </button>
         )}
       </div>
-      {lines.map((l, i) => (
-        <p key={i} className="leading-relaxed">
-          <span className="font-semibold">{STREET_LABELS[l.street]}:</span>{" "}
-          {l.text.map((t) => (typeof t === "string" ? t : `${t.folds} fold${t.folds > 1 ? "s" : ""}`)).join(" · ")}
-        </p>
-      ))}
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={() => onAct({ seat: o.seat, kind: o.canCheck ? "check" : "fold" })}
+          className="h-12 rounded-lg border border-line text-sm font-medium"
+        >
+          {o.canCheck ? "Check" : "Fold"}
+        </button>
+        <button
+          type="button"
+          disabled={!o.canCall}
+          onClick={() => onAct({ seat: o.seat, kind: "call" })}
+          className="h-12 rounded-lg border border-sky-500/50 bg-sky-500/10 text-sm font-medium disabled:opacity-30"
+        >
+          Call{o.canCall ? ` ${fmtChips(o.callAmount)}` : ""}
+        </button>
+        <button type="button" onClick={allIn} className="h-12 rounded-lg border border-rose-500/60 bg-rose-500/15 text-sm font-semibold">
+          All-in{shoveTo !== null && o.aggressive ? ` ${fmtChips(shoveTo)}` : ""}
+        </button>
+      </div>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          raise();
+        }}
+      >
+        <input
+          ref={input}
+          inputMode="decimal"
+          enterKeyHint="go"
+          value={amount}
+          disabled={!o.aggressive}
+          placeholder={o.aggressive ? `${o.aggressive === "bet" ? "Bet" : "Raise to"} · min ${fmtChips(o.minTo)}` : "No raise possible"}
+          onChange={(e) => setAmount(e.target.value)}
+          className={`${INPUT} mt-0 h-11 flex-1`}
+        />
+        <button
+          type="submit"
+          disabled={!o.aggressive || !amount.trim()}
+          className="h-11 w-24 rounded-lg bg-rose-600 text-sm font-medium text-white capitalize disabled:opacity-40"
+        >
+          {o.aggressive ?? "raise"}
+        </button>
+      </form>
     </div>
   );
 }
 
 /* -------------------------------------------------------------- result */
 
-function ResultPanel(props: {
-  editing: "board" | number | null;
-  setEditing: (e: "board" | number | null) => void;
+/**
+ * The end of the hand. Won without showdown: nothing to do but save. At a
+ * showdown the winners come from the cards when they are all known; until
+ * then, or to change them, tap who took each pot. An all-in before the river
+ * needs no board: only who won.
+ */
+function ResultBar({
+  state,
+  settlement,
+  auto,
+  board,
+  cards,
+  hero,
+  label,
+  short,
+  net,
+  currency,
+  saving,
+  onToggle,
+  onCards,
+  onUndo,
+  onSave,
+}: {
   state: HandState;
   settlement: ReturnType<typeof settle>;
-  winners: number[][];
-  setWinners: (w: number[][]) => void;
+  auto: boolean;
   board: string[];
-  setBoard: (b: string[]) => void;
-  shown: Record<number, string[]>;
-  setShown: (f: (s: Record<number, string[]>) => Record<number, string[]>) => void;
+  cards: Map<number, string[]>;
   hero: number | null;
-  used: Set<string>;
   label: (seat: number) => string;
-  autoNet: number | null;
-  netOverride: string;
-  setNetOverride: (v: string) => void;
+  short: (seat: number) => string;
+  net: number | null;
   currency: string;
-  starred: boolean;
-  setStarred: (v: boolean) => void;
-  notes: string;
-  setNotes: (v: string) => void;
+  saving: boolean;
+  onToggle: (pot: number, seat: number) => void;
+  onCards: (seat: number) => void;
+  onUndo: () => void;
+  onSave: () => void;
 }) {
-  const { state, settlement, editing, setEditing } = props;
+  const end = state.end!;
   const live = state.seats.filter((s) => !s.folded).map((s) => s.seat);
-  const showdown = state.end?.reason === "showdown" || (!state.end && live.length > 1);
-
-  const toggleWinner = (pot: number, seat: number) => {
-    const next = settlement.pots.map((_, i) => [...(props.winners[i] ?? [])]);
-    const cur = next[pot];
-    next[pot] = cur.includes(seat) ? cur.filter((s) => s !== seat) : [...cur, seat];
-    props.setWinners(next);
+  const handName = (s: number) => {
+    const c = cards.get(s);
+    return c && board.length === 5 ? categoryName(bestScore([...c, ...board])) : null;
   };
+  const missing = end.reason === "showdown" ? live.filter((s) => !cards.has(s)) : [];
+  const open = settlement.pots.some((p) => p.takers.length === 0);
 
   return (
-    <>
-      {!state.end && <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs">The action is not finished — you can still save it as it is.</p>}
+    <div className="space-y-2">
+      <div className="flex h-6 items-center gap-2 text-sm">
+        <span className="min-w-0 flex-1 truncate font-medium">
+          {end.reason === "fold" ? `${label(end.winner)} wins ${fmtChips(settlement.total)}` : end.runout ? "All-in — who wins?" : "Showdown"}
+        </span>
+        <UndoButton onClick={onUndo} />
+      </div>
 
-      <section>
-        <div className="flex items-center gap-2">
-          <h3 className="text-xs font-medium tracking-wide text-muted uppercase">Board</h3>
-          <span className="flex gap-0.5">
-            {props.board.map((c) => (
-              <PlayingCard key={c} card={c} size="xs" />
+      {end.reason === "showdown" && (
+        <>
+          <ul className="max-h-36 space-y-1.5 overflow-y-auto">
+            {settlement.pots.map((p, i) => (
+              <li key={i} className="flex items-center gap-1.5">
+                <span className="w-16 shrink-0 text-xs text-muted">
+                  {settlement.pots.length === 1 ? "Pot" : i === 0 ? "Main" : `Side ${i}`} {fmtChips(p.amount)}
+                </span>
+                <span className="flex flex-wrap gap-1.5">
+                  {p.eligible.map((s) => {
+                    const on = p.takers.includes(s);
+                    const hn = handName(s);
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={p.eligible.length === 1}
+                        onClick={() => onToggle(i, s)}
+                        className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-emerald-600 bg-emerald-600 text-white" : "border-line"}`}
+                      >
+                        {short(s)}
+                        {hn ? ` · ${hn}` : ""}
+                      </button>
+                    );
+                  })}
+                </span>
+              </li>
             ))}
-          </span>
-          <button
-            type="button"
-            onClick={() => setEditing(editing === "board" ? null : "board")}
-            className="ml-auto rounded-full border border-line px-3 py-1 text-xs"
-          >
-            {editing === "board" ? "Done" : props.board.length ? "Change" : "Add the board"}
-          </button>
-        </div>
-        {editing === "board" && (
-          <div className="mt-2">
-            <CardGrid
-              count={5}
-              selected={props.board}
-              dead={new Set([...props.used].filter((c) => !props.board.includes(c)))}
-              onChange={props.setBoard}
-            />
+          </ul>
+          {missing.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-muted">Cards:</span>
+              {missing.map((s) => (
+                <button key={s} type="button" onClick={() => onCards(s)} className="rounded-full border border-dashed border-line px-2.5 py-1">
+                  {short(s)} +
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="flex items-center gap-3">
+        <span className="flex-1 text-sm">
+          {hero !== null && net !== null ? (
+            <>
+              Net{" "}
+              <span className={`font-semibold tabular-nums ${net > 0 ? "text-emerald-600" : net < 0 ? "text-red-500" : ""}`}>
+                {net > 0 ? "+" : net < 0 ? "−" : ""}
+                {fmtChips(Math.abs(net))} {currency}
+              </span>
+              {end.reason === "showdown" && !open && auto && <span className="text-xs text-muted"> · from the cards</span>}
+            </>
+          ) : open ? (
+            <span className="text-xs text-muted">Tap who won</span>
+          ) : null}
+        </span>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="h-11 rounded-lg bg-accent px-6 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- seat */
+
+/**
+ * One seat, at any point of the hand: its cards (shown or only said, for an
+ * opponent) and its stack; before the first action also whether it is dealt
+ * in, the button, and blinds bought back. During the action, "Fold to here"
+ * folds everyone who acts before it.
+ */
+function SeatSheet(props: {
+  seat: number;
+  title: string;
+  isHero: boolean;
+  dealt: boolean;
+  beforeAction: boolean;
+  isButton: boolean;
+  blind: boolean;
+  post: PostMode | null;
+  stack: string;
+  held: Held;
+  used: Set<string>;
+  foldTo: HandAction[] | null;
+  onDeal: (on: boolean) => void;
+  onButton: () => void;
+  onPost: (m: PostMode | null) => void;
+  onStack: (v: string) => void;
+  onCards: (cards: string[], how: Held["how"]) => void;
+  onFoldTo: (folds: HandAction[]) => void;
+  onClose: () => void;
+}) {
+  const [how, setHow] = useState<Held["how"]>(props.held.how);
+  const chip = (on: boolean) => `rounded-full border px-3 py-1.5 text-xs ${on ? "border-accent bg-accent text-white" : "border-line"}`;
+  return (
+    <Sheet open onClose={props.onClose} title={props.title}>
+      <div className="space-y-3">
+        {props.beforeAction && (
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" onClick={() => props.onDeal(!props.dealt)} className={chip(props.dealt)}>
+              {props.dealt ? "Dealt in" : "Out"}
+            </button>
+            <button type="button" onClick={props.onButton} className={chip(props.isButton)}>
+              Button
+            </button>
+            {props.dealt && !props.blind && (
+              <>
+                <button type="button" onClick={() => props.onPost(props.post === "bb" ? null : "bb")} className={chip(props.post === "bb")}>
+                  Posts BB
+                </button>
+                <button type="button" onClick={() => props.onPost(props.post === "both" ? null : "both")} className={chip(props.post === "both")}>
+                  Posts BB + SB dead
+                </button>
+              </>
+            )}
           </div>
         )}
-      </section>
 
-      {showdown && (
-        <section>
-          <h3 className="text-xs font-medium tracking-wide text-muted uppercase">Shown · tap a seat or “Add cards”</h3>
-          <ul className="mt-1 space-y-1">
-            {live
-              .filter((s) => s !== props.hero)
-              .map((s) => {
-                const cards = props.shown[s] ?? [];
-                return (
-                  <li key={s}>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="min-w-0 flex-1 truncate">{props.label(s)}</span>
-                      <span className="flex gap-0.5">
-                        {cards.map((c) => (
-                          <PlayingCard key={c} card={c} size="xs" />
-                        ))}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setEditing(editing === s ? null : s)}
-                        className="shrink-0 rounded-full border border-line px-3 py-1 text-xs"
-                      >
-                        {editing === s ? "Done" : cards.length ? "Change" : "Add cards"}
-                      </button>
-                    </div>
-                    {editing === s && (
-                      <div className="mt-1">
-                        <CardGrid
-                          count={2}
-                          selected={cards}
-                          dead={new Set([...props.used].filter((c) => !cards.includes(c)))}
-                          onChange={(next) => props.setShown((x) => ({ ...x, [s]: next }))}
-                        />
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-          </ul>
-        </section>
-      )}
+        {props.dealt && (
+          <>
+            <div className="flex items-end gap-2">
+              <label className="flex-1 text-xs text-muted">
+                Stack
+                <input
+                  inputMode="decimal"
+                  onFocus={(e) => e.currentTarget.select()}
+                  value={props.stack}
+                  placeholder="?"
+                  onChange={(e) => props.onStack(e.target.value)}
+                  className={INPUT}
+                />
+              </label>
+              {props.foldTo && (
+                <button type="button" onClick={() => props.onFoldTo(props.foldTo!)} className="h-10 rounded-lg border border-line px-3 text-sm">
+                  Fold to here
+                </button>
+              )}
+            </div>
 
-      <section>
-        <h3 className="text-xs font-medium tracking-wide text-muted uppercase">Pots</h3>
-        {settlement.refund && (
-          <p className="mt-1 text-xs text-muted">
-            {fmtChips(settlement.refund.amount)} uncalled, back to {props.label(settlement.refund.seat)}.
-          </p>
-        )}
-        <ul className="mt-1 space-y-2">
-          {settlement.pots.map((p, i) => (
-            <li key={i} className="rounded-lg border border-line p-2">
-              <p className="text-sm font-medium">
-                {i === 0 ? "Main pot" : `Side pot ${i}`} · {fmtChips(p.amount)} {props.currency}
-              </p>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {p.eligible.map((s) => {
-                  const on = p.takers.includes(s);
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      disabled={p.eligible.length === 1}
-                      onClick={() => toggleWinner(i, s)}
-                      className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-emerald-600 bg-emerald-600 text-white" : "border-line"}`}
-                    >
-                      {props.label(s)}
-                    </button>
-                  );
-                })}
+            {!props.isHero && (
+              <div className="flex gap-1.5">
+                {(["shown", "said"] as const).map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => {
+                      setHow(h);
+                      if (props.held.cards.length === 2) props.onCards(props.held.cards, h);
+                    }}
+                    className={chip(how === h)}
+                  >
+                    {h === "shown" ? "Shown" : "Said he had"}
+                  </button>
+                ))}
               </div>
-              {p.takers.length === 0 && <p className="mt-1 text-[11px] text-muted">Who won it? Tap one, or several for a split.</p>}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {props.hero !== null && (
-        <section className="flex items-center gap-2">
-          <span className="shrink-0 text-sm">Your net</span>
-          <input
-            inputMode="decimal" onFocus={(e) => e.currentTarget.select()}
-            value={props.netOverride}
-            onChange={(e) => props.setNetOverride(e.target.value)}
-            placeholder={props.autoNet !== null ? fmtChips(props.autoNet) : "?"}
-            className={`${INPUT} w-28`}
-          />
-          <span className="text-xs text-muted">
-            {props.currency} · {props.netOverride.trim() ? "set by you" : props.autoNet !== null ? "from the pots" : "pick the winners"} · before rake
-          </span>
-        </section>
-      )}
-
-      <section>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={props.starred} onChange={(e) => props.setStarred(e.target.checked)} /> ★ Review later
-        </label>
-        <textarea
-          value={props.notes}
-          onChange={(e) => props.setNotes(e.target.value)}
-          rows={3}
-          placeholder="Notes on the hand"
-          className={`${INPUT} mt-2`}
-        />
-      </section>
-    </>
+            )}
+            <CardsPanel
+              title={props.isHero ? "Your cards" : how === "shown" ? "Shows" : "Says he had"}
+              current={props.held.cards}
+              used={props.used}
+              onPick={(cards) => {
+                props.onCards(cards, how);
+                props.onClose();
+              }}
+              onClear={() => props.onCards([], how)}
+            />
+          </>
+        )}
+      </div>
+    </Sheet>
   );
 }

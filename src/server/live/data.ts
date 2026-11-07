@@ -41,7 +41,7 @@ const PLAYER_COLUMNS = "id, name, description, known, created_at, updated_at";
 const TAG_COLUMNS = "id, name, color, position";
 const NOTE_COLUMNS = "id, player_id, session_id, hand_id, body, source, created_at, updated_at";
 const HAND_COLUMNS =
-  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, posts, seats, actions, hero_cards, board, shown, winners, hero_net, starred, notes, created_at, updated_at";
+  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, posts, seats, actions, hero_cards, board, shown, said, winners, hero_net, starred, notes, created_at, updated_at";
 
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -125,6 +125,7 @@ function asHand(row: Record<string, unknown>): LiveHand {
     posts: ((h.posts ?? []) as HandPost[]).map((p) => ({ seat: num(p.seat), live: num(p.live ?? 0), dead: num(p.dead ?? 0) })),
     board: h.board ?? [],
     shown: h.shown ?? {},
+    said: h.said ?? {},
     winners: Array.isArray(h.winners) ? h.winners : [],
     actions: h.actions ?? [],
   };
@@ -1183,6 +1184,7 @@ function handRow(input: HandInput) {
     hero_cards: input.hero_cards,
     board: input.board,
     shown: input.shown,
+    said: input.said ?? {},
     winners: input.winners,
     hero_net: input.hero_net,
     starred: input.starred,

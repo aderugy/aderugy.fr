@@ -5,10 +5,12 @@ import { PlayingCard, CardBack } from "@/components/poker/trainer/Cards";
 import { splitCards } from "@/lib/live/types";
 
 /**
- * A full-ring casino table seen from above: the dealer at the top, seat 1 on
- * the dealer's left (screen right), numbers increasing clockwise down the
- * right side, along the bottom and up the left — which is also the order
- * action goes in. A taller oval on phones, wider from `sm` up.
+ * A full-ring casino table seen from above: the dealer in the middle of the
+ * left side, seat 1 on the dealer's left (just above them), numbers
+ * increasing clockwise along the top, down the right side, along the bottom
+ * and back up to the dealer — which is also the order action goes in. A
+ * taller oval on phones, wider from `sm` up. With `fit`, the table takes the
+ * largest size that fits its container (which must have a definite height).
  */
 
 export type SeatView = {
@@ -28,6 +30,8 @@ export type SeatView = {
   bet?: number;
   /** Face-up cards (shown at showdown, or the hero's). */
   cards?: string | null;
+  /** The face-up cards were only said, not shown: drawn faded, marked "said". */
+  said?: boolean;
   /** Face-down cards in front of a seat still in the hand. */
   hidden?: boolean;
   /** No cards yet, but they can be added: an empty slot to tap. */
@@ -38,12 +42,15 @@ const fmt = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(2).repla
 
 /** Where seat `seat` of `size` sits, as percentages of the table box. */
 function anchor(seat: number, size: number, k = 1): { x: number; y: number } {
-  const theta = (seat * 2 * Math.PI) / (size + 1);
+  // The dealer is at angle 0, on the left; seats follow clockwise.
+  const theta = (seat * 2 * Math.PI) / (size + 1) - Math.PI / 2;
   return { x: 50 + 41 * k * Math.sin(theta), y: 50 - 41 * k * Math.cos(theta) };
 }
 
 function at(p: { x: number; y: number }): CSSProperties {
-  return { left: `${p.x}%`, top: `${p.y}%` };
+  // Rounded: the server and the browser need not agree on the last digits of a sine.
+  const r = (v: number) => Math.round(v * 1000) / 1000;
+  return { left: `${r(p.x)}%`, top: `${r(p.y)}%` };
 }
 
 export function LiveTable({
@@ -56,7 +63,10 @@ export function LiveTable({
   selected,
   label,
   onCards,
+  fit = false,
 }: {
+  /** Fill the container's height and width, keeping the table's shape. */
+  fit?: boolean;
   size: number;
   seats: SeatView[];
   /** Tapping a seat's cards (or its empty card slot) — distinct from tapping the seat. */
@@ -74,14 +84,20 @@ export function LiveTable({
   const all = Array.from({ length: size }, (_, i) => i + 1);
 
   return (
-    <div className="relative mx-auto aspect-[3/4] w-full max-w-[26rem] select-none sm:aspect-[16/10] sm:max-w-2xl">
+    <div
+      className={
+        fit
+          ? "relative mx-auto aspect-[3/4] w-[min(100cqw,75cqh)] select-none sm:aspect-[16/10] sm:w-[min(100cqw,160cqh)]"
+          : "relative mx-auto aspect-[3/4] w-full max-w-[26rem] select-none sm:aspect-[16/10] sm:max-w-2xl"
+      }
+    >
       {/* Felt */}
       <div
         className="absolute inset-[11%] rounded-[50%] border-[5px] border-[#5b3a1e] shadow-inner"
         style={{ background: "radial-gradient(ellipse at center, #2f7d4f 0%, #1f5c3a 70%, #184a2f 100%)" }}
       />
       {/* The dealer's place */}
-      <div className="absolute left-1/2 top-[11%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white/80">
+      <div className="absolute left-[11%] top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white/80">
         Dealer
       </div>
 
@@ -136,12 +152,19 @@ export function LiveTable({
                         }
                       : undefined
                   }
-                  className={`mb-0.5 flex gap-0.5 ${onCards ? "-m-1.5 cursor-pointer p-1.5" : ""} ${s.out && !cards ? "opacity-40" : ""}`}
+                  className={`relative mb-0.5 flex gap-0.5 ${onCards ? "-m-1.5 cursor-pointer p-1.5" : ""} ${s.out && !cards ? "opacity-40" : ""}`}
                 >
                   {cards ? (
                     <>
-                      <PlayingCard card={cards[0]} size="xs" />
-                      <PlayingCard card={cards[1]} size="xs" />
+                      {s.said && (
+                        <span className="absolute -top-1.5 left-1/2 z-10 -translate-x-1/2 rounded bg-amber-500 px-1 text-[8px] font-semibold leading-tight text-white">
+                          said
+                        </span>
+                      )}
+                      <span className={`flex gap-0.5 ${s.said ? "opacity-60" : ""}`}>
+                        <PlayingCard card={cards[0]} size="xs" />
+                        <PlayingCard card={cards[1]} size="xs" />
+                      </span>
                     </>
                   ) : s.hidden ? (
                     <>

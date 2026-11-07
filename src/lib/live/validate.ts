@@ -46,16 +46,24 @@ export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
   if (board.length > 5) throw new Error("A board has five cards at most.");
   board.forEach((c) => take(c, "Board"));
 
+  // Cards seen, then cards only claimed: a seat has one or the other, seen first.
   const shown: Record<string, string> = {};
-  for (const [k, v] of Object.entries(raw.shown ?? {})) {
-    if (!v) continue;
-    const seat = Number(k);
-    if (!seats.some((s) => s.seat === seat)) throw new Error(`Seat ${k} was not in the hand.`);
-    if (seat === hero) continue; // his own cards are hero_cards
-    const pair = splitCards(v);
-    if (!pair) throw new Error(`Seat ${k}: shown cards must be two different cards.`);
-    pair.forEach((c) => take(c, `Seat ${k}`));
-    shown[String(seat)] = pair.join("");
+  const said: Record<string, string> = {};
+  for (const [what, src, out] of [
+    ["shown", raw.shown, shown],
+    ["said", raw.said, said],
+  ] as const) {
+    for (const [k, v] of Object.entries(src ?? {})) {
+      if (!v) continue;
+      const seat = Number(k);
+      if (!seats.some((s) => s.seat === seat)) throw new Error(`Seat ${k} was not in the hand.`);
+      if (seat === hero) continue; // his own cards are hero_cards
+      if (what === "said" && shown[String(seat)]) continue;
+      const pair = splitCards(v);
+      if (!pair) throw new Error(`Seat ${k}: ${what} cards must be two different cards.`);
+      pair.forEach((c) => take(c, `Seat ${k}`));
+      out[String(seat)] = pair.join("");
+    }
   }
 
   const sb = r2(Number(raw.small_blind));
@@ -110,6 +118,7 @@ export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
       hero_cards: heroCards,
       board,
       shown,
+      said,
       winners: settlement.pots.map((p) => p.takers),
       hero_net: heroNet,
       starred: Boolean(raw.starred),

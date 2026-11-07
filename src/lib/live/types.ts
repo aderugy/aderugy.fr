@@ -169,7 +169,10 @@ export type LiveHand = {
   actions: HandAction[];
   hero_cards: string | null;
   board: string[];
+  /** Cards seen at showdown: {"5": "AhKd"}. */
   shown: Record<string, string>;
+  /** Cards a player said he had, not seen: {"5": "AhKd"}. A seat is in one or the other. */
+  said: Record<string, string>;
   /** Who took each pot, main pot first. */
   winners: number[][];
   hero_net: number | null;
@@ -194,6 +197,8 @@ export type HandInput = {
   hero_cards: string | null;
   board: string[];
   shown: Record<string, string>;
+  /** Optional: older callers send none. */
+  said?: Record<string, string>;
   winners: number[][];
   hero_net: number | null;
   starred: boolean;
