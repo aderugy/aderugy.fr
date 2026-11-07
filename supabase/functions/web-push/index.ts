@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { adminClient, callerFromRequest, isServiceRole, json } from "../_shared/db.ts";
 import type { PushSession } from "../_shared/push-events.ts";
+import { QUESTION_MAX_AGE_MS, questionFor } from "../_shared/questions.ts";
 import { reminderFor, TEST_REMINDER, type ReminderPayload } from "../_shared/reminders.ts";
 import { sendPush, type VapidKeys } from "../_shared/webpush.ts";
 
@@ -9,7 +10,8 @@ import { sendPush, type VapidKeys } from "../_shared/webpush.ts";
  * `google-push`, which writes sessions to Google Calendar.
  *
  * - The service-role key with `{ due: true }` ⇒ the cron sweep: one reminder
- *   per planned session, `lead_minutes` before it starts, to every device.
+ *   per planned session, `lead_minutes` before it starts, to every device;
+ *   and each question Claude asked on a research project (/projects), once.
  * - A user JWT with `{ action: "test" }` ⇒ a test notification to the caller's
  *   own devices, from the settings page.
  */
@@ -172,6 +174,51 @@ async function sweep(admin: SupabaseClient, vapid: VapidKeys) {
   return { sent: results.filter((r) => r.delivered > 0).length, results };
 }
 
+type QuestionRow = {
+  id: string;
+  user_id: string;
+  body: string;
+  research_projects: { slug: string } | { slug: string }[] | null;
+};
+
+/**
+ * Claude's questions on /projects ring once. Claimed first (pushed_at), like
+ * the reminders, so two overlapping sweeps never ring twice; a question that
+ * reached no device is released for the next minute.
+ */
+async function sweepQuestions(admin: SupabaseClient, vapid: VapidKeys) {
+  const since = new Date(Date.now() - QUESTION_MAX_AGE_MS).toISOString();
+  const { data, error } = await admin
+    .from("research_messages")
+    .update({ pushed_at: new Date().toISOString() })
+    .eq("author", "claude")
+    .eq("kind", "question")
+    .is("pushed_at", null)
+    .gte("created_at", since)
+    .select("id, user_id, body, research_projects(slug)");
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as QuestionRow[];
+  if (rows.length === 0) return { questions: 0 };
+
+  const subs = await subscriptionsOf(admin, [...new Set(rows.map((r) => r.user_id))]);
+  let sent = 0;
+  for (const row of rows) {
+    const p = Array.isArray(row.research_projects) ? row.research_projects[0] : row.research_projects;
+    const outcome = await sendToUser(
+      admin,
+      vapid,
+      subs.get(row.user_id) ?? [],
+      questionFor({ id: row.id, body: row.body, slug: p?.slug ?? "?" }),
+      QUESTION_MAX_AGE_MS / 1000,
+    );
+    if (outcome.delivered > 0) sent++;
+    else if (outcome.retryable > 0) {
+      await admin.from("research_messages").update({ pushed_at: null }).eq("id", row.id);
+    }
+  }
+  return { questions: sent };
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -193,7 +240,10 @@ Deno.serve(async (request) => {
 
   if (isServiceRole(request) && body.due) {
     try {
-      return json({ ok: true, ...(await sweep(admin, vapid)) });
+      const reminders = await sweep(admin, vapid);
+      // A failure here must not cost the reminders their answer, nor the reverse.
+      const questions = await sweepQuestions(admin, vapid).catch((e) => ({ questions: 0, questionsError: String(e) }));
+      return json({ ok: true, ...reminders, ...questions });
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
     }

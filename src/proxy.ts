@@ -18,5 +18,6 @@ export const config = {
     "/maths/:path*",
     "/jobs/:path*",
     "/flashcards/:path*",
+    "/projects/:path*",
   ],
 };
