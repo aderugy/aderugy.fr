@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { CardGrid } from "./CardGrid";
 import { FeltCenter, LiveTable, type BoardStreet, type SeatView } from "./LiveTable";
 import { INPUT, Sheet } from "./ui";
 import { PlayingCard } from "@/components/poker/trainer/Cards";
 import {
-  applyAction,
   behind,
   describeStep,
   foldsUntil,
@@ -135,23 +134,28 @@ export function HandEditor({
   const posts: HandPost[] = dealt
     .filter((seat) => postsBy[seat])
     .map((seat) => ({ seat, live: nums.bb ?? 0, dead: postsBy[seat] === "both" ? (nums.sb ?? 0) : 0 }));
-  const seats = dealt.map((seat) => {
-    const st = parseAmount(stacks[seat] ?? "");
-    return { seat, player_id: names.get(seat)?.playerId ?? null, stack: st && st > 0 ? st : null };
-  });
+  const seatsFor = (st: Record<number, string>) =>
+    dealt.map((seat) => {
+      const v = parseAmount(st[seat] ?? "");
+      return { seat, player_id: names.get(seat)?.playerId ?? null, stack: v && v > 0 ? v : null };
+    });
+  const seats = seatsFor(stacks);
 
-  // Replayed on every render: a hand is a few dozen actions at most.
-  const play = ((): { result: PlayResult; error: null } | { result: null; error: string } => {
+  /** Replay the hand with other stacks or actions — to check a change before making it. */
+  const replay = (st: Record<number, string>, list: HandAction[]): { result: PlayResult; error: null } | { result: null; error: string } => {
     try {
       if (!(nums.sb! > 0) || !(nums.bb! > 0)) return { result: null, error: "Set the blinds (⋯)." };
       return {
-        result: playHand({ seats, button, sb: nums.sb!, bb: nums.bb!, straddle: nums.straddle, posts }, actions),
+        result: playHand({ seats: seatsFor(st), button, sb: nums.sb!, bb: nums.bb!, straddle: nums.straddle, posts }, list),
         error: null,
       };
     } catch (e) {
       return { result: null, error: e instanceof Error ? e.message : String(e) };
     }
-  })();
+  };
+
+  // Replayed on every render: a hand is a few dozen actions at most.
+  const play = replay(stacks, actions);
 
   const result = play.result;
   const state: HandState | null = result?.state ?? null;
@@ -204,18 +208,58 @@ export function HandEditor({
     setBoard((b) => [...b.slice(0, at), ...cards.slice(0, n), ...b.slice(at + n)]);
   }
 
-  /** Apply an action if it fits; say why not otherwise. */
-  function act(a: HandAction | HandAction[]) {
+  /** The engine's sentences name seats by number: name them as on the table. */
+  const say = (msg: string) => msg.replace(/[Ss]eat (\d+)/g, (_, n) => short(Number(n)));
+
+  /**
+   * Apply actions if they fit, with a stack learnt on the way (an all-in from
+   * an unknown stack); say why not otherwise and change nothing.
+   */
+  function act(a: HandAction | HandAction[], stackPatch?: Record<number, string>) {
     if (!state) return;
     const list = Array.isArray(a) ? a : [a];
-    try {
-      let s = state;
-      for (const x of list) s = applyAction(s, x).state;
-    } catch (e) {
-      return setError(e instanceof Error ? e.message : String(e));
-    }
+    const nextStacks = stackPatch ? { ...stacks, ...stackPatch } : stacks;
+    const r = replay(nextStacks, [...actions, ...list]);
+    if (!r.result) return setError(say(r.error));
+    if (!r.result.ok) return setError(say(r.result.error ?? "That action does not fit."));
     setError(null);
+    if (stackPatch) setStacks(nextStacks);
     setActions((xs) => [...xs, ...list]);
+  }
+
+  /**
+   * The seat to act goes all-in for `total` on this street, its stack not
+   * being known: that tells its stack, which is kept. A raise when it is more
+   * than the bet (short of a full raise is fine), a call for less otherwise.
+   */
+  function allInFor(total: number) {
+    if (!state || state.toAct === null) return;
+    const o = options(state)!;
+    const s = state.seats.find((x) => x.seat === o.seat)!;
+    if (!(total > s.street)) return setError(`${short(o.seat)} already has ${fmtChips(s.street)} in on this street: the all-in is more.`);
+    const stack = fmtChips(r2(s.committed - s.street + total));
+    const a: HandAction =
+      o.aggressive && total > state.currentBet && othersCanAct(state, o.seat)
+        ? { seat: o.seat, kind: o.aggressive, to: total, all_in: true }
+        : { seat: o.seat, kind: "call", all_in: true };
+    act(a, { [o.seat]: stack });
+  }
+
+  /**
+   * A stack typed in a seat sheet: kept only if the hand still plays with it
+   * and it covers what the seat already put in. Empty is fine: not known.
+   */
+  function changeStack(seat: number, v: string): string | null {
+    const amount = v.trim() ? parseAmount(v) : null;
+    if (amount !== null && !(amount > 0)) return "Type an amount.";
+    const inSoFar = state?.seats.find((x) => x.seat === seat)?.committed ?? 0;
+    if (amount !== null && actions.length > 0 && amount < inSoFar) return `Already put in ${fmtChips(inSoFar)} this hand.`;
+    const next = { ...stacks, [seat]: v };
+    const r = replay(next, actions);
+    if (r.result && !r.result.ok) return say(r.result.error ?? "The hand no longer plays with that stack.");
+    setError(null);
+    setStacks(next);
+    return null;
   }
 
   function undo() {
@@ -340,14 +384,16 @@ export function HandEditor({
         <button type="button" onClick={() => setMoreOpen(true)} className="px-2 text-lg leading-none text-muted" aria-label="More">
           ⋯
         </button>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || step !== "play"}
-          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+        {step === "play" && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        )}
       </header>
 
       <div className="flex min-h-0 flex-1 items-center justify-center px-1 py-1 [container-type:size]">
@@ -390,11 +436,11 @@ export function HandEditor({
             onSkip={() => setStep("play")}
           />
         ) : !result ? (
-          <p className="text-sm text-red-500">{play.error}</p>
+          <p className="text-sm text-red-500">{say(play.error)}</p>
         ) : !result.ok ? (
           <div className="flex items-center gap-2">
             <p className="flex-1 text-sm text-red-500">
-              Action {result.failedAt! + 1}: {result.error}
+              Action {result.failedAt! + 1}: {say(result.error ?? "")}
             </p>
             <UndoButton onClick={undo} />
           </div>
@@ -414,6 +460,7 @@ export function HandEditor({
             key={actions.length}
             state={state}
             label={label}
+            short={short}
             lastLine={lastLine(result, short)}
             preflopStart={actions.length === 0}
             straddle={nums.straddle}
@@ -422,7 +469,8 @@ export function HandEditor({
               setError(null);
               setStraddle(nums.straddle ? "" : fmtChips(r2((nums.bb ?? 0) * 2)));
             }}
-            onAct={act}
+            onAct={(a) => act(a)}
+            onAllInFor={allInFor}
             onUndo={actions.length ? undo : undefined}
           />
         ) : state && settlement ? (
@@ -458,6 +506,7 @@ export function HandEditor({
           title={dealt.includes(seatSheet) ? label(seatSheet) : `${short(seatSheet)} · seat ${seatSheet}`}
           isHero={seatSheet === hero || seatSheet === heroSeat}
           dealt={dealt.includes(seatSheet)}
+          canSitOut={dealt.length > 2}
           beforeAction={actions.length === 0}
           isButton={button === seatSheet}
           blind={pos.get(seatSheet) === "SB" || pos.get(seatSheet) === "BB"}
@@ -468,6 +517,7 @@ export function HandEditor({
           foldTo={state && !state.end && !needBoard && state.toAct !== null && state.toAct !== seatSheet ? foldsUntil(state, seatSheet) : null}
           onDeal={(on) => {
             setError(null);
+            if (!on && dealt.length <= 2) return setError("A hand needs at least two players.");
             setDealt((d) => (on ? [...d, seatSheet].sort((a, b) => a - b) : d.filter((x) => x !== seatSheet)));
           }}
           onButton={() => setButton(seatSheet)}
@@ -479,7 +529,7 @@ export function HandEditor({
               return next;
             })
           }
-          onStack={(v) => setStacks((x) => ({ ...x, [seatSheet]: v }))}
+          onStack={(v) => changeStack(seatSheet, v)}
           onCards={(cards, how) => setCards(seatSheet, cards, how)}
           onFoldTo={(folds) => {
             act(folds);
@@ -656,63 +706,126 @@ function CardsPanel({
 
 /* -------------------------------------------------------------- action */
 
+/** Is anyone else still able to answer a raise? With nobody, a raise means nothing. */
+function othersCanAct(state: HandState, seat: number): boolean {
+  return state.seats.some((x) => x.seat !== seat && !x.folded && !x.allIn);
+}
+
 /**
- * The seat to act: check or fold, call, all-in in one tap; a raise is the
- * amount typed, then one tap (or Enter). Bet or raise is worked out.
+ * The seat to act, with only what it may do: check or fold, call (when there
+ * is something to call), all-in, and a raise field when a raise is possible
+ * — the amount typed, then one tap (or Enter); bet or raise is worked out.
+ * An all-in from an unknown stack asks how much it is for.
  */
 function ActionBar({
   state,
   label,
+  short,
   lastLine,
   preflopStart,
   straddle,
   canStraddle,
   onStraddle,
   onAct,
+  onAllInFor,
   onUndo,
 }: {
   state: HandState;
   label: (seat: number) => string;
+  short: (seat: number) => string;
   lastLine: string;
   preflopStart: boolean;
   straddle: number | null;
   canStraddle: boolean;
   onStraddle: () => void;
   onAct: (a: HandAction) => void;
+  /** All-in for this total on the street, from a stack not known. */
+  onAllInFor: (total: number) => void;
   onUndo?: () => void;
 }) {
   const o = options(state)!;
+  const seat = state.seats.find((s) => s.seat === o.seat)!;
   const [amount, setAmount] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-  const shoveTo = o.maxTo;
+  const [asking, setAsking] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
 
-  const raise = (allIn = false) => {
-    const typed = parseAmount(amount);
-    if (!o.aggressive) return;
-    if (allIn && shoveTo !== null) return onAct({ seat: o.seat, kind: o.aggressive, to: shoveTo, all_in: true });
-    if (!typed || Number.isNaN(typed)) return input.current?.focus();
-    const to = shoveTo !== null && typed >= shoveTo ? shoveTo : typed;
-    onAct({ seat: o.seat, kind: o.aggressive, to, ...(allIn || to === shoveTo ? { all_in: true } : {}) });
+  const others = othersCanAct(state, o.seat);
+  const known = o.behind !== null;
+  // A call that takes every chip left is the all-in: one button, not two.
+  const callIsAllIn = known && o.canCall && o.callAmount >= o.behind!;
+  const canRaise = Boolean(o.aggressive) && others && !(known && o.maxTo! <= state.currentBet);
+  const showAllIn = known ? canRaise : o.canCall || canRaise;
+  const verb = o.aggressive === "bet" ? "Bet" : "Raise";
+
+  const typed = () => {
+    const v = parseAmount(amount);
+    return v && v > 0 && !Number.isNaN(v) ? v : null;
+  };
+
+  const raise = () => {
+    const to = typed();
+    if (to === null) return setHint("Type an amount.");
+    if (to <= state.currentBet) return setHint(`More than ${fmtChips(state.currentBet)} — it is the total, not the raise.`);
+    // At or over the stack: the stack.
+    if (known && to >= o.maxTo!) return onAct({ seat: o.seat, kind: o.aggressive!, to: o.maxTo!, all_in: true });
+    if (to < o.minTo) return setHint(`At least ${fmtChips(o.minTo)} — or All-in if that is all he had.`);
+    onAct({ seat: o.seat, kind: o.aggressive!, to });
   };
 
   const allIn = () => {
-    // Known stack: shove it, or call it off when a raise is not possible.
-    if (o.behind !== null) {
-      if (o.aggressive && shoveTo !== null && shoveTo > state.currentBet) return raise(true);
-      return onAct({ seat: o.seat, kind: "call" });
-    }
-    // Unknown stack: the amount typed is the shove; with none, an all-in call.
-    if (amount.trim() && o.aggressive) return raise(true);
-    if (o.canCall) return onAct({ seat: o.seat, kind: "call", all_in: true });
-    input.current?.focus();
+    if (known) return onAct({ seat: o.seat, kind: o.aggressive!, to: o.maxTo!, all_in: true });
+    // Stack not known: the amount typed is the all-in, otherwise ask for it.
+    const to = typed();
+    if (to !== null) return onAllInFor(to);
+    setAsking(true);
   };
+
+  if (asking) {
+    return (
+      <AllInAsk
+        who={short(o.seat)}
+        street={seat.street}
+        toCall={o.canCall ? r2(seat.street + o.toCall) : null}
+        onCancel={() => setAsking(false)}
+        onDone={onAllInFor}
+      />
+    );
+  }
+
+  const buttons: React.ReactNode[] = [
+    <button
+      key="passive"
+      type="button"
+      onClick={() => onAct({ seat: o.seat, kind: o.canCheck ? "check" : "fold" })}
+      className="h-12 rounded-lg border border-line text-sm font-medium"
+    >
+      {o.canCheck ? "Check" : "Fold"}
+    </button>,
+  ];
+  if (o.canCall)
+    buttons.push(
+      <button
+        key="call"
+        type="button"
+        onClick={() => onAct({ seat: o.seat, kind: "call" })}
+        className={`h-12 rounded-lg border text-sm font-medium ${callIsAllIn ? "border-rose-500/60 bg-rose-500/15" : "border-sky-500/50 bg-sky-500/10"}`}
+      >
+        {callIsAllIn ? `Call all-in ${fmtChips(o.callAmount)}` : `Call ${fmtChips(o.callAmount)}`}
+      </button>,
+    );
+  if (showAllIn)
+    buttons.push(
+      <button key="allin" type="button" onClick={allIn} className="h-12 rounded-lg border border-rose-500/60 bg-rose-500/15 text-sm font-semibold">
+        All-in{known ? ` ${fmtChips(o.maxTo!)}` : ""}
+      </button>,
+    );
 
   return (
     <div className="space-y-2">
       <div className="flex h-6 items-center gap-2 text-sm">
         <span className="shrink-0 font-semibold">{label(o.seat)}</span>
         <span className="min-w-0 flex-1 truncate text-xs text-muted">
-          {lastLine || (o.behind !== null ? `${fmtChips(o.behind)} behind` : "")}
+          {lastLine || (known ? `${fmtChips(o.behind!)} behind` : "stack ?")}
         </span>
         {preflopStart && canStraddle && (
           <button
@@ -730,52 +843,89 @@ function ActionBar({
           </button>
         )}
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <button
-          type="button"
-          onClick={() => onAct({ seat: o.seat, kind: o.canCheck ? "check" : "fold" })}
-          className="h-12 rounded-lg border border-line text-sm font-medium"
+      <div className={`grid gap-2 ${buttons.length === 3 ? "grid-cols-3" : buttons.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>{buttons}</div>
+      {canRaise && (
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            raise();
+          }}
         >
-          {o.canCheck ? "Check" : "Fold"}
-        </button>
-        <button
-          type="button"
-          disabled={!o.canCall}
-          onClick={() => onAct({ seat: o.seat, kind: "call" })}
-          className="h-12 rounded-lg border border-sky-500/50 bg-sky-500/10 text-sm font-medium disabled:opacity-30"
-        >
-          Call{o.canCall ? ` ${fmtChips(o.callAmount)}` : ""}
-        </button>
-        <button type="button" onClick={allIn} className="h-12 rounded-lg border border-rose-500/60 bg-rose-500/15 text-sm font-semibold">
-          All-in{shoveTo !== null && o.aggressive ? ` ${fmtChips(shoveTo)}` : ""}
+          <input
+            inputMode="decimal"
+            enterKeyHint="go"
+            value={amount}
+            placeholder={`${verb} to · min ${fmtChips(o.minTo)}`}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              setHint(null);
+            }}
+            className={`${INPUT} mt-0 h-11 flex-1`}
+          />
+          <button type="submit" className="h-11 w-24 rounded-lg bg-rose-600 text-sm font-medium text-white">
+            {verb}
+          </button>
+        </form>
+      )}
+      {hint && <p className="text-xs text-red-500">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * An all-in from a stack that is not known: how much is it, in all, on this
+ * street? That makes the stack known for the rest of the hand.
+ */
+function AllInAsk({
+  who,
+  street,
+  toCall,
+  onCancel,
+  onDone,
+}: {
+  who: string;
+  street: number;
+  /** The total a full call comes to, when there is a bet. */
+  toCall: number | null;
+  onCancel: () => void;
+  onDone: (total: number) => void;
+}) {
+  const [v, setV] = useState("");
+  const total = parseAmount(v);
+  const ok = total !== null && !Number.isNaN(total) && total > street;
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ok) onDone(total!);
+      }}
+    >
+      <div className="flex h-6 items-center gap-2 text-sm">
+        <span className="flex-1 font-semibold">{who} all-in — for how much?</span>
+        <button type="button" onClick={onCancel} className="text-xs text-muted">
+          Cancel
         </button>
       </div>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          raise();
-        }}
-      >
+      <div className="flex gap-2">
         <input
-          ref={input}
+          autoFocus
           inputMode="decimal"
           enterKeyHint="go"
-          value={amount}
-          disabled={!o.aggressive}
-          placeholder={o.aggressive ? `${o.aggressive === "bet" ? "Bet" : "Raise to"} · min ${fmtChips(o.minTo)}` : "No raise possible"}
-          onChange={(e) => setAmount(e.target.value)}
+          value={v}
+          onChange={(e) => setV(e.target.value)}
+          placeholder={street > 0 ? `Total on this street (has ${fmtChips(street)} in)` : "Total on this street"}
           className={`${INPUT} mt-0 h-11 flex-1`}
         />
-        <button
-          type="submit"
-          disabled={!o.aggressive || !amount.trim()}
-          className="h-11 w-24 rounded-lg bg-rose-600 text-sm font-medium text-white capitalize disabled:opacity-40"
-        >
-          {o.aggressive ?? "raise"}
-        </button>
-      </form>
-    </div>
+        {ok && (
+          <button type="submit" className="h-11 w-24 rounded-lg bg-rose-600 text-sm font-semibold text-white">
+            All-in
+          </button>
+        )}
+      </div>
+      {ok && toCall !== null && total! < toCall && <p className="text-xs text-muted">Less than the bet: a call all-in for {fmtChips(total!)}.</p>}
+    </form>
   );
 }
 
@@ -850,11 +1000,16 @@ function ResultBar({
                   {p.eligible.map((s) => {
                     const on = p.takers.includes(s);
                     const hn = handName(s);
+                    if (p.eligible.length === 1)
+                      return (
+                        <span key={s} className="rounded-full border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-xs text-white">
+                          {short(s)}
+                        </span>
+                      );
                     return (
                       <button
                         key={s}
                         type="button"
-                        disabled={p.eligible.length === 1}
                         onClick={() => onToggle(i, s)}
                         className={`rounded-full border px-2.5 py-1 text-xs ${on ? "border-emerald-600 bg-emerald-600 text-white" : "border-line"}`}
                       >
@@ -899,9 +1054,9 @@ function ResultBar({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="h-11 rounded-lg bg-accent px-6 text-sm font-medium text-white disabled:opacity-50"
+          className={`h-11 rounded-lg px-6 text-sm font-medium disabled:opacity-50 ${open ? "border border-line" : "bg-accent text-white"}`}
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Saving…" : open ? "Save without result" : "Save"}
         </button>
       </div>
     </div>
@@ -921,6 +1076,8 @@ function SeatSheet(props: {
   title: string;
   isHero: boolean;
   dealt: boolean;
+  /** False when taking this seat out would leave fewer than two players. */
+  canSitOut: boolean;
   beforeAction: boolean;
   isButton: boolean;
   blind: boolean;
@@ -932,21 +1089,26 @@ function SeatSheet(props: {
   onDeal: (on: boolean) => void;
   onButton: () => void;
   onPost: (m: PostMode | null) => void;
-  onStack: (v: string) => void;
+  /** Keeps the stack if it fits the hand; returns why not otherwise. */
+  onStack: (v: string) => string | null;
   onCards: (cards: string[], how: Held["how"]) => void;
   onFoldTo: (folds: HandAction[]) => void;
   onClose: () => void;
 }) {
   const [how, setHow] = useState<Held["how"]>(props.held.how);
+  const [stack, setStack] = useState(props.stack);
+  const [stackError, setStackError] = useState<string | null>(null);
   const chip = (on: boolean) => `rounded-full border px-3 py-1.5 text-xs ${on ? "border-accent bg-accent text-white" : "border-line"}`;
   return (
     <Sheet open onClose={props.onClose} title={props.title}>
       <div className="space-y-3">
         {props.beforeAction && (
           <div className="flex flex-wrap gap-1.5">
-            <button type="button" onClick={() => props.onDeal(!props.dealt)} className={chip(props.dealt)}>
-              {props.dealt ? "Dealt in" : "Out"}
-            </button>
+            {(!props.dealt || props.canSitOut) && (
+              <button type="button" onClick={() => props.onDeal(!props.dealt)} className={chip(props.dealt)}>
+                {props.dealt ? "Dealt in" : "Out"}
+              </button>
+            )}
             <button type="button" onClick={props.onButton} className={chip(props.isButton)}>
               Button
             </button>
@@ -971,11 +1133,15 @@ function SeatSheet(props: {
                 <input
                   inputMode="decimal"
                   onFocus={(e) => e.currentTarget.select()}
-                  value={props.stack}
+                  value={stack}
                   placeholder="?"
-                  onChange={(e) => props.onStack(e.target.value)}
+                  onChange={(e) => {
+                    setStack(e.target.value);
+                    setStackError(props.onStack(e.target.value));
+                  }}
                   className={INPUT}
                 />
+                {stackError && <span className="mt-1 block text-red-500">{stackError}</span>}
               </label>
               {props.foldTo && (
                 <button type="button" onClick={() => props.onFoldTo(props.foldTo!)} className="h-10 rounded-lg border border-line px-3 text-sm">
