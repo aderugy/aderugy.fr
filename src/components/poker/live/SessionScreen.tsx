@@ -220,6 +220,7 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
           heroSeat={session.hero_seat}
           names={namesFromTable(table, (id) => playerById.get(id) ?? null, colorsOf)}
           initial={newHand(session, table, nextHandButton)}
+          rake={session.rake}
           onSave={(input) => createHand(session.id, input)}
           onClose={close}
         />

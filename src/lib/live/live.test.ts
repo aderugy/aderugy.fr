@@ -21,6 +21,7 @@ import {
 import { buttonFor, checkSeatEvent, dealtIn, heroSeatAt, nextButton, seatedTogether, tableAt } from "./table";
 import { fmtDuration, summarize, totals } from "./session";
 import type { HandAction, SeatEvent, SessionEvent } from "./types";
+import { asRakeRule, rakeOn, type RakeRule } from "./rake";
 import { addToStack, moveStack, stackOf, stacksAfterHand, withStack } from "./stacks";
 import { fmtMoney, isBlankUnknown, parseAmount, splitCards, unknownLabel, unknownName } from "./types";
 
@@ -623,4 +624,54 @@ test("cards said are kept apart from cards shown", () => {
   assert.deepEqual(c.input.shown, { "7": "QsQd" });
   assert.deepEqual(c.input.said, { "2": "7c7d" });
   assert.throws(() => checkHand({ ...base, said: { "2": "AhQc" } }, 9), /Ah appears twice/);
+});
+
+/* ------------------------------------------------------------------ rake */
+
+const charron: RakeRule = { percent: 4, step: 0.5, cap: null, preflop: true };
+
+test("Pierre Charron's rake: 4 %, by 0,50 rounded up, 0,50 minimum, no cap", () => {
+  assert.equal(rakeOn(3, charron, false), 0.5, "the minimum, even preflop");
+  assert.equal(rakeOn(12.5, charron, true), 0.5);
+  assert.equal(rakeOn(25, charron, true), 1, "exactly 1,00 stays 1,00");
+  assert.equal(rakeOn(30, charron, true), 1.5, "1,20 goes up to 1,50");
+  assert.equal(rakeOn(615, charron, true), 25, "24,60 goes up to 25");
+  assert.equal(rakeOn(2000, charron, true), 80, "no cap");
+  assert.equal(rakeOn(0, charron, true), 0);
+  assert.equal(rakeOn(0.3, charron, true), 0.3, "never more than the pot");
+  const capped: RakeRule = { percent: 5, step: 0, cap: 3, preflop: false };
+  assert.equal(rakeOn(40, capped, true), 2);
+  assert.equal(rakeOn(100, capped, true), 3);
+  assert.equal(rakeOn(100, capped, false), 0, "no flop, no drop");
+  assert.equal(asRakeRule({ percent: 4, step: 0.5, cap: null, preflop: true })?.percent, 4);
+  assert.equal(asRakeRule(null), null);
+  assert.equal(asRakeRule({ percent: -1, step: 0 }), null);
+});
+
+test("settle takes the rake off the main pot and nets are after it", () => {
+  const r = playHand({ seats: seats([1, 2, 3], { 1: 50, 2: 200, 3: 300 }), button: 3, sb: 1, bb: 2 }, [
+    { seat: 3, kind: "raise", to: 300, all_in: true },
+    { seat: 1, kind: "call" },
+    { seat: 2, kind: "call" },
+  ]);
+  assert.equal(r.ok, true);
+  const out = settle(r.state, [[1], [3]], charron);
+  assert.deepEqual(out.pots.map((p) => p.amount), [150, 300]);
+  assert.equal(out.total, 450);
+  assert.equal(out.rake, 18, "4 % of 450");
+  assert.deepEqual(out.pots.map((p) => p.rake), [18, 0]);
+  assert.equal(out.net.get(1), 150 - 18 - 50);
+  assert.equal(out.net.get(3), 300 - 200);
+
+  // Won preflop: still raked here.
+  const walk = playHand({ seats: seats([1, 2, 3]), button: 1, sb: 1, bb: 2 }, [
+    { seat: 1, kind: "raise", to: 6 },
+    { seat: 2, kind: "fold" },
+    { seat: 3, kind: "fold" },
+  ]);
+  const w = settle(walk.state, [], charron);
+  assert.equal(w.rake, 0.5);
+  assert.equal(w.net.get(1), 3 - 0.5);
+  assert.equal(settle(walk.state, [], { ...charron, preflop: false }).rake, 0);
+  assert.equal(settle(walk.state).rake, 0, "no rule, no rake");
 });

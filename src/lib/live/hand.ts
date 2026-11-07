@@ -17,6 +17,7 @@
 
 import type { ActionKind, HandAction, HandPost, HandSeat, Street } from "./types";
 import { STREETS } from "./types";
+import { rakeOn, type RakeRule } from "./rake";
 
 export type HandSetup = {
   seats: HandSeat[];
@@ -473,7 +474,10 @@ export function positions(seats: number[], button: number): Map<number, string> 
 /* ---------------------------------------------------------------- result */
 
 export type Pot = {
+  /** What went in, before rake. */
   amount: number;
+  /** The part of it the room keeps (0 without a rake rule). */
+  rake: number;
   /** Seats still in the hand that put in enough to win it. */
   eligible: number[];
   /** Who takes it: the winners eligible for it, or its only eligible seat. Empty when unknown. */
@@ -486,7 +490,10 @@ export type Settlement = {
   refund: { seat: number; amount: number } | null;
   /** Net per seat over the hand, for the pots whose winner is known. */
   net: Map<number, number>;
+  /** Every pot together, before rake. */
   total: number;
+  /** What the room keeps from the hand; 0 without a rake rule. */
+  rake: number;
 };
 
 /**
@@ -495,8 +502,11 @@ export type Settlement = {
  * evenly, odd chips not modelled). A pot with a single eligible seat goes to
  * it whatever `winners` says, and so does everything in a hand won without
  * showdown. A pot nobody is named for stays unassigned.
+ *
+ * With a rake rule, the room's share of the whole hand comes off the main pot
+ * first (then the side pots, should it be larger), and the nets are after it.
  */
-export function settle(state: HandState, winners: number[][] = []): Settlement {
+export function settle(state: HandState, winners: number[][] = [], rake: RakeRule | null = null): Settlement {
   // Bets make the pots; dead money (blinds bought back) joins the main pot.
   const contrib = new Map(state.seats.map((s) => [s.seat, r2(s.committed - (s.dead ?? 0))]));
   const deadOf = new Map(state.seats.map((s) => [s.seat, s.dead ?? 0]));
@@ -519,7 +529,7 @@ export function settle(state: HandState, winners: number[][] = []): Settlement {
     let amount = 0;
     for (const c of contrib.values()) amount += Math.max(0, Math.min(c, level) - prev);
     const eligible = live.filter((s) => contrib.get(s)! >= level);
-    if (amount > 0) pots.push({ amount: r2(amount), eligible, takers: [] });
+    if (amount > 0) pots.push({ amount: r2(amount), rake: 0, eligible, takers: [] });
     prev = level;
   }
   // Chips a folded seat put in above every live seat's level join the last pot.
@@ -528,7 +538,16 @@ export function settle(state: HandState, winners: number[][] = []): Settlement {
   if (extra > 0 && pots.length) pots[pots.length - 1].amount = r2(pots[pots.length - 1].amount + extra);
   if (dead > 0) {
     if (pots.length) pots[0].amount = r2(pots[0].amount + dead);
-    else pots.push({ amount: dead, eligible: live, takers: [] });
+    else pots.push({ amount: dead, rake: 0, eligible: live, takers: [] });
+  }
+
+  const total = r2(pots.reduce((t, p) => t + p.amount, 0));
+  const sawFlop = state.street !== "preflop" || state.end?.reason === "showdown";
+  const taken = rake ? rakeOn(total, rake, sawFlop) : 0;
+  let left = taken;
+  for (const p of pots) {
+    p.rake = r2(Math.min(left, p.amount));
+    left = r2(left - p.rake);
   }
 
   pots.forEach((p, i) => {
@@ -539,10 +558,9 @@ export function settle(state: HandState, winners: number[][] = []): Settlement {
   const net = new Map<number, number>();
   for (const [seat, c] of contrib) net.set(seat, -r2(c + (deadOf.get(seat) ?? 0)));
   for (const p of pots) {
-    for (const t of p.takers) net.set(t, r2((net.get(t) ?? 0) + p.amount / p.takers.length));
+    for (const t of p.takers) net.set(t, r2((net.get(t) ?? 0) + (p.amount - p.rake) / p.takers.length));
   }
-  const total = r2(pots.reduce((t, p) => t + p.amount, 0));
-  return { pots, refund, net, total };
+  return { pots, refund, net, total, rake: taken };
 }
 
 /** Whether every pot has a taker. */

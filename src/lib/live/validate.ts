@@ -5,13 +5,17 @@
 
 import { BOARD_SIZE, CARD_RE, LIVE_LIMITS, splitCards, type HandInput } from "./types";
 import { playHand, settle, type PlayResult, type Settlement } from "./hand";
+import type { RakeRule } from "./rake";
 
 export type CheckedHand = { input: HandInput; play: PlayResult; settlement: Settlement };
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
-/** Normalise and check a hand; throws a sentence. */
-export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
+/**
+ * Normalise and check a hand; throws a sentence. With the session's rake rule
+ * the pots are settled net of rake and the input carries what the room took.
+ */
+export function checkHand(raw: HandInput, tableSize: number, rake: RakeRule | null = null): CheckedHand {
   const seats = (raw.seats ?? []).map((s) => ({
     seat: Number(s.seat),
     player_id: s.player_id ?? null,
@@ -94,7 +98,7 @@ export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
   const winners = (raw.winners ?? []).map((w) =>
     [...new Set((w ?? []).map(Number))].filter((s) => seats.some((x) => x.seat === s)),
   );
-  const settlement = settle(play.state, winners);
+  const settlement = settle(play.state, winners, rake);
 
   const heroNet = raw.hero_net == null ? null : r2(Number(raw.hero_net));
   if (heroNet !== null && (!Number.isFinite(heroNet) || Math.abs(heroNet) > LIVE_LIMITS.maxAmount)) {
@@ -121,6 +125,7 @@ export function checkHand(raw: HandInput, tableSize: number): CheckedHand {
       said,
       winners: settlement.pots.map((p) => p.takers),
       hero_net: heroNet,
+      rake: rake ? settlement.rake : null,
       starred: Boolean(raw.starred),
       notes,
     },
