@@ -60,7 +60,10 @@ export function handText(hand: LiveHand, nameOf: (playerId: string | null) => st
   }
   if (!play.ok) lines.push(`(the action stops at action ${play.failedAt! + 1}: ${play.error})`);
 
-  const shown = Object.entries(hand.shown).map(([seat, cards]) => `${who(Number(seat))} shows ${cards}`);
+  const shown = [
+    ...Object.entries(hand.shown).map(([seat, cards]) => `${who(Number(seat))} shows ${cards}`),
+    ...Object.entries(hand.said ?? {}).map(([seat, cards]) => `${who(Number(seat))} says he had ${cards} (not shown)`),
+  ];
   if (shown.length) lines.push(shown.join("; "));
   const out = settle(play.state, hand.winners);
   lines.push(

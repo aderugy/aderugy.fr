@@ -577,3 +577,50 @@ test("after a hand each known stack moves by what the seat won or lost", () => {
   assert.deepEqual(stacksAfterHand(before, handSeats, settle(sd.state)), before);
   assert.deepEqual(stacksAfterHand(before, handSeats, settle(sd.state, [[7]])), { ...before, "2": 298, "7": 203 });
 });
+
+/* ----------------------------------------------------------- showdowns */
+
+import { bestScore, categoryName, compareScores, showdownWinners } from "./eval";
+
+test("the best five of seven cards", () => {
+  const name = (c: string) => categoryName(bestScore(c.match(/../g)!));
+  assert.equal(name("AhKhQhJhTh2c3d"), "Straight flush");
+  assert.equal(name("Ah2c3d4s5h9cKd"), "Straight"); // the wheel
+  assert.equal(name("AhAdAsKcKd2c3d"), "Full house");
+  assert.equal(name("2h5h9hJhKh2c2d"), "Flush");
+  assert.equal(name("AhAdKsKc2d2c7d"), "Two pair");
+  assert.equal(name("AhKd9s7c5d3c2h"), "High card");
+  // A six-high straight beats the wheel; a better kicker wins the pair.
+  assert.ok(compareScores(bestScore("2h3d4s5c6h".match(/../g)!), bestScore("Ah2d3s4c5h".match(/../g)!)) > 0);
+  assert.ok(compareScores(bestScore("AhAdKs7c2d".match(/../g)!), bestScore("AsAcQs7d2c".match(/../g)!)) > 0);
+});
+
+test("pots go to the best hand when the cards are known", () => {
+  // Seat 2 all-in short, 6 and 7 in the side pot.
+  const st = playHand({ seats: seats([2, 6, 7], { 2: 20, 6: 100, 7: 100 }), button: 7, sb: 1, bb: 2 }, [
+    { seat: 7, kind: "raise", to: 100, all_in: true },
+    { seat: 2, kind: "call" },
+    { seat: 6, kind: "call" },
+  ]).state;
+  const pots = settle(st, []).pots;
+  assert.equal(pots.length, 2);
+  const board = ["Kh", "7d", "2c", "9s", "3h"];
+  const cards = new Map([
+    [2, ["Ac", "Kd"]], // pair of kings, ace kicker
+    [6, ["Ks", "Qd"]], // pair of kings, queen kicker
+    [7, ["Jh", "Jd"]], // jacks
+  ]);
+  assert.deepEqual(showdownWinners(pots, board, cards), [[2], [6]]);
+  // A missing card, or no full board: left to pick.
+  assert.deepEqual(showdownWinners(pots, board, new Map([[2, ["Ac", "Kd"]]])), [[], []]);
+  assert.deepEqual(showdownWinners(pots, board.slice(0, 3), cards), [[], []]);
+  // A chop.
+  assert.deepEqual(showdownWinners(pots.slice(0, 1), ["Ah", "Kh", "Qh", "Jh", "Th"], cards), [[2, 6, 7]]);
+});
+
+test("cards said are kept apart from cards shown", () => {
+  const c = checkHand({ ...base, shown: { "7": "QsQd" }, said: { "7": "2c2d", "2": "7c7d" } }, 9);
+  assert.deepEqual(c.input.shown, { "7": "QsQd" });
+  assert.deepEqual(c.input.said, { "2": "7c7d" });
+  assert.throws(() => checkHand({ ...base, said: { "2": "AhQc" } }, 9), /Ah appears twice/);
+});

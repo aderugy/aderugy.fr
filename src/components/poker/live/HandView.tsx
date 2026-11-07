@@ -89,7 +89,8 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
     const st = state.seats.find((x) => x.seat === s.seat)!;
     const nm = names.get(s.seat);
     const isHero = s.seat === hand.hero_seat;
-    const shownCards = atEnd ? hand.shown[String(s.seat)] : null;
+    const saidCards = atEnd ? (hand.said?.[String(s.seat)] ?? null) : null;
+    const shownCards = atEnd ? (hand.shown[String(s.seat)] ?? saidCards) : null;
     const left = behind(st);
     return {
       seat: s.seat,
@@ -100,6 +101,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
       bet: st.street,
       out: st.folded,
       cards: isHero ? hand.hero_cards : shownCards,
+      said: !isHero && Boolean(saidCards) && !hand.shown[String(s.seat)],
       hidden: !isHero && !shownCards && !st.folded,
       sub:
         last && last.action.seat === s.seat
@@ -213,6 +215,10 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
               .join(" · ")}
             {Object.keys(hand.shown).length > 0 &&
               ` · shown: ${Object.entries(hand.shown)
+                .map(([s, c]) => `${label(Number(s))} ${c}`)
+                .join(", ")}`}
+            {Object.keys(hand.said ?? {}).length > 0 &&
+              ` · said: ${Object.entries(hand.said)
                 .map(([s, c]) => `${label(Number(s))} ${c}`)
                 .join(", ")}`}
           </p>
