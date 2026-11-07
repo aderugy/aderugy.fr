@@ -30,6 +30,7 @@ import {
   type Street,
 } from "@/lib/live/types";
 import { computedHeroNet } from "@/lib/live/validate";
+import type { RakeRule } from "@/lib/live/rake";
 
 /** Who sits in a seat, for the editor; `known: false` for an unknown player. */
 export type SeatName = { playerId: string | null; name: string | null; colors?: string[]; known?: boolean };
@@ -83,6 +84,7 @@ export function HandEditor({
   heroSeat,
   names,
   initial,
+  rake,
   onSave,
   onClose,
 }: {
@@ -92,6 +94,8 @@ export function HandEditor({
   heroSeat: number;
   names: Map<number, SeatName>;
   initial: HandInput;
+  /** The session's rake rule: nets are after rake when there is one. */
+  rake: RakeRule | null;
   onSave: (input: HandInput) => Promise<{ ok: boolean; error?: string }>;
   onClose: () => void;
 }) {
@@ -168,7 +172,7 @@ export function HandEditor({
   const bare = state ? settle(state, []) : null;
   const autoWinners = bare && atShowdown ? showdownWinners(bare.pots, board, cardsBySeat) : [];
   const winners = manualWinners ?? autoWinners;
-  const settlement = state ? settle(state, winners) : null;
+  const settlement = state ? settle(state, winners, rake) : null;
   const autoNet = settlement && hero !== null ? computedHeroNet({ settlement }, hero) : null;
   const typedNet = netOverride.trim() ? parseAmount(netOverride) : null;
   const net = typedNet !== null && !Number.isNaN(typedNet) ? typedNet : autoNet;
@@ -518,7 +522,7 @@ export function HandEditor({
           </div>
           {hero !== null && (
             <Amount
-              label={`Your net (${currency}, before rake)`}
+              label={`Your net (${currency}, ${rake ? "after rake" : "before rake"})`}
               value={netOverride}
               onChange={setNetOverride}
               placeholder={autoNet !== null ? `${fmtChips(autoNet)} — from the pots` : "?"}
@@ -833,7 +837,8 @@ function ResultBar({
     <div className="space-y-2">
       <div className="flex h-6 items-center gap-2 text-sm">
         <span className="min-w-0 flex-1 truncate font-medium">
-          {end.reason === "fold" ? `${label(end.winner)} wins ${fmtChips(settlement.total)}` : end.runout ? "All-in — who wins?" : "Showdown"}
+          {end.reason === "fold" ? `${label(end.winner)} wins ${fmtChips(settlement.total - settlement.rake)}` : end.runout ? "All-in — who wins?" : "Showdown"}
+          {settlement.rake > 0 && <span className="font-normal text-muted"> · rake {fmtChips(settlement.rake)}</span>}
         </span>
         <UndoButton onClick={onUndo} />
       </div>

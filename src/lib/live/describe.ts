@@ -69,9 +69,11 @@ export function handText(hand: LiveHand, nameOf: (playerId: string | null) => st
   lines.push(
     out.pots
       .map((p, i) => `${i === 0 ? "Pot" : `Side pot ${i}`} ${fmtChips(p.amount)} → ${p.takers.length ? p.takers.map(who).join(" and ") : "not recorded"}`)
-      .join("; "),
+      .join("; ") + (hand.rake != null ? ` · rake ${fmtChips(hand.rake)} ${currency}` : ""),
   );
-  if (hand.hero_net != null) lines.push(`Arthur's net: ${hand.hero_net > 0 ? "+" : ""}${fmtChips(hand.hero_net)} ${currency} (before rake)`);
+  if (hand.hero_net != null) {
+    lines.push(`Arthur's net: ${hand.hero_net > 0 ? "+" : ""}${fmtChips(hand.hero_net)} ${currency} (${hand.rake != null ? "after rake" : "before rake"})`);
+  }
   if (hand.notes) lines.push(`Notes: ${hand.notes}`);
   return [...head, ...lines].join("\n");
 }

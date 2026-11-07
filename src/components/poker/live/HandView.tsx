@@ -213,6 +213,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
                   `${k === 0 ? "Pot" : `Side pot ${k}`} ${fmtChips(p.amount)} → ${p.takers.length ? p.takers.map(label).join(" & ") : "?"}`,
               )
               .join(" · ")}
+            {hand.rake != null && ` · rake ${fmtChips(hand.rake)}`}
             {Object.keys(hand.shown).length > 0 &&
               ` · shown: ${Object.entries(hand.shown)
                 .map(([s, c]) => `${label(Number(s))} ${c}`)
@@ -281,6 +282,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
           heroSeat={hand.hero_seat ?? session.hero_seat}
           names={names}
           initial={{ ...hand }}
+          rake={session.rake}
           onSave={(input) => updateHand(hand.id, input)}
           onClose={() => setEditing(false)}
         />

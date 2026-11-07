@@ -21,6 +21,7 @@ import { buttonFor, checkSeatEvent, dealtIn, heroSeatAt, nextButton, seatedToget
 import { breaksOf } from "@/lib/live/session";
 import { addToStack, moveStack, stacksAfterHand, withStack, type Stacks } from "@/lib/live/stacks";
 import { checkHand } from "@/lib/live/validate";
+import { asRakeRule, type RakeRule } from "@/lib/live/rake";
 
 /**
  * /poker/live persistence shared by the pages' server actions and the Claude
@@ -34,14 +35,14 @@ import { checkHand } from "@/lib/live/validate";
  */
 
 const SESSION_COLUMNS =
-  "id, venue, game, small_blind, big_blind, currency, seats, hero_seat, button_seat, stacks, started_at, ended_at, cash_out, notes, created_at, updated_at";
+  "id, venue, game, small_blind, big_blind, currency, seats, hero_seat, button_seat, stacks, started_at, ended_at, cash_out, notes, rake, created_at, updated_at";
 const EVENT_COLUMNS = "id, session_id, kind, amount, at";
 const SEAT_EVENT_COLUMNS = "id, session_id, seat, kind, player_id, at, created_at";
 const PLAYER_COLUMNS = "id, name, description, known, created_at, updated_at";
 const TAG_COLUMNS = "id, name, color, position";
 const NOTE_COLUMNS = "id, player_id, session_id, hand_id, body, source, created_at, updated_at";
 const HAND_COLUMNS =
-  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, posts, seats, actions, hero_cards, board, shown, said, winners, hero_net, starred, notes, created_at, updated_at";
+  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, posts, seats, actions, hero_cards, board, shown, said, winners, hero_net, rake, starred, notes, created_at, updated_at";
 
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -96,6 +97,7 @@ function asSession(row: Record<string, unknown>): LiveSession {
     small_blind: num(row.small_blind),
     big_blind: num(row.big_blind),
     cash_out: numOrNull(row.cash_out),
+    rake: asRakeRule(row.rake),
     stacks: Object.fromEntries(
       Object.entries((row.stacks as Record<string, unknown> | null) ?? {})
         .map(([k, v]) => [k, Number(v)] as const)
@@ -121,6 +123,7 @@ function asHand(row: Record<string, unknown>): LiveHand {
     big_blind: num(row.big_blind),
     straddle: numOrNull(row.straddle),
     hero_net: numOrNull(row.hero_net),
+    rake: numOrNull(row.rake),
     seats: (h.seats ?? []).map((s) => ({ seat: num(s.seat), player_id: s.player_id ?? null, stack: numOrNull(s.stack) })),
     posts: ((h.posts ?? []) as HandPost[]).map((p) => ({ seat: num(p.seat), live: num(p.live ?? 0), dead: num(p.dead ?? 0) })),
     board: h.board ?? [],
@@ -197,6 +200,21 @@ export async function recentVenues(db: SupabaseClient, userId: string): Promise<
     }
   }
   return out;
+}
+
+/** The rake rule of the most recent session at this venue (case and spaces ignored), if any. */
+async function lastRakeAt(db: SupabaseClient, userId: string, venue: string): Promise<RakeRule | null> {
+  const { data, error } = await db
+    .from("live_sessions")
+    .select("venue, rake")
+    .eq("user_id", userId)
+    .not("rake", "is", null)
+    .order("started_at", { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  const key = venue.trim().toLowerCase();
+  const row = (data ?? []).find((r) => String(r.venue).trim().toLowerCase() === key);
+  return row ? asRakeRule(row.rake) : null;
 }
 
 export type NewSession = {
@@ -276,9 +294,11 @@ export async function startSession(db: SupabaseClient, userId: string, input: Ne
   if (!startedAt) return { ok: false, error: "The start time is not a valid time." };
   if (Date.parse(startedAt) > Date.now() + 5 * 60_000) return { ok: false, error: "A session cannot start in the future." };
 
+  // The room's rake carries over from the last session at the same venue.
+  const rake = await lastRakeAt(db, userId, fields.venue as string);
   const { data, error } = await db
     .from("live_sessions")
-    .insert({ user_id: userId, ...fields, seats, hero_seat: hero, started_at: startedAt, stacks: { [String(hero)]: buyIn } })
+    .insert({ user_id: userId, ...fields, seats, hero_seat: hero, started_at: startedAt, stacks: { [String(hero)]: buyIn }, rake })
     .select(SESSION_COLUMNS)
     .single();
   if (error) {
@@ -1187,6 +1207,7 @@ function handRow(input: HandInput) {
     said: input.said ?? {},
     winners: input.winners,
     hero_net: input.hero_net,
+    rake: input.rake ?? null,
     starred: input.starred,
     notes: input.notes,
   };
@@ -1203,7 +1224,7 @@ export async function createHand(
   let input: HandInput;
   let checked: ReturnType<typeof checkHand>;
   try {
-    checked = checkHand(raw, session.seats);
+    checked = checkHand(raw, session.seats, session.rake);
     input = checked.input;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -1237,7 +1258,7 @@ export async function updateHand(db: SupabaseClient, userId: string, id: string,
   if (!session) return { ok: false, error: "No such session." };
   let input: HandInput;
   try {
-    input = checkHand(raw, session.seats).input;
+    input = checkHand(raw, session.seats, session.rake).input;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

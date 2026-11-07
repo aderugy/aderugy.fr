@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { McpServer, CallToolResult } from "@modelcontextprotocol/server";
 import { fmtDateTime } from "@/lib/jobs/format";
 import { handText } from "@/lib/live/describe";
+import { describeRake } from "@/lib/live/rake";
 import { breaksOf, fmtDuration, summarize } from "@/lib/live/session";
 import { describeMove, describeSeatEvent, readableSeatLog } from "@/lib/live/table";
 import { LIVE_LIMITS, fmtMoney, fmtStakes, isBlankUnknown, type LiveTag, type PlayerSummary } from "@/lib/live/types";
@@ -40,7 +41,7 @@ How the data works:
 - Players are a database reused across sessions: a name or nickname, a description (how to recognise them), tags (Arthur's, e.g. fish, reg, nit) and timestamped notes. A note may point at the session or hand it was taken in.
 - Someone not identified yet is an unknown player ("Unknown 4", marked unknown): a player like any other — tags, description, notes — kept apart from the known ones until Arthur names them or merges them into who they turn out to be. New sessions seat one in every seat. Many share a name, so refer to them by id.
 - Hands may carry blinds bought back: a player returning after missing the blinds posts the big blind live and sometimes the small blind dead.
-- Hands are entered action by action. Amounts are chips in the session's currency; "raises to 15" is the total on that street. Arthur's net per hand is before rake.
+- Hands are entered action by action. Amounts are chips in the session's currency; "raises to 15" is the total on that street. Arthur's net per hand is after rake when the session has a rake rule (the hand then states the rake taken), before rake otherwise; the session result (cash-out − buy-ins) is always the real one.
 
 What you may do: read everything; add notes on players (add_player_note), edit or delete the notes you wrote (never Arthur's); tag and untag players with existing tags (tag_player). You cannot create sessions, players or tags, change the table, or edit hands.
 
@@ -134,6 +135,7 @@ export function registerLiveTools(server: McpServer) {
         `${fmtDateTime(s.started_at)} → ${s.ended_at ? fmtDateTime(s.ended_at) : "still running"} · played ${fmtDuration(sum.playedMs)}`,
         `Money: ${money.join(", ")}${s.ended_at ? ` · cash-out ${fmtMoney(s.cash_out ?? 0, s.currency)} · result ${sum.net! >= 0 ? "+" : ""}${fmtMoney(sum.net!, s.currency)}${sum.hourly !== null ? ` (${fmtMoney(Math.round(sum.hourly), s.currency)}/h)` : ""}` : ""}`,
         breaks.length ? `Breaks: ${breaks.join(", ")}` : "",
+        `Rake: ${s.rake ? describeRake(s.rake, s.currency) : "not set — hand nets are before rake"}`,
         !s.ended_at && Object.keys(s.stacks).length
           ? `Stacks now: ${Object.entries(s.stacks)
               .sort(([a], [b]) => Number(a) - Number(b))

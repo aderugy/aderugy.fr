@@ -8,15 +8,30 @@ hands entered action by action, then replayed.
 
 | Table | What it holds |
 |---|---|
-| `live_sessions` | Venue, game, blinds, currency, 9 or 10 seats, Arthur's current seat, where the button is for the next hand, each seat's stack now (`stacks`), start/end, cash-out, notes. **At most one running** per user (partial unique index). An ended session must have a cash-out. |
+| `live_sessions` | Venue, game, blinds, currency, 9 or 10 seats, Arthur's current seat, where the button is for the next hand, each seat's stack now (`stacks`), start/end, cash-out, notes, the room's rake rule (`rake`, see below). **At most one running** per user (partial unique index). An ended session must have a cash-out. |
 | `live_session_events` | `buy_in`, `rebuy` (with an amount), `break_start`, `break_end`. |
 | `live_seat_events` | The table's log: `sit`, `sit_out`, `back`, `leave`, `hero_move`. `player_id` null = nobody on file (sessions from before unknown players). A seat must exist at the session's table (trigger). |
 | `live_players` | Name or nickname, description (how to recognise them), `known` (false for an unknown player). |
 | `live_tags` / `live_player_tags` | Arthur's flat tag list (fish, reg, nit…), several per player. |
 | `live_player_notes` | Timestamped notes on a player, optionally tied to the session and hand they were taken in. `source` (`app` / `claude`) is set by trigger from the token. |
-| `live_hands` | Seats dealt in (with optional stacks), button, blinds, straddle, blinds bought back (`posts`), the action list, Arthur's cards, board, shown cards, who took each pot, Arthur's net (before rake), star, notes. Numbered within the session by trigger. |
+| `live_hands` | Seats dealt in (with optional stacks), button, blinds, straddle, blinds bought back (`posts`), the action list, Arthur's cards, board, shown cards, who took each pot, Arthur's net, the rake the room took (`rake`, null without a rule), star, notes. Numbered within the session by trigger. |
 
 Amounts are chips in the session's currency; big blinds are computed for display.
+
+## Rake
+
+A session carries the room's rake rule (`src/lib/live/rake.ts`): `percent` of
+the pot, rounded up to the next `step` and at least one step, capped at `cap`
+when the room caps, preflop pots raked or not. Pierre Charron is 4 %, 0,50 €
+steps, no cap, preflop raked (set by `0032_live_rake.sql`). A new session copies
+the rule of the last session at the same venue, so a room's rake is entered
+once; it is per session so a change of rake never rewrites old hands.
+
+`settle()` takes the rake on the whole hand off the main pot first; nets and
+stacks are after it. A hand stores the rake taken; when that is set its
+`hero_net` is after rake, when null (no rule, or a hand saved before 0032) it
+is before rake. The session result (cash-out − buy-ins) is the real one either
+way.
 
 ## Unknown players
 
@@ -50,7 +65,8 @@ straight in), Arthur's included; it shows under each name on the table. Arthur
 starts with his buy-in and each rebuy is added. A change of seat carries the
 stack; a seat that empties or gets someone new is cleared. A new hand starts
 from these stacks (editable in its setup), and saving a hand moves each known
-stack by what the seat won or lost — once every pot has a taker, before rake.
+stack by what the seat won or lost — once every pot has a taker, after rake when
+the session has a rule.
 
 ## The table is a log
 

@@ -5,6 +5,8 @@
  * money and time in ./session.ts.
  */
 
+import type { RakeRule } from "./rake";
+
 export const LIVE_LIMITS = {
   maxVenue: 120,
   maxGame: 40,
@@ -37,6 +39,8 @@ export type LiveSession = {
   ended_at: string | null;
   cash_out: number | null;
   notes: string | null;
+  /** The room's rake for this session (see rake.ts); null when not set. */
+  rake: RakeRule | null;
   created_at: string;
   updated_at: string;
 };
@@ -175,7 +179,10 @@ export type LiveHand = {
   said: Record<string, string>;
   /** Who took each pot, main pot first. */
   winners: number[][];
+  /** Arthur's net on the hand: after rake when `rake` is set, before it otherwise. */
   hero_net: number | null;
+  /** What the room took from the hand, or null when the session had no rake rule. */
+  rake: number | null;
   starred: boolean;
   notes: string | null;
   created_at: string;
@@ -201,6 +208,8 @@ export type HandInput = {
   said?: Record<string, string>;
   winners: number[][];
   hero_net: number | null;
+  /** Set by the server from the session's rule; whatever a caller sends is ignored. */
+  rake?: number | null;
   starred: boolean;
   notes: string | null;
 };
