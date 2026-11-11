@@ -5,6 +5,7 @@
  * money and time in ./session.ts.
  */
 
+import type { AllIn } from "./allin";
 import type { RakeRule } from "./rake";
 
 export const LIVE_LIMITS = {
@@ -17,6 +18,7 @@ export const LIVE_LIMITS = {
   maxSessionNotes: 20000,
   maxHandNotes: 10000,
   maxAmount: 1_000_000,
+  maxExpenseLabel: 80,
 } as const;
 
 export const TABLE_SIZES = [9, 10] as const;
@@ -45,7 +47,8 @@ export type LiveSession = {
   updated_at: string;
 };
 
-export const SESSION_EVENT_KINDS = ["buy_in", "rebuy", "break_start", "break_end"] as const;
+/** `expense`: food and drinks bought at the table — not poker money, kept apart from the result. */
+export const SESSION_EVENT_KINDS = ["buy_in", "rebuy", "break_start", "break_end", "expense"] as const;
 export type SessionEventKind = (typeof SESSION_EVENT_KINDS)[number];
 
 export type SessionEvent = {
@@ -53,6 +56,8 @@ export type SessionEvent = {
   session_id: string;
   kind: SessionEventKind;
   amount: number | null;
+  /** What an expense was for ("rice"); null otherwise. */
+  label: string | null;
   at: string;
 };
 
@@ -183,6 +188,8 @@ export type LiveHand = {
   hero_net: number | null;
   /** What the room took from the hand, or null when the session had no rake rule. */
   rake: number | null;
+  /** What the hand was worth when the money went in, when it counts (see allin.ts). */
+  allin: AllIn | null;
   starred: boolean;
   notes: string | null;
   created_at: string;

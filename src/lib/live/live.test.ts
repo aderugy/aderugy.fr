@@ -266,6 +266,7 @@ const sev = (kind: SessionEvent["kind"], at: string, amount: number | null = nul
   session_id: "s",
   kind,
   amount,
+  label: null,
   at,
 });
 
@@ -674,4 +675,14 @@ test("settle takes the rake off the main pot and nets are after it", () => {
   assert.equal(w.net.get(1), 3 - 0.5);
   assert.equal(settle(walk.state, [], { ...charron, preflop: false }).rake, 0);
   assert.equal(settle(walk.state).rake, 0, "no rule, no rake");
+});
+
+test("summarize: food and drinks are counted apart, not in the result", () => {
+  const s = summarize(
+    { started_at: "2026-11-07T18:00:00Z", ended_at: "2026-11-07T22:00:00Z", cash_out: 700, big_blind: 2 },
+    [sev("buy_in", "2026-11-07T18:00:00Z", 500), { ...sev("expense", "2026-11-07T20:00:00Z", 7), label: "Riz" }, sev("expense", "2026-11-07T21:00:00Z", 3.5)],
+  );
+  assert.equal(s.invested, 500);
+  assert.equal(s.expenses, 10.5);
+  assert.equal(s.net, 200);
 });

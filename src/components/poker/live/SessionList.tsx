@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ResultChart } from "./ResultChart";
 import { Field, INPUT, NetText, fmtClock, fmtDay, fromLocalInput, toLocalInput, useNow } from "./ui";
 import { ErrorLine } from "@/components/jobs/bits";
 import { fmtDuration, summarize, totals } from "@/lib/live/session";
@@ -16,6 +17,12 @@ export function SessionList({ sessions, venues }: { sessions: SessionRow[]; venu
   const done = sessions.filter((s) => s.ended_at);
   const sums = done.map((s) => summarize(s, s.events, now));
   const t = totals(sums);
+  const luck = Math.round(done.reduce((x, s) => x + s.allin_luck, 0) * 100) / 100;
+  const allins = done.reduce((x, s) => x + s.allin_hands, 0);
+  // Oldest first, for the curve.
+  const points = done
+    .map((s, i) => ({ id: s.id, at: s.started_at, net: sums[i].net ?? 0, ev: Math.round(((sums[i].net ?? 0) - s.allin_luck) * 100) / 100 }))
+    .reverse();
   const currency = done[0]?.currency ?? "€";
   const [open, setOpen] = useState(!running && sessions.length === 0);
 
@@ -33,11 +40,15 @@ export function SessionList({ sessions, venues }: { sessions: SessionRow[]; venu
 
       {done.length > 0 && (
         <section className="mt-6">
-          <div className="grid grid-cols-4 gap-2 rounded-xl border border-line bg-surface p-3 text-center">
+          <div className="grid grid-cols-5 gap-1.5 rounded-xl border border-line bg-surface p-3 text-center">
             <Stat label="Sessions" value={String(t.sessions)} />
-            <Stat label="Result" value={<NetText value={t.net} currency={currency} />} />
+            <Stat label="Result" value={<NetText value={t.net} currency={currency} whole />} />
+            <Stat label="EV adj." value={<NetText value={Math.round((t.net - luck) * 100) / 100} currency={currency} whole />} sub={`${allins} all-in${allins === 1 ? "" : "s"}`} />
             <Stat label="Played" value={fmtDuration(t.playedMs)} />
             <Stat label="Per hour" value={<NetText value={t.hourly} currency={currency} whole />} />
+          </div>
+          <div className="mt-3">
+            <ResultChart points={points} currency={currency} />
           </div>
           <ul className="mt-3 divide-y divide-line rounded-xl border border-line bg-surface">
             {done.map((s, i) => {
@@ -54,6 +65,9 @@ export function SessionList({ sessions, venues }: { sessions: SessionRow[]; venu
                     </span>
                     <span className="shrink-0 text-right text-sm">
                       <NetText value={sum.net} currency={s.currency} />
+                      {s.allin_hands > 0 && sum.net !== null && (
+                        <span className="block text-[11px] text-muted tabular-nums">EV adj. {fmtMoney(Math.round((sum.net - s.allin_luck) * 100) / 100, s.currency, true)}</span>
+                      )}
                       {sum.bbPerHour !== null && <span className="block text-[11px] text-muted tabular-nums">{Math.round(sum.bbPerHour * 10) / 10} bb/h</span>}
                     </span>
                   </Link>
@@ -67,11 +81,12 @@ export function SessionList({ sessions, venues }: { sessions: SessionRow[]; venu
   );
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
   return (
-    <div>
-      <div className="text-[10px] tracking-wide text-muted uppercase">{label}</div>
+    <div className="min-w-0">
+      <div className="truncate text-[10px] tracking-wide text-muted uppercase">{label}</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums">{value}</div>
+      {sub && <div className="text-[10px] text-muted">{sub}</div>}
     </div>
   );
 }

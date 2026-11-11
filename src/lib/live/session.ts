@@ -12,6 +12,8 @@ export type Break = { start: string; end: string | null };
 
 export type SessionSummary = {
   invested: number;
+  /** Food and drinks: not in `net`, which stays the poker result. */
+  expenses: number;
   buyIns: number;
   rebuys: number;
   breaks: Break[];
@@ -50,7 +52,9 @@ export function summarize(
   let invested = 0;
   let buyIns = 0;
   let rebuys = 0;
+  let expenses = 0;
   for (const e of events) {
+    if (e.kind === "expense") expenses += Number(e.amount ?? 0);
     if (e.kind === "buy_in" || e.kind === "rebuy") invested += Number(e.amount ?? 0);
     if (e.kind === "buy_in") buyIns++;
     if (e.kind === "rebuy") rebuys++;
@@ -72,6 +76,7 @@ export function summarize(
   const bb = Number(session.big_blind);
   return {
     invested: r2(invested),
+    expenses: r2(expenses),
     buyIns,
     rebuys,
     breaks,

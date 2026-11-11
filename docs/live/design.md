@@ -9,12 +9,12 @@ hands entered action by action, then replayed.
 | Table | What it holds |
 |---|---|
 | `live_sessions` | Venue, game, blinds, currency, 9 or 10 seats, Arthur's current seat, where the button is for the next hand, each seat's stack now (`stacks`), start/end, cash-out, notes, the room's rake rule (`rake`, see below). **At most one running** per user (partial unique index). An ended session must have a cash-out. |
-| `live_session_events` | `buy_in`, `rebuy` (with an amount), `break_start`, `break_end`. |
+| `live_session_events` | `buy_in`, `rebuy` (with an amount), `break_start`, `break_end`, `expense` (food and drinks: an amount and a `label`, `0033`). |
 | `live_seat_events` | The table's log: `sit`, `sit_out`, `back`, `leave`, `hero_move`. `player_id` null = nobody on file (sessions from before unknown players). A seat must exist at the session's table (trigger). |
 | `live_players` | Name or nickname, description (how to recognise them), `known` (false for an unknown player). |
 | `live_tags` / `live_player_tags` | Arthur's flat tag list (fish, reg, nit…), several per player. |
 | `live_player_notes` | Timestamped notes on a player, optionally tied to the session and hand they were taken in. `source` (`app` / `claude`) is set by trigger from the token. |
-| `live_hands` | Seats dealt in (with optional stacks), button, blinds, straddle, blinds bought back (`posts`), the action list, Arthur's cards, board, shown cards, who took each pot, Arthur's net, the rake the room took (`rake`, null without a rule), star, notes. Numbered within the session by trigger. |
+| `live_hands` | Seats dealt in (with optional stacks), button, blinds, straddle, blinds bought back (`posts`), the action list, Arthur's cards, board, shown cards, who took each pot, Arthur's net, the rake the room took (`rake`, null without a rule), the all-in EV (`allin`, see below), star, notes. Numbered within the session by trigger. |
 
 Amounts are chips in the session's currency; big blinds are computed for display.
 
@@ -32,6 +32,40 @@ stacks are after it. A hand stores the rake taken; when that is set its
 `hero_net` is after rake, when null (no rule, or a hand saved before 0032) it
 is before rake. The session result (cash-out − buy-ins) is the real one either
 way.
+
+## All-in EV
+
+`src/lib/live/allin.ts`, computed by the server when a hand is saved and kept
+in `live_hands.allin`. A hand counts when betting stopped with someone all-in
+before the river (`end.runout`), Arthur was still in and every other seat
+still in showed its cards. Over every runout of the rest of the board (exact
+enumeration — a preflop all-in heads-up is C(48,5) = 1 712 304 boards, under a
+second):
+
+    equity_p = Arthur's average share of pot p (1/k on a k-way tie)
+    EV       = Σ_p equity_p × (amount_p − rake_p) − what Arthur put in
+    luck     = net − EV
+
+The rake depends only on the total pot, fixed once everyone is all-in, so it is
+the same on every runout and comes off the main pot first, as `settle()` takes
+it. The uncalled part of a bet goes back and is in no pot. Cards known to be out
+— Arthur's, the board so far, every card shown, folded hands included — are not
+dealt. A session's **all-in EV adjusted result** is its real result minus the
+luck of its hands; the sessions page plots both, cumulated.
+
+## Pot odds (hand review)
+
+Under the pot, for the seat facing a bet at the current step
+(`src/lib/live/odds.ts`): to call, pot after the call, the rake on that pot,
+`need = to call ÷ (pot after − rake)` and `(pot after − rake − to call) : to
+call`. No money after the call is assumed. Amounts are in the session's
+currency; tapping the pot switches the review to big blinds.
+
+## Food and drinks
+
+`expense` events, added from the session screen or the review. Not poker
+money: the result stays cash-out − buy-ins; the review shows the result after
+them.
 
 ## Unknown players
 

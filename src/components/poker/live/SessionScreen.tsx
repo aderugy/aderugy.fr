@@ -8,7 +8,7 @@ import { FeltCenter, LiveTable, type SeatView } from "./LiveTable";
 import { PlayerNotes } from "./PlayerNotes";
 import { PlayerPicker } from "./PlayerPicker";
 import { BarButton, INPUT, NetText, Sheet, TagToggles, fmtClock, fromLocalInput, toLocalInput, useNow } from "./ui";
-import { HandRow, Timeline } from "./SessionParts";
+import { Expenses, HandRow, Timeline } from "./SessionParts";
 import { useAction } from "@/components/jobs/controls";
 import { ErrorLine } from "@/components/jobs/bits";
 import { DEFAULT_COLOR } from "@/lib/categories";
@@ -151,6 +151,7 @@ export function SessionScreen({ data }: { data: SessionBundle }) {
               </ul>
             )}
           </section>
+          <Expenses session={session} events={events} net={null} />
           <Timeline
             session={session}
             events={events}

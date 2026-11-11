@@ -22,6 +22,7 @@ import { breaksOf } from "@/lib/live/session";
 import { addToStack, moveStack, stacksAfterHand, withStack, type Stacks } from "@/lib/live/stacks";
 import { checkHand } from "@/lib/live/validate";
 import { asRakeRule, type RakeRule } from "@/lib/live/rake";
+import { allInLuck, allInOf, asAllIn, type AllIn } from "@/lib/live/allin";
 
 /**
  * /poker/live persistence shared by the pages' server actions and the Claude
@@ -36,13 +37,13 @@ import { asRakeRule, type RakeRule } from "@/lib/live/rake";
 
 const SESSION_COLUMNS =
   "id, venue, game, small_blind, big_blind, currency, seats, hero_seat, button_seat, stacks, started_at, ended_at, cash_out, notes, rake, created_at, updated_at";
-const EVENT_COLUMNS = "id, session_id, kind, amount, at";
+const EVENT_COLUMNS = "id, session_id, kind, amount, label, at";
 const SEAT_EVENT_COLUMNS = "id, session_id, seat, kind, player_id, at, created_at";
 const PLAYER_COLUMNS = "id, name, description, known, created_at, updated_at";
 const TAG_COLUMNS = "id, name, color, position";
 const NOTE_COLUMNS = "id, player_id, session_id, hand_id, body, source, created_at, updated_at";
 const HAND_COLUMNS =
-  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, posts, seats, actions, hero_cards, board, shown, said, winners, hero_net, rake, starred, notes, created_at, updated_at";
+  "id, session_id, number, played_at, button_seat, hero_seat, small_blind, big_blind, straddle, posts, seats, actions, hero_cards, board, shown, said, winners, hero_net, rake, allin, starred, notes, created_at, updated_at";
 
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -112,7 +113,7 @@ async function saveStacks(db: SupabaseClient, userId: string, sessionId: string,
 }
 
 function asEvent(row: Record<string, unknown>): SessionEvent {
-  return { ...(row as unknown as SessionEvent), amount: numOrNull(row.amount) };
+  return { ...(row as unknown as SessionEvent), amount: numOrNull(row.amount), label: (row.label as string | null) ?? null };
 }
 
 function asHand(row: Record<string, unknown>): LiveHand {
@@ -124,6 +125,7 @@ function asHand(row: Record<string, unknown>): LiveHand {
     straddle: numOrNull(row.straddle),
     hero_net: numOrNull(row.hero_net),
     rake: numOrNull(row.rake),
+    allin: asAllIn(row.allin),
     seats: (h.seats ?? []).map((s) => ({ seat: num(s.seat), player_id: s.player_id ?? null, stack: numOrNull(s.stack) })),
     posts: ((h.posts ?? []) as HandPost[]).map((p) => ({ seat: num(p.seat), live: num(p.live ?? 0), dead: num(p.dead ?? 0) })),
     board: h.board ?? [],
@@ -136,12 +138,18 @@ function asHand(row: Record<string, unknown>): LiveHand {
 
 /* -------------------------------------------------------------- sessions */
 
-export type SessionRow = LiveSession & { events: SessionEvent[]; hand_count: number };
+export type SessionRow = LiveSession & {
+  events: SessionEvent[];
+  hand_count: number;
+  /** Hands with an all-in EV, and Σ (net − EV) over them: the result minus it is the all-in EV adjusted result. */
+  allin_hands: number;
+  allin_luck: number;
+};
 
 export async function listSessions(db: SupabaseClient, userId: string, limit = 200): Promise<SessionRow[]> {
   const { data, error } = await db
     .from("live_sessions")
-    .select(`${SESSION_COLUMNS}, live_session_events(${EVENT_COLUMNS}), live_hands(count)`)
+    .select(`${SESSION_COLUMNS}, live_session_events(${EVENT_COLUMNS}), live_hands(hero_net, allin)`)
     .eq("user_id", userId)
     .order("started_at", { ascending: false })
     .limit(limit);
@@ -149,12 +157,16 @@ export async function listSessions(db: SupabaseClient, userId: string, limit = 2
   return (data ?? []).map((row) => {
     const { live_session_events, live_hands, ...rest } = row as Record<string, unknown> & {
       live_session_events: Record<string, unknown>[];
-      live_hands: { count: number }[];
+      live_hands: { hero_net: unknown; allin: unknown }[];
     };
+    const hands = (live_hands ?? []).map((h) => ({ hero_net: numOrNull(h.hero_net), allin: asAllIn(h.allin) }));
+    const luck = allInLuck(hands);
     return {
       ...asSession(rest),
       events: (live_session_events ?? []).map(asEvent),
-      hand_count: live_hands?.[0]?.count ?? 0,
+      hand_count: hands.length,
+      allin_hands: luck.hands,
+      allin_luck: luck.luck,
     };
   });
 }
@@ -484,6 +496,29 @@ export async function addMoney(
   return { ok: true };
 }
 
+/** Food or drinks bought at the table: kept apart from the poker result. */
+export async function addExpense(
+  db: SupabaseClient,
+  userId: string,
+  sessionId: string,
+  input: { label: string | null; amount: number | string; at?: string | null },
+): Promise<Result> {
+  const value = amount(input.amount, "The amount");
+  if (typeof value === "string") return { ok: false, error: value };
+  const label = cleanText(input.label);
+  if (label && label.length > LIVE_LIMITS.maxExpenseLabel) return { ok: false, error: `What it was: at most ${LIVE_LIMITS.maxExpenseLabel} characters.` };
+  const session = await getSession(db, userId, sessionId);
+  if (!session) return { ok: false, error: "No such session." };
+  // Default time: now while playing; afterwards, the end of the session.
+  const at = input.at ? isoOrNow(input.at) : session.ended_at ?? new Date().toISOString();
+  if (!at) return { ok: false, error: "Not a valid time." };
+  const { error } = await db
+    .from("live_session_events")
+    .insert({ user_id: userId, session_id: sessionId, kind: "expense", amount: value, label, at });
+  if (error) throw error;
+  return { ok: true };
+}
+
 /** Start a break, or end the one running. */
 export async function toggleBreak(db: SupabaseClient, userId: string, sessionId: string): Promise<Result<"started" | "ended">> {
   const session = await getSession(db, userId, sessionId);
@@ -529,9 +564,9 @@ export async function patchMoney(db: SupabaseClient, userId: string, eventId: st
     .update({ amount: value }, { count: "exact" })
     .eq("user_id", userId)
     .eq("id", eventId)
-    .in("kind", ["buy_in", "rebuy"]);
+    .in("kind", ["buy_in", "rebuy", "expense"]);
   if (error) throw error;
-  if (!count) return { ok: false, error: "No such buy-in or rebuy." };
+  if (!count) return { ok: false, error: "No such buy-in, rebuy or expense." };
   return { ok: true };
 }
 
@@ -1191,7 +1226,7 @@ export async function sessionsWithPlayer(
   return [...out.values()];
 }
 
-function handRow(input: HandInput) {
+function handRow(input: HandInput, allin: AllIn | null) {
   return {
     button_seat: input.button_seat,
     hero_seat: input.hero_seat,
@@ -1208,6 +1243,7 @@ function handRow(input: HandInput) {
     winners: input.winners,
     hero_net: input.hero_net,
     rake: input.rake ?? null,
+    allin,
     starred: input.starred,
     notes: input.notes,
   };
@@ -1233,7 +1269,7 @@ export async function createHand(
   if (!playedAt) return { ok: false, error: "Not a valid time." };
   const { data, error } = await db
     .from("live_hands")
-    .insert({ user_id: userId, session_id: sessionId, played_at: playedAt, ...handRow(input) })
+    .insert({ user_id: userId, session_id: sessionId, played_at: playedAt, ...handRow(input, allInOf(input, checked.play, session.rake)) })
     .select(HAND_COLUMNS)
     .single();
   if (error) throw error;
@@ -1257,14 +1293,17 @@ export async function updateHand(db: SupabaseClient, userId: string, id: string,
   const session = await getSession(db, userId, hand.session_id);
   if (!session) return { ok: false, error: "No such session." };
   let input: HandInput;
+  let allin: AllIn | null;
   try {
-    input = checkHand(raw, session.seats, session.rake).input;
+    const checked = checkHand(raw, session.seats, session.rake);
+    input = checked.input;
+    allin = allInOf(input, checked.play, session.rake);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
   const { data, error } = await db
     .from("live_hands")
-    .update(handRow(input))
+    .update(handRow(input, allin))
     .eq("user_id", userId)
     .eq("id", id)
     .select(HAND_COLUMNS)
