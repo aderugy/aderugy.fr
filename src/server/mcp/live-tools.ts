@@ -5,6 +5,7 @@ import { fmtDateTime } from "@/lib/jobs/format";
 import { handText } from "@/lib/live/describe";
 import { describeRake } from "@/lib/live/rake";
 import { breaksOf, fmtDuration, summarize } from "@/lib/live/session";
+import { allInLuck } from "@/lib/live/allin";
 import { describeMove, describeSeatEvent, readableSeatLog } from "@/lib/live/table";
 import { LIVE_LIMITS, fmtMoney, fmtStakes, isBlankUnknown, type LiveTag, type PlayerSummary } from "@/lib/live/types";
 import {
@@ -36,7 +37,8 @@ import { callerOf } from "./auth";
 export const LIVE_INSTRUCTIONS = `Arthur's live poker sessions (aderugy.fr/poker/live): NLHE cash games in card rooms, full ring (9 or 10 seats).
 
 How the data works:
-- A session is one sitting: venue, stakes, buy-in and rebuys, breaks, cash-out. The result is cash-out − buy-ins; time played leaves out breaks.
+- A session is one sitting: venue, stakes, buy-in and rebuys, breaks, cash-out. The result is cash-out − buy-ins; time played leaves out breaks. Food and drinks bought at the table are listed apart and are not in the result.
+- All-in EV: a hand where the money went in before the river with every other seat still in showing its cards carries Arthur's equity and EV after rake (Σ pots equity × (pot − rake) − what he put in). Luck = net − EV; a session's all-in EV adjusted result = result − Σ luck.
 - The table is a log of seat events: who sat where, sat out, came back, changed seat, left.
 - Players are a database reused across sessions: a name or nickname, a description (how to recognise them), tags (Arthur's, e.g. fish, reg, nit) and timestamped notes. A note may point at the session or hand it was taken in.
 - Someone not identified yet is an unknown player ("Unknown 4", marked unknown): a player like any other — tags, description, notes — kept apart from the known ones until Arthur names them or merges them into who they turn out to be. New sessions seat one in every seat. Many share a name, so refer to them by id.
@@ -79,7 +81,7 @@ export function registerLiveTools(server: McpServer) {
     "list_live_sessions",
     {
       title: "List live poker sessions",
-      description: "Arthur's live sessions, newest first: date, venue, stakes, time played, result, hands entered. The running one, if any, is marked.",
+      description: "Arthur's live sessions, newest first: date, venue, stakes, time played, result, all-in EV adjusted result, hands entered. The running one, if any, is marked.",
       inputSchema: z.object({
         limit: z.number().int().min(1).max(200).optional().describe("How many, newest first. Default 30."),
       }),
@@ -94,7 +96,9 @@ export function registerLiveTools(server: McpServer) {
         const result = s.ended_at
           ? `${sum.net! >= 0 ? "+" : ""}${fmtMoney(sum.net!, s.currency)}${sum.bbPerHour !== null ? ` (${Math.round(sum.bbPerHour * 10) / 10} bb/h)` : ""}`
           : "RUNNING";
-        return `- ${fmtDateTime(s.started_at)} · ${s.venue} · ${fmtStakes(s)} ${s.game} · ${fmtDuration(sum.playedMs)} · in ${fmtMoney(sum.invested, s.currency)} · ${result} · ${s.hand_count} hands (id ${s.id})`;
+        const ev = s.ended_at && s.allin_hands ? ` · all-in EV adj. ${fmtMoney(Math.round((sum.net! - s.allin_luck) * 100) / 100, s.currency, true)} (${s.allin_hands} all-in${s.allin_hands > 1 ? "s" : ""})` : "";
+        const food = sum.expenses ? ` · food & drinks ${fmtMoney(sum.expenses, s.currency)}` : "";
+        return `- ${fmtDateTime(s.started_at)} · ${s.venue} · ${fmtStakes(s)} ${s.game} · ${fmtDuration(sum.playedMs)} · in ${fmtMoney(sum.invested, s.currency)} · ${result}${ev}${food} · ${s.hand_count} hands (id ${s.id})`;
       });
       return ok(`${rows.length} session${rows.length > 1 ? "s" : ""}:\n${lines.join("\n")}`);
     },
@@ -128,12 +132,20 @@ export function registerLiveTools(server: McpServer) {
       const money = events
         .filter((e) => e.kind === "buy_in" || e.kind === "rebuy")
         .map((e) => `${e.kind === "buy_in" ? "buy-in" : "rebuy"} ${fmtMoney(e.amount ?? 0, s.currency)} at ${fmtDateTime(e.at)}`);
+      const luck = allInLuck(hands);
+      const food = events
+        .filter((e) => e.kind === "expense")
+        .map((e) => `${e.label ?? "food & drinks"} ${fmtMoney(e.amount ?? 0, s.currency)}`);
       const breaks = breaksOf(events).map((b) => `${fmtDateTime(b.start)}–${b.end ? fmtDateTime(b.end) : "…"}`);
 
       const out = [
         `# ${s.venue} — ${fmtStakes(s)} ${s.game}, ${s.seats}-max (session ${s.id})`,
         `${fmtDateTime(s.started_at)} → ${s.ended_at ? fmtDateTime(s.ended_at) : "still running"} · played ${fmtDuration(sum.playedMs)}`,
         `Money: ${money.join(", ")}${s.ended_at ? ` · cash-out ${fmtMoney(s.cash_out ?? 0, s.currency)} · result ${sum.net! >= 0 ? "+" : ""}${fmtMoney(sum.net!, s.currency)}${sum.hourly !== null ? ` (${fmtMoney(Math.round(sum.hourly), s.currency)}/h)` : ""}` : ""}`,
+        s.ended_at && luck.hands
+          ? `All-in EV adjusted result: ${fmtMoney(Math.round((sum.net! - luck.luck) * 100) / 100, s.currency, true)} (${luck.hands} all-in${luck.hands > 1 ? "s" : ""}, luck ${fmtMoney(luck.luck, s.currency, true)})`
+          : "",
+        food.length ? `Food & drinks (not in the result): ${food.join(", ")} · ${fmtMoney(sum.expenses, s.currency)}` : "",
         breaks.length ? `Breaks: ${breaks.join(", ")}` : "",
         `Rake: ${s.rake ? describeRake(s.rake, s.currency) : "not set — hand nets are before rake"}`,
         !s.ended_at && Object.keys(s.stacks).length

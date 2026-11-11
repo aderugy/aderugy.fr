@@ -12,7 +12,8 @@ import { ErrorLine } from "@/components/jobs/bits";
 import { NotesEditor } from "@/components/ui/NotesEditor";
 import { DEFAULT_COLOR } from "@/lib/categories";
 import { behind, describePost, describeStep, playHand, positions, settle, stepsByStreet, type HandState, type Step } from "@/lib/live/hand";
-import { BOARD_SIZE, STREET_LABELS, fmtChips, type LiveHand, type Street } from "@/lib/live/types";
+import { BOARD_SIZE, STREET_LABELS, fmtBb, fmtChips, type LiveHand, type Street } from "@/lib/live/types";
+import { facingOdds } from "@/lib/live/odds";
 import type { SessionBundle } from "@/server/live/data";
 import { deleteHand, updateHand, updateHandFlags } from "@/server/actions/live";
 
@@ -26,6 +27,10 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
   const { pending, error, run } = useAction();
   const [editing, setEditing] = useState(false);
   const [noteFor, setNoteFor] = useState<string | null>(null);
+  // Amounts in the session's currency; a tap on the pot switches to big blinds.
+  const [inBb, setInBb] = useState(false);
+  const money = (x: number) => (inBb ? fmtBb(x, hand.big_blind) : `${fmtChips(x)} ${session.currency}`);
+  const signed = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${money(Math.abs(Math.round(x * 100) / 100))}`;
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
   const tagById = useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags]);
@@ -105,16 +110,17 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
       hidden: !isHero && !shownCards && !st.folded,
       sub:
         last && last.action.seat === s.seat
-          ? describeStep(last)
+          ? describeStep(last, money)
           : st.allIn
             ? "all-in"
             : left !== null
-              ? fmtChips(left)
+              ? money(left)
               : undefined,
     };
   });
 
   const playersInHand = hand.seats.filter((s) => s.player_id && s.seat !== hand.hero_seat);
+  const odds = facingOdds(state, session.rake);
 
   return (
     <main className={`mx-auto h-full w-full max-w-2xl overflow-y-auto px-3 py-4 sm:px-6 ${pending ? "opacity-80" : ""}`}>
@@ -152,6 +158,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
           size={session.seats}
           seats={views}
           button={hand.button_seat}
+          money={money}
           toAct={atEnd ? null : state.toAct}
           onCards={() => setEditing(true)}
           center={
@@ -159,6 +166,17 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
               board={boardShown}
               onBoard={() => setEditing(true)}
               pot={state.pot + state.seats.reduce((t, s) => t + s.street, 0)}
+              money={money}
+              onPot={() => setInBb((x) => !x)}
+              under={
+                odds && (
+                  <span className="rounded-md bg-black/35 px-2 py-0.5 text-[10px] leading-tight tabular-nums text-white/90">
+                    {pos.get(odds.seat) ?? `Seat ${odds.seat}`} calls {money(odds.toCall)} to win {money(odds.netPot - odds.toCall)}
+                    <br />
+                    {Math.round(odds.ratio * 10) / 10}:1 · needs {Math.round(odds.need * 1000) / 10} %{session.rake ? " · rake incl." : ""}
+                  </span>
+                )
+              }
               note={state.end && atEnd ? (state.end.reason === "fold" ? `${label(state.end.winner)} wins` : "Showdown") : STREET_LABELS[state.street]}
             />
           }
@@ -201,7 +219,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
                 <span className="text-muted"> [{hand.board.slice(0, BOARD_SIZE[g.street]).join(" ")}]</span>
               )}
               :{" "}
-              {preflopLine(g.steps, g.street, label)}
+              {preflopLine(g.steps, g.street, label, money)}
             </p>
           ))
         )}
@@ -210,10 +228,10 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
             {settlement.pots
               .map(
                 (p, k) =>
-                  `${k === 0 ? "Pot" : `Side pot ${k}`} ${fmtChips(p.amount)} → ${p.takers.length ? p.takers.map(label).join(" & ") : "?"}`,
+                  `${k === 0 ? "Pot" : `Side pot ${k}`} ${money(p.amount)} → ${p.takers.length ? p.takers.map(label).join(" & ") : "?"}`,
               )
               .join(" · ")}
-            {hand.rake != null && ` · rake ${fmtChips(hand.rake)}`}
+            {hand.rake != null && ` · rake ${money(hand.rake)}`}
             {Object.keys(hand.shown).length > 0 &&
               ` · shown: ${Object.entries(hand.shown)
                 .map(([s, c]) => `${label(Number(s))} ${c}`)
@@ -222,6 +240,16 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
               ` · said: ${Object.entries(hand.said)
                 .map(([s, c]) => `${label(Number(s))} ${c}`)
                 .join(", ")}`}
+          </p>
+        )}
+        {hand.allin && (
+          <p className="mt-2 border-t border-line pt-2 text-xs">
+            <span className="font-medium">All-in on the {hand.allin.street}</span>
+            <span className="text-muted">
+              {" "}
+              · equity {Math.round(hand.allin.equity * 1000) / 10} % · EV {signed(hand.allin.ev)} (after rake)
+              {hand.hero_net !== null && ` · luck ${signed(hand.hero_net - hand.allin.ev)}`}
+            </span>
           </p>
         )}
       </section>
@@ -292,7 +320,7 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
 }
 
 /** A street's actions in words; folds to an unraised pot preflop are only counted. */
-function preflopLine(steps: Step[], street: Street, label: (seat: number) => string): string {
+function preflopLine(steps: Step[], street: Street, label: (seat: number) => string, money: (x: number) => string): string {
   const out: string[] = [];
   let opened = street !== "preflop";
   let folds = 0;
@@ -307,7 +335,7 @@ function preflopLine(steps: Step[], street: Street, label: (seat: number) => str
     }
     flush();
     if (s.action.kind === "raise") opened = true;
-    out.push(`${label(s.action.seat)} ${describeStep(s)}`);
+    out.push(`${label(s.action.seat)} ${describeStep(s, money)}`);
   }
   flush();
   return out.join(" · ");

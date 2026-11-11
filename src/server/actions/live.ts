@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { requireUser, fail, type ActionResult } from "@/server/auth";
 import { unknownName, type HandInput, type SeatEventKind } from "@/lib/live/types";
 import {
+  addExpense as addExpenseRow,
   addMoney as addMoneyRow,
   addNote as addNoteRow,
   createHand as createHandRow,
@@ -93,6 +94,13 @@ export async function addMoney(
   input: { kind: "buy_in" | "rebuy"; amount: number | string; at?: string | null },
 ): Promise<ActionResult> {
   return act(({ supabase, user }) => addMoneyRow(supabase, user.id, sessionId, input));
+}
+
+export async function addExpense(
+  sessionId: string,
+  input: { label: string | null; amount: number | string; at?: string | null },
+): Promise<ActionResult> {
+  return act(({ supabase, user }) => addExpenseRow(supabase, user.id, sessionId, input));
 }
 
 export async function updateMoney(eventId: string, amount: number | string): Promise<ActionResult> {

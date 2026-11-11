@@ -64,7 +64,10 @@ export function LiveTable({
   label,
   onCards,
   fit = false,
+  money = fmt,
 }: {
+  /** How amounts are written (chips by default). */
+  money?: (x: number) => string;
   /** Fill the container's height and width, keeping the table's shape. */
   fit?: boolean;
   size: number;
@@ -118,7 +121,7 @@ export function LiveTable({
               <div className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={at(anchor(n, size, 0.58))}>
                 <span className="flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
                   <span className="inline-block size-2 rounded-full border border-white/70 bg-amber-400" />
-                  {fmt(bet)}
+                  {money(bet)}
                 </span>
               </div>
             )}
@@ -264,9 +267,18 @@ export function FeltCenter({
   note,
   onBoard,
   slots = 0,
+  money = (x: number) => fmt(x),
+  onPot,
+  under,
 }: {
   board: string[];
   pot?: number | null;
+  /** How the pot is written (chips by default). */
+  money?: (x: number) => string;
+  /** Tapping the pot (e.g. to switch € / bb). */
+  onPot?: () => void;
+  /** A line under the pot (pot odds). */
+  under?: ReactNode;
   note?: string | null;
   onBoard?: (street: BoardStreet) => void;
   slots?: number;
@@ -296,9 +308,15 @@ export function FeltCenter({
           })}
         </span>
       )}
-      {pot != null && pot > 0 && (
-        <span className="rounded-full bg-black/45 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-white">Pot {fmt(pot)}</span>
-      )}
+      {pot != null && pot > 0 &&
+        (onPot ? (
+          <button type="button" onClick={onPot} className="rounded-full bg-black/45 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-white" title="€ / bb">
+            Pot {money(pot)}
+          </button>
+        ) : (
+          <span className="rounded-full bg-black/45 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-white">Pot {money(pot)}</span>
+        ))}
+      {under}
       {note && <span className="text-[11px] text-white/75">{note}</span>}
     </>
   );

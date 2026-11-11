@@ -74,6 +74,11 @@ export function handText(hand: LiveHand, nameOf: (playerId: string | null) => st
   if (hand.hero_net != null) {
     lines.push(`Arthur's net: ${hand.hero_net > 0 ? "+" : ""}${fmtChips(hand.hero_net)} ${currency} (${hand.rake != null ? "after rake" : "before rake"})`);
   }
+  if (hand.allin) {
+    const a = hand.allin;
+    const luck = hand.hero_net != null ? ` · luck ${hand.hero_net - a.ev >= 0 ? "+" : ""}${fmtChips(Math.round((hand.hero_net - a.ev) * 100) / 100)} ${currency}` : "";
+    lines.push(`All-in on the ${a.street}: Arthur's equity ${Math.round(a.equity * 1000) / 10} % · EV ${a.ev >= 0 ? "+" : ""}${fmtChips(a.ev)} ${currency} after rake${luck}`);
+  }
   if (hand.notes) lines.push(`Notes: ${hand.notes}`);
   return [...head, ...lines].join("\n");
 }

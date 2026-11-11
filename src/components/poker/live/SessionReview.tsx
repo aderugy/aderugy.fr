@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { HandRow, Timeline } from "./SessionParts";
+import { Expenses, HandRow, Timeline } from "./SessionParts";
 import { Field, INPUT, NetText, fmtClock, fmtDay, fromLocalInput, toLocalInput } from "./ui";
 import { useAction } from "@/components/jobs/controls";
 import { ErrorLine } from "@/components/jobs/bits";
 import { NotesEditor } from "@/components/ui/NotesEditor";
 import { fmtDuration, summarize } from "@/lib/live/session";
+import { allInLuck } from "@/lib/live/allin";
 import { fmtChips, fmtMoney, fmtStakes } from "@/lib/live/types";
 import type { SessionBundle } from "@/server/live/data";
 import { deleteSession, reopenSession, updateMoney, updateSession } from "@/server/actions/live";
@@ -20,6 +21,8 @@ export function SessionReview({ data }: { data: SessionBundle }) {
   const { pending, error, run } = useAction();
   const [editing, setEditing] = useState(false);
   const sum = summarize(session, events);
+  const luck = allInLuck(hands);
+  const evAdj = sum.net === null ? null : Math.round((sum.net - luck.luck) * 100) / 100;
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
   // Everyone who sat at this table, in order of arrival.
@@ -53,12 +56,17 @@ export function SessionReview({ data }: { data: SessionBundle }) {
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-line bg-surface p-3 text-center text-sm sm:grid-cols-5">
+      <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-line bg-surface p-3 text-center text-sm sm:grid-cols-6">
         <Stat label="Played" value={fmtDuration(sum.playedMs)} />
         <Stat label="In" value={fmtMoney(sum.invested, session.currency)} sub={sum.rebuys ? `${sum.rebuys} rebuy${sum.rebuys > 1 ? "s" : ""}` : undefined} />
         <Stat label="Out" value={fmtMoney(session.cash_out ?? 0, session.currency)} />
         <Stat label="Per hour" value={<NetText value={sum.hourly} currency={session.currency} whole />} />
         <Stat label="bb/h" value={sum.bbPerHour === null ? "—" : String(Math.round(sum.bbPerHour * 10) / 10)} />
+        <Stat
+          label="All-in EV adj."
+          value={<NetText value={evAdj} currency={session.currency} />}
+          sub={luck.hands ? `${luck.hands} all-in${luck.hands > 1 ? "s" : ""} · luck ${fmtMoney(luck.luck, session.currency, true)}` : "no all-in"}
+        />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-3 text-xs">
@@ -95,6 +103,10 @@ export function SessionReview({ data }: { data: SessionBundle }) {
           </ul>
         )}
       </section>
+
+      <div className="mt-6">
+        <Expenses session={session} events={events} net={sum.net} />
+      </div>
 
       <section className="mt-6">
         <h2 className="mb-1 text-xs font-medium tracking-wide text-muted uppercase">Players</h2>

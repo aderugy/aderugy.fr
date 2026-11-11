@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { BoardCards, PlayingCard } from "@/components/poker/trainer/Cards";
 import { useAction } from "@/components/jobs/controls";
 import { ErrorLine } from "@/components/jobs/bits";
-import { NetText, fmtClock } from "./ui";
+import { INPUT, NetText, fmtClock } from "./ui";
 import { positions } from "@/lib/live/hand";
 import { describeMove, describeSeatEvent, readableSeatLog } from "@/lib/live/table";
 import { fmtMoney, splitCards, type LiveHand, type LiveSession, type SeatEvent, type SessionEvent } from "@/lib/live/types";
-import { deleteSeatEvent, deleteSessionEvent } from "@/server/actions/live";
+import { addExpense, deleteSeatEvent, deleteSessionEvent } from "@/server/actions/live";
 
 /** One line per hand: number, time, cards, position, board, result. */
 export function HandRow({ hand, sessionId, currency }: { hand: LiveHand; sessionId: string; currency: string }) {
@@ -82,9 +83,11 @@ export function Timeline({
         ? `Buy-in ${fmtMoney(e.amount ?? 0, session.currency)}`
         : e.kind === "rebuy"
           ? `Rebuy ${fmtMoney(e.amount ?? 0, session.currency)}`
-          : e.kind === "break_start"
-            ? "Break"
-            : "Back from the break";
+          : e.kind === "expense"
+            ? `${e.label ?? "Food & drinks"} ${fmtMoney(e.amount ?? 0, session.currency)}`
+            : e.kind === "break_start"
+              ? "Break"
+              : "Back from the break";
     lines.push({
       at: e.at,
       key: e.id,
@@ -145,4 +148,72 @@ async function deleteBoth(sitId: string, leaveId: string) {
   const a = await deleteSeatEvent(sitId);
   if (!a.ok) return a;
   return deleteSeatEvent(leaveId);
+}
+
+/**
+ * Food and drinks bought at the table. Not poker money: the result stays
+ * cash-out − buy-ins, and this shows what is left after them.
+ */
+export function Expenses({ session, events, net }: { session: LiveSession; events: SessionEvent[]; net: number | null }) {
+  const { pending, error, run } = useAction();
+  const [label, setLabel] = useState("");
+  const [amount, setAmount] = useState("");
+  const list = events.filter((e) => e.kind === "expense").sort((a, b) => a.at.localeCompare(b.at));
+  const total = Math.round(list.reduce((t, e) => t + (e.amount ?? 0), 0) * 100) / 100;
+
+  return (
+    <section className={pending ? "opacity-70" : ""}>
+      <h2 className="mb-1 flex items-baseline gap-2 text-xs font-medium tracking-wide text-muted uppercase">
+        Food & drinks{total > 0 ? ` · ${fmtMoney(total, session.currency)}` : ""}
+        {total > 0 && net !== null && (
+          <span className="ml-auto normal-case tracking-normal">
+            result after: <NetText value={Math.round((net - total) * 100) / 100} currency={session.currency} />
+          </span>
+        )}
+      </h2>
+      {list.length > 0 && (
+        <ul className="mb-2 divide-y divide-line rounded-lg border border-line bg-surface text-sm">
+          {list.map((e) => (
+            <li key={e.id} className="flex items-center gap-2 px-3 py-1.5">
+              <span className="w-10 shrink-0 text-xs tabular-nums text-muted">{fmtClock(e.at)}</span>
+              <span className="min-w-0 flex-1 truncate">{e.label ?? "Food & drinks"}</span>
+              <span className="tabular-nums">{fmtMoney(e.amount ?? 0, session.currency)}</span>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => confirm(`Remove “${e.label ?? "Food & drinks"}”?`) && run(() => deleteSessionEvent(e.id))}
+                className="px-1 text-muted hover:text-red-500"
+                aria-label={`Remove ${e.label ?? "expense"}`}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          run(() => addExpense(session.id, { label: label || null, amount }), () => {
+            setLabel("");
+            setAmount("");
+          });
+        }}
+        className="flex gap-2"
+      >
+        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Rice, coffee…" className={`${INPUT} min-w-0 flex-1`} />
+        <input
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={session.currency}
+          className={`${INPUT} w-20`}
+        />
+        <button type="submit" disabled={pending || !amount} className="rounded-lg border border-line px-3 text-sm disabled:opacity-50">
+          Add
+        </button>
+      </form>
+      <ErrorLine error={error} />
+    </section>
+  );
 }

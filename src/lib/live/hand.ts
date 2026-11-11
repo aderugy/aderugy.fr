@@ -579,18 +579,19 @@ export const ACTION_VERBS: Record<ActionKind, string> = {
 };
 
 /** "raises to 15", "calls 10 (all-in)", "folds" */
-export function describeStep(step: Step): string {
+/** `money` formats the amounts (chips by default). */
+export function describeStep(step: Step, money: (x: number) => string = fmt): string {
   const { action } = step;
   let text: string;
   switch (action.kind) {
     case "call":
-      text = `calls ${fmt(step.added)}`;
+      text = `calls ${money(step.added)}`;
       break;
     case "bet":
-      text = `bets ${fmt(step.to)}`;
+      text = `bets ${money(step.to)}`;
       break;
     case "raise":
-      text = `raises to ${fmt(step.to)}`;
+      text = `raises to ${money(step.to)}`;
       break;
     default:
       text = ACTION_VERBS[action.kind];
