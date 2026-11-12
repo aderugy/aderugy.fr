@@ -170,10 +170,11 @@ export function HandView({ data, hand }: { data: SessionBundle; hand: LiveHand }
               onPot={() => setInBb((x) => !x)}
               under={
                 odds && (
-                  <span className="rounded-md bg-black/35 px-2 py-0.5 text-[10px] leading-tight tabular-nums text-white/90">
-                    {pos.get(odds.seat) ?? `Seat ${odds.seat}`} calls {money(odds.toCall)} to win {money(odds.netPot - odds.toCall)}
-                    <br />
-                    {Math.round(odds.ratio * 10) / 10}:1 · needs {Math.round(odds.need * 1000) / 10} %{session.rake ? " · rake incl." : ""}
+                  <span
+                    className="rounded-md bg-black/35 px-2 py-0.5 text-[11px] tabular-nums text-white/90"
+                    title={`${pos.get(odds.seat) ?? `Seat ${odds.seat}`}: ${money(odds.toCall)} to win ${money(odds.netPot - odds.toCall)}${session.rake ? ", after rake" : ""}`}
+                  >
+                    {Math.round(odds.ratio * 10) / 10}:1 ({Math.round(odds.need * 1000) / 10} %)
                   </span>
                 )
               }
