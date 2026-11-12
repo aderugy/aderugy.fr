@@ -20,14 +20,10 @@ type Unit = "money" | "bb";
 
 const H = 220;
 const PAD = { top: 12, right: 12, bottom: 24, left: 52 };
-const RESULT = {
-  stroke: "stroke-[#3b5bdb] dark:stroke-[#3987e5]",
-  fill: "fill-[#3b5bdb] dark:fill-[#3987e5]",
-};
-const EV = {
-  stroke: "stroke-[#eb6834] dark:stroke-[#d95926]",
-  fill: "fill-[#eb6834] dark:fill-[#d95926]",
-};
+// Result green, all-in EV dark yellow: one pair that passes the colour-blind
+// and contrast checks on both the light and the dark surface.
+const RESULT = { stroke: "stroke-[#237a36]", fill: "fill-[#237a36]" };
+const EV = { stroke: "stroke-[#b08a0c]", fill: "fill-[#b08a0c]" };
 
 /** "Nice" round step for about `n` ticks over `span`. */
 function niceStep(span: number, n: number): number {
