@@ -11,7 +11,8 @@ import type { LiveTag } from "@/lib/live/types";
 export function LiveNav() {
   const path = usePathname();
   const links = [
-    { href: "/poker/live", label: "Sessions", active: path === "/poker/live" || /^\/poker\/live\/(?!players|tags)/.test(path) },
+    { href: "/poker/live", label: "Sessions", active: path === "/poker/live" || /^\/poker\/live\/(?!players|tags|hands)/.test(path) },
+    { href: "/poker/live/hands", label: "Hands", active: path.startsWith("/poker/live/hands") },
     { href: "/poker/live/players", label: "Players", active: path.startsWith("/poker/live/players") },
     { href: "/poker/live/tags", label: "Tags", active: path.startsWith("/poker/live/tags") },
   ];

@@ -146,6 +146,26 @@ export type SessionRow = LiveSession & {
   allin_luck: number;
 };
 
+/** A hand in the list of every hand, with what is needed from its session. */
+export type HandListItem = LiveHand & { venue: string; currency: string; session_started_at: string };
+
+/** Every hand, newest first, across sessions. */
+export async function listAllHands(db: SupabaseClient, userId: string, limit = 2000): Promise<HandListItem[]> {
+  const { data, error } = await db
+    .from("live_hands")
+    .select(`${HAND_COLUMNS}, live_sessions(venue, currency, started_at)`)
+    .eq("user_id", userId)
+    .order("played_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const { live_sessions: s, ...rest } = row as unknown as Record<string, unknown> & {
+      live_sessions: { venue: string; currency: string; started_at: string } | null;
+    };
+    return { ...asHand(rest), venue: s?.venue ?? "", currency: s?.currency ?? "€", session_started_at: s?.started_at ?? String(rest.played_at) };
+  });
+}
+
 export async function listSessions(db: SupabaseClient, userId: string, limit = 200): Promise<SessionRow[]> {
   const { data, error } = await db
     .from("live_sessions")

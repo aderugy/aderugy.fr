@@ -7,18 +7,51 @@ import { useAction } from "@/components/jobs/controls";
 import { ErrorLine } from "@/components/jobs/bits";
 import { INPUT, NetText, fmtClock } from "./ui";
 import { positions } from "@/lib/live/hand";
-import { describeMove, describeSeatEvent, readableSeatLog } from "@/lib/live/table";
-import { fmtMoney, splitCards, type LiveHand, type LiveSession, type SeatEvent, type SessionEvent } from "@/lib/live/types";
-import { addExpense, deleteSeatEvent, deleteSessionEvent } from "@/server/actions/live";
+import {
+  describeMove,
+  describeSeatEvent,
+  readableSeatLog,
+} from "@/lib/live/table";
+import {
+  fmtMoney,
+  splitCards,
+  type LiveHand,
+  type LiveSession,
+  type SeatEvent,
+  type SessionEvent,
+} from "@/lib/live/types";
+import {
+  addExpense,
+  deleteSeatEvent,
+  deleteSessionEvent,
+} from "@/server/actions/live";
 
 /** One line per hand: number, time, cards, position, board, result. */
-export function HandRow({ hand, sessionId, currency }: { hand: LiveHand; sessionId: string; currency: string }) {
+export function HandRow({
+  hand,
+  sessionId,
+  currency,
+}: {
+  hand: LiveHand;
+  sessionId: string;
+  currency: string;
+}) {
   const cards = splitCards(hand.hero_cards);
-  const pos = hand.hero_seat ? positions(hand.seats.map((s) => s.seat), hand.button_seat).get(hand.hero_seat) : null;
+  const pos = hand.hero_seat
+    ? positions(
+        hand.seats.map((s) => s.seat),
+        hand.button_seat,
+      ).get(hand.hero_seat)
+    : null;
   return (
     <li>
-      <Link href={`/poker/live/${sessionId}/hands/${hand.id}`} className="flex items-center gap-2 px-3 py-2 text-sm">
-        <span className="w-8 shrink-0 text-xs tabular-nums text-muted">#{hand.number}</span>
+      <Link
+        href={`/poker/live/${sessionId}/hands/${hand.id}`}
+        className="flex items-center gap-2 px-3 py-2 text-sm"
+      >
+        <span className="w-8 shrink-0 text-xs tabular-nums text-muted">
+          #{hand.number}
+        </span>
         <span className="flex w-10 shrink-0 gap-0.5">
           {cards ? (
             <>
@@ -29,19 +62,31 @@ export function HandRow({ hand, sessionId, currency }: { hand: LiveHand; session
             <span className="text-xs text-muted">—</span>
           )}
         </span>
-        <span className="w-9 shrink-0 text-[11px] font-semibold text-muted">{pos ?? ""}</span>
-        <span className="min-w-0 flex-1 truncate text-xs">{hand.board.length > 0 && <BoardCards cards={hand.board} size="xs" />}</span>
+        <span className="w-9 shrink-0 text-[11px] font-semibold text-muted">
+          {pos ?? ""}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-xs">
+          {hand.board.length > 0 && <BoardCards cards={hand.board} size="xs" />}
+        </span>
         {hand.starred && <span className="text-amber-500">★</span>}
         <span className="shrink-0 text-xs">
           <NetText value={hand.hero_net} currency={currency} />
         </span>
-        <span className="hidden w-10 shrink-0 text-right text-[11px] text-muted sm:inline">{fmtClock(hand.played_at)}</span>
+        <span className="hidden w-10 shrink-0 text-right text-[11px] text-muted sm:inline">
+          {fmtClock(hand.played_at)}
+        </span>
       </Link>
     </li>
   );
 }
 
-type Line = { at: string; key: string; text: string; tone?: "money" | "break" | "hand"; del?: () => Promise<{ ok: boolean; error?: string }> };
+type Line = {
+  at: string;
+  key: string;
+  text: string;
+  tone?: "money" | "break" | "hand";
+  del?: () => Promise<{ ok: boolean; error?: string }>;
+};
 
 /**
  * The session's log, newest first: who sat, left, sat out, came back; money
@@ -73,7 +118,12 @@ export function Timeline({
         : to
           ? describeMove(e, to, nameOf(e.player_id))
           : describeSeatEvent(e, nameOf(e.player_id));
-    const del = e.id === firstHero ? undefined : to ? () => deleteBoth(to.id, e.id) : () => deleteSeatEvent(e.id);
+    const del =
+      e.id === firstHero
+        ? undefined
+        : to
+          ? () => deleteBoth(to.id, e.id)
+          : () => deleteSeatEvent(e.id);
     lines.push({ at: e.at, key: e.id, text, del });
   }
   const firstBuyIn = events.find((e) => e.kind === "buy_in")?.id;
@@ -96,8 +146,20 @@ export function Timeline({
       del: e.id === firstBuyIn ? undefined : () => deleteSessionEvent(e.id),
     });
   }
-  for (const h of hands) lines.push({ at: h.played_at, key: h.id, text: `Hand #${h.number}`, tone: "hand" });
-  if (session.ended_at) lines.push({ at: session.ended_at, key: "end", text: `Cash-out ${fmtMoney(session.cash_out ?? 0, session.currency)}`, tone: "money" });
+  for (const h of hands)
+    lines.push({
+      at: h.played_at,
+      key: h.id,
+      text: `Hand #${h.number}`,
+      tone: "hand",
+    });
+  if (session.ended_at)
+    lines.push({
+      at: session.ended_at,
+      key: "end",
+      text: `Cash-out ${fmtMoney(session.cash_out ?? 0, session.currency)}`,
+      tone: "money",
+    });
   lines.sort((a, b) => b.at.localeCompare(a.at));
 
   // Hands make the log long and have their own list: fold runs of them.
@@ -112,7 +174,9 @@ export function Timeline({
 
   return (
     <section className={pending ? "opacity-70" : ""}>
-      <h2 className="mb-1 text-xs font-medium tracking-wide text-muted uppercase">At the table</h2>
+      <h2 className="mb-1 text-xs font-medium tracking-wide text-muted uppercase">
+        At the table
+      </h2>
       <ErrorLine error={error} />
       <ul className="space-y-0.5 text-xs">
         {folded.map((l) =>
@@ -122,13 +186,21 @@ export function Timeline({
             </li>
           ) : (
             <li key={l.key} className="flex items-center gap-2">
-              <span className="w-10 shrink-0 tabular-nums text-muted">{fmtClock(l.at)}</span>
-              <span className={`min-w-0 flex-1 ${l.tone === "money" ? "font-medium" : l.tone === "break" ? "italic text-muted" : ""}`}>{l.text}</span>
+              <span className="w-10 shrink-0 tabular-nums text-muted">
+                {fmtClock(l.at)}
+              </span>
+              <span
+                className={`min-w-0 flex-1 ${l.tone === "money" ? "font-medium" : l.tone === "break" ? "italic text-muted" : ""}`}
+              >
+                {l.text}
+              </span>
               {editable && l.del && (
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => confirm(`Remove “${l.text}” from the log?`) && run(l.del!)}
+                  onClick={() =>
+                    confirm(`Remove “${l.text}” from the log?`) && run(l.del!)
+                  }
                   className="px-1 text-muted hover:text-red-500"
                   aria-label={`Remove ${l.text}`}
                 >
@@ -154,20 +226,36 @@ async function deleteBoth(sitId: string, leaveId: string) {
  * Food and drinks bought at the table. Not poker money: the result stays
  * cash-out − buy-ins, and this shows what is left after them.
  */
-export function Expenses({ session, events, net }: { session: LiveSession; events: SessionEvent[]; net: number | null }) {
+export function Expenses({
+  session,
+  events,
+  net,
+}: {
+  session: LiveSession;
+  events: SessionEvent[];
+  net: number | null;
+}) {
   const { pending, error, run } = useAction();
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
-  const list = events.filter((e) => e.kind === "expense").sort((a, b) => a.at.localeCompare(b.at));
-  const total = Math.round(list.reduce((t, e) => t + (e.amount ?? 0), 0) * 100) / 100;
+  const list = events
+    .filter((e) => e.kind === "expense")
+    .sort((a, b) => a.at.localeCompare(b.at));
+  const total =
+    Math.round(list.reduce((t, e) => t + (e.amount ?? 0), 0) * 100) / 100;
 
   return (
     <section className={pending ? "opacity-70" : ""}>
       <h2 className="mb-1 flex items-baseline gap-2 text-xs font-medium tracking-wide text-muted uppercase">
-        Food & drinks{total > 0 ? ` · ${fmtMoney(total, session.currency)}` : ""}
+        Food & drinks
+        {total > 0 ? ` · ${fmtMoney(total, session.currency)}` : ""}
         {total > 0 && net !== null && (
           <span className="ml-auto normal-case tracking-normal">
-            result after: <NetText value={Math.round((net - total) * 100) / 100} currency={session.currency} />
+            result after:{" "}
+            <NetText
+              value={Math.round((net - total) * 100) / 100}
+              currency={session.currency}
+            />
           </span>
         )}
       </h2>
@@ -175,13 +263,22 @@ export function Expenses({ session, events, net }: { session: LiveSession; event
         <ul className="mb-2 divide-y divide-line rounded-lg border border-line bg-surface text-sm">
           {list.map((e) => (
             <li key={e.id} className="flex items-center gap-2 px-3 py-1.5">
-              <span className="w-10 shrink-0 text-xs tabular-nums text-muted">{fmtClock(e.at)}</span>
-              <span className="min-w-0 flex-1 truncate">{e.label ?? "Food & drinks"}</span>
-              <span className="tabular-nums">{fmtMoney(e.amount ?? 0, session.currency)}</span>
+              <span className="w-10 shrink-0 text-xs tabular-nums text-muted">
+                {fmtClock(e.at)}
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {e.label ?? "Food & drinks"}
+              </span>
+              <span className="tabular-nums">
+                {fmtMoney(e.amount ?? 0, session.currency)}
+              </span>
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => confirm(`Remove “${e.label ?? "Food & drinks"}”?`) && run(() => deleteSessionEvent(e.id))}
+                onClick={() =>
+                  confirm(`Remove “${e.label ?? "Food & drinks"}”?`) &&
+                  run(() => deleteSessionEvent(e.id))
+                }
                 className="px-1 text-muted hover:text-red-500"
                 aria-label={`Remove ${e.label ?? "expense"}`}
               >
@@ -194,22 +291,38 @@ export function Expenses({ session, events, net }: { session: LiveSession; event
       <form
         onSubmit={(ev) => {
           ev.preventDefault();
-          run(() => addExpense(session.id, { label: label || null, amount }), () => {
-            setLabel("");
-            setAmount("");
-          });
+          run(
+            () => addExpense(session.id, { label: label || null, amount }),
+            () => {
+              setLabel("");
+              setAmount("");
+            },
+          );
         }}
         className="flex gap-2"
       >
-        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Rice, coffee…" className={`${INPUT} min-w-0 flex-1`} />
-        <input
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder={session.currency}
-          className={`${INPUT} w-20`}
-        />
-        <button type="submit" disabled={pending || !amount} className="rounded-lg border border-line px-3 text-sm disabled:opacity-50">
+        <div className="min-w-0 flex-1">
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Rice, coffee…"
+            className={INPUT}
+          />
+        </div>
+        <div className="w-20 shrink-0">
+          <input
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder={session.currency}
+            className={INPUT}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={pending || !amount}
+          className="rounded-lg border border-line px-3 text-sm disabled:opacity-50"
+        >
           Add
         </button>
       </form>
