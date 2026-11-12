@@ -21,7 +21,7 @@ export function SessionList({ sessions, venues }: { sessions: SessionRow[]; venu
   const allins = done.reduce((x, s) => x + s.allin_hands, 0);
   // Oldest first, for the curve.
   const points = done
-    .map((s, i) => ({ id: s.id, at: s.started_at, net: sums[i].net ?? 0, ev: Math.round(((sums[i].net ?? 0) - s.allin_luck) * 100) / 100 }))
+    .map((s, i) => ({ id: s.id, at: s.started_at, net: sums[i].net ?? 0, ev: Math.round(((sums[i].net ?? 0) - s.allin_luck) * 100) / 100, bb: Number(s.big_blind) || 1 }))
     .reverse();
   const currency = done[0]?.currency ?? "€";
   const [open, setOpen] = useState(!running && sessions.length === 0);

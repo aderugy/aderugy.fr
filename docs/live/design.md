@@ -53,6 +53,16 @@ it. The uncalled part of a bet goes back and is in no pot. Cards known to be out
 dealt. A session's **all-in EV adjusted result** is its real result minus the
 luck of its hands; the sessions page plots both, cumulated.
 
+The chart switches between sessions (cumulative curves) and months (a pair
+of bars a month: result and all-in EV adjusted), in money or in big blinds
+(each session's result ÷ its big blind).
+
+## Every hand
+
+`/poker/live/hands`: all hands across sessions, newest first, grouped by
+session; filters for starred, all-ins, hands with notes, Arthur's position and
+his hole cards ("AK", "AKs", "88").
+
 ## Pot odds (hand review)
 
 Under the pot, for the seat facing a bet at the current step
