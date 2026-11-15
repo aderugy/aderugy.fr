@@ -32,7 +32,8 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     shortcuts: [
-      { name: "Agenda", url: "/agenda" },
+      // The query marks a deliberate trip to the agenda (see LaunchHome).
+      { name: "Agenda", url: "/agenda?from=shortcut" },
       { name: "Backlog", url: "/agenda/backlog" },
       { name: "Live poker", url: "/poker/live" },
       { name: "Jobs", url: "/jobs" },

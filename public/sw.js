@@ -44,6 +44,9 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || "/agenda", self.location.origin);
+  // A bare /agenda opened from a closed app would look like an old install's
+  // launch and be sent home (LaunchHome); the query says the agenda is meant.
+  if (target.pathname === "/agenda" && !target.search) target.searchParams.set("from", "notification");
 
   event.waitUntil(
     (async () => {

@@ -2,11 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export const LOGIN_PATH = "/agenda/login";
-export const HOME_PATH = "/agenda";
+/** Where a sign-in lands when it was not sent from a page: the home page, which leads everywhere. */
+export const HOME_PATH = "/";
 
 // Segment roots a `next` may point at. Every feature area shares the one Google
 // sign-in, so a redirect target is legitimate for any of them.
-const ALLOWED_ROOTS = [HOME_PATH, "/poker/live", "/poker/spots", "/poker/trainers", "/maths", "/jobs", "/projects"];
+const ALLOWED_ROOTS = ["/agenda", "/poker/live", "/poker/spots", "/poker/trainers", "/maths", "/jobs", "/projects", "/flashcards"];
 
 /**
  * The only function allowed to turn a `next` parameter into a redirect target.
@@ -21,6 +22,7 @@ export function safeNext(value: string | null | undefined): string {
   if (value.startsWith("//")) return HOME_PATH;
   if (value === LOGIN_PATH || value.startsWith(`${LOGIN_PATH}?`)) return HOME_PATH;
   if (value.startsWith(`${LOGIN_PATH}/`)) return HOME_PATH;
+  if (value === "/") return value;
   // The query string rides along: the OAuth consent page cannot work without
   // its `authorization_id`, and a deep link to a given week keeps its `?week`.
   const allowed = ALLOWED_ROOTS.some(
