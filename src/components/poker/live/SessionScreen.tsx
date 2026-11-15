@@ -352,7 +352,7 @@ function SeatSheet({
     <span className="flex items-center gap-2">
       <span className="tabular-nums text-muted">{seat}</span>
       {player ? (
-        <Link href={`/poker/live/players/${player.id}`} className={`truncate underline-offset-2 hover:underline ${player.known ? "" : "italic"}`}>
+        <Link href={`/poker/live/players/${player.id}?from=${session.id}`} className={`truncate underline-offset-2 hover:underline ${player.known ? "" : "italic"}`}>
           {player.name}
         </Link>
       ) : (

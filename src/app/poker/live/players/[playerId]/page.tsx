@@ -12,8 +12,9 @@ export async function generateMetadata({ params }: PageProps<"/poker/live/player
   return { title: data?.name ? `${data.name} — Live` : "Player — Live" };
 }
 
-export default async function PlayerPage({ params }: PageProps<"/poker/live/players/[playerId]">) {
+export default async function PlayerPage({ params, searchParams }: PageProps<"/poker/live/players/[playerId]">) {
   const { playerId } = await params;
+  const { from, hand } = await searchParams;
   if (!UUID.test(playerId)) notFound();
   const { supabase, user } = await requireUser();
   let detail;
@@ -43,5 +44,16 @@ export default async function PlayerPage({ params }: PageProps<"/poker/live/play
     unstable_rethrow(e); // notFound() is a throw too
     return <LoadError what="this player" error={e} />;
   }
-  return <PlayerView detail={detail} />;
+  return <PlayerView detail={detail} back={backLink(detail.sessions, from, hand)} />;
+}
+
+/** `?from=<session>[&hand=<hand>]`: opened from a table, a review or a hand — the back link returns there. */
+function backLink(
+  sessions: { id: string; venue: string }[],
+  from: string | string[] | undefined,
+  hand: string | string[] | undefined,
+): { href: string; label: string } | undefined {
+  if (typeof from !== "string" || !UUID.test(from)) return undefined;
+  if (typeof hand === "string" && UUID.test(hand)) return { href: `/poker/live/${from}/hands/${hand}`, label: "Hand" };
+  return { href: `/poker/live/${from}`, label: sessions.find((s) => s.id === from)?.venue ?? "Session" };
 }

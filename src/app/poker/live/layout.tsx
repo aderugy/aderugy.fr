@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { PokerHeader } from "@/components/poker/PokerHeader";
+import { loadLive } from "@/server/now";
 import { LiveNav } from "@/components/poker/live/ui";
 
 export const metadata = { title: "Live — Poker" };
@@ -12,10 +13,12 @@ export default async function LiveLayout({ children }: LayoutProps<"/poker/live"
   // The proxy already gates this; the guard keeps a misconfigured proxy from
   // rendering a blank, signed-out page.
   if (!user) redirect(LOGIN_PATH);
+  // The way back to a running session, in the header of every page below.
+  const running = await loadLive(supabase, user.id);
 
   return (
     <div className="flex h-[100dvh] flex-col">
-      <PokerHeader email={user.email ?? null} />
+      <PokerHeader email={user.email ?? null} running={running} />
       <LiveNav />
       <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>

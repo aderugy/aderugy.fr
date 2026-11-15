@@ -8,6 +8,12 @@ import { ErrorLine } from "@/components/jobs/bits";
 import type { PlayerNote } from "@/lib/live/types";
 import { addNote, deleteNote, updateNote } from "@/server/actions/live";
 
+/** A player's page, remembering the table or hand it was opened from so its back link returns there. */
+export function playerHref(playerId: string, sessionId?: string | null, handId?: string | null): string {
+  if (!sessionId) return `/poker/live/players/${playerId}`;
+  return `/poker/live/players/${playerId}?from=${sessionId}${handId ? `&hand=${handId}` : ""}`;
+}
+
 /**
  * Timestamped notes on a player, newest first, with a box to add one. A note
  * taken during a session remembers which (and which hand, if any); Claude's
@@ -110,7 +116,7 @@ export function PlayerNotes({
         {notes.length === 0 && <li className="text-xs text-muted">No notes yet.</li>}
       </ul>
       {limit && notes.length > limit && (
-        <Link href={`/poker/live/players/${playerId}`} className="mt-2 block text-xs text-muted underline">
+        <Link href={playerHref(playerId, sessionId, handId)} className="mt-2 block text-xs text-muted underline">
           All {notes.length} notes →
         </Link>
       )}
