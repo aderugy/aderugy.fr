@@ -25,7 +25,7 @@ export type PlayerDetail = {
 };
 
 /** One player: who they are, how to spot them, the notes, where you met, the hands. */
-export function PlayerView({ detail }: { detail: PlayerDetail }) {
+export function PlayerView({ detail, back }: { detail: PlayerDetail; back?: { href: string; label: string } }) {
   const { player, tagIds, tags, notes, sessions, hands, knownPlayers } = detail;
   const router = useRouter();
   const { pending, error, run } = useAction();
@@ -33,8 +33,9 @@ export function PlayerView({ detail }: { detail: PlayerDetail }) {
 
   return (
     <main className={`mx-auto h-full w-full max-w-2xl overflow-y-auto px-4 py-5 sm:px-6 sm:py-8 ${pending ? "opacity-80" : ""}`}>
-      <Link href="/poker/live/players" className="text-xs text-muted hover:text-foreground">
-        ← Players
+      {/* Back to where it was opened from: the table or hand of a session, else the list. */}
+      <Link href={back?.href ?? "/poker/live/players"} className="text-xs text-muted hover:text-foreground">
+        ← {back?.label ?? "Players"}
       </Link>
       {!player.known && <Upgrade player={player} tags={tags} knownPlayers={knownPlayers} venue={sessions[0]?.venue ?? ""} />}
       <h1 className={`mt-2 text-xl font-semibold tracking-tight ${player.known ? "" : "italic"}`}>

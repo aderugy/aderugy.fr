@@ -117,7 +117,7 @@ export function SessionReview({ data }: { data: SessionBundle }) {
             {met.map((m) => (
               <Link
                 key={m.id}
-                href={`/poker/live/players/${m.id}`}
+                href={`/poker/live/players/${m.id}?from=${session.id}`}
                 className={`rounded-full border px-2.5 py-1 text-xs ${m.known ? "border-line bg-surface" : "border-dashed border-line italic text-muted"}`}
               >
                 <span className="not-italic tabular-nums text-muted">{m.seat}</span> {m.name}

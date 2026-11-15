@@ -202,6 +202,23 @@ export async function getRunningSessionId(db: SupabaseClient, userId: string): P
   return (data?.id as string | undefined) ?? null;
 }
 
+/** What the header pill and the home page need to lead back to a running session. */
+export type RunningSession = { id: string; venue: string; started_at: string };
+
+/** The session still running, if any — there is at most one (startSession refuses a second). */
+export async function getRunningSession(db: SupabaseClient, userId: string): Promise<RunningSession | null> {
+  const { data, error } = await db
+    .from("live_sessions")
+    .select("id, venue, started_at")
+    .eq("user_id", userId)
+    .is("ended_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { id: String(data.id), venue: String(data.venue), started_at: String(data.started_at) } : null;
+}
+
 export async function getSession(db: SupabaseClient, userId: string, id: string): Promise<LiveSession | null> {
   const { data, error } = await db
     .from("live_sessions")
