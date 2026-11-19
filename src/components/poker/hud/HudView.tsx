@@ -310,59 +310,65 @@ export function HudView() {
               )}
               {(loading || (current && current.key !== key)) && <span className="text-xs text-accent">updating…</span>}
             </div>
-            {current?.hud.error ? (
-              <p className="mt-3 text-sm text-red-600">{current.hud.error}</p>
-            ) : !current ? (
-              <p className="mt-3 text-sm text-muted">Loading his hands…</p>
-            ) : (
-              <div className={current.key !== key ? "opacity-60 transition-opacity" : undefined}>
-                <div className="mt-3 flex flex-wrap items-start gap-3">
-                  <div className="min-w-0">
-                    <HudPanel group={MAIN} hud={current.hud} compact onPopup={setPopup} />
-                  </div>
-                  {SIDE && (
-                    <div className="min-w-0">
-                      <HudPanel group={SIDE} hud={current.hud} compact onPopup={setPopup} />
-                    </div>
-                  )}
-                  {/* The note: as tall as the panels, expands on hover / while typing.
-                      One box per pinned player, inactive ones hidden: a note being
-                      typed survives switching players. */}
-                  <div className="relative min-h-24 w-64 self-stretch">
-                    {pins.map((p) => (
-                      <div key={p.id} hidden={p.id !== selected} className="absolute inset-0">
-                        <NotesBox
-                          player={p.id}
-                          note={notes[p.id]}
-                          autos={autos[p.id]}
-                          onSaved={(n) => setNotes((prev) => ({ ...prev, [p.id]: n }))}
-                        />
+            {/* Two columns: the HUD (⅔) and the notes (⅓, kept in view). */}
+            <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <div className="min-w-0">
+                {current?.hud.error ? (
+                  <p className="text-sm text-red-600">{current.hud.error}</p>
+                ) : !current ? (
+                  <p className="text-sm text-muted">Loading his hands…</p>
+                ) : (
+                  <div className={current.key !== key ? "opacity-60 transition-opacity" : undefined}>
+                    <div className="flex flex-wrap items-start gap-3">
+                      <div className="min-w-0">
+                        <HudPanel group={MAIN} hud={current.hud} compact onPopup={setPopup} />
                       </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-4 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
-                  {TABS.map(({ label, group: g }) => (
-                    <button
-                      key={g.name}
-                      type="button"
-                      onClick={() => setPopup(g.name)}
-                      className={[
-                        "shrink-0 rounded-md px-2.5 py-1 text-xs",
-                        g.name === popupGroup?.name ? "bg-accent font-medium text-white" : "text-muted hover:text-foreground",
-                      ].join(" ")}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {popupGroup && (
-                  <div className="mt-2">
-                    <HudPanel group={popupGroup} hud={current.hud} onPopup={setPopup} />
+                      {SIDE && (
+                        <div className="min-w-0">
+                          <HudPanel group={SIDE} hud={current.hud} compact onPopup={setPopup} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
+                      {TABS.map(({ label, group: g }) => (
+                        <button
+                          key={g.name}
+                          type="button"
+                          onClick={() => setPopup(g.name)}
+                          className={[
+                            "shrink-0 rounded-md px-2.5 py-1 text-xs",
+                            g.name === popupGroup?.name
+                              ? "bg-accent font-medium text-white"
+                              : "text-muted hover:text-foreground",
+                          ].join(" ")}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {popupGroup && (
+                      <div className="mt-2">
+                        <HudPanel group={popupGroup} hud={current.hud} onPopup={setPopup} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
+              {/* One box per pinned player, inactive ones hidden: a note being
+                  typed survives switching players. */}
+              <aside className="min-w-0 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto">
+                {pins.map((p) => (
+                  <div key={p.id} hidden={p.id !== selected}>
+                    <NotesBox
+                      player={p.id}
+                      note={notes[p.id]}
+                      autos={autos[p.id]}
+                      onSaved={(n) => setNotes((prev) => ({ ...prev, [p.id]: n }))}
+                    />
+                  </div>
+                ))}
+              </aside>
+            </div>
           </section>
         ) : (
           <p className="mt-6 text-sm text-muted">
