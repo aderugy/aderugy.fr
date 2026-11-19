@@ -289,13 +289,16 @@ export function HudView() {
       </aside>
 
       {/* HUD */}
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-5">
+      <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-5">
+        {/* Filters live in a menu: the HUD keeps the space while playing. */}
+        <div className="absolute right-3 top-3 z-40 sm:right-5 sm:top-4">
+          <FiltersMenu filters={filters} limits={limits} onChange={setFilters} />
+        </div>
         <BridgeState status={status} error={error} />
-        <Filters filters={filters} limits={limits} onChange={setFilters} />
 
         {currentPin ? (
-          <section className="mt-4">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <section>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pr-12">
               <h1 className="text-lg font-semibold tracking-tight">{currentPin.name}</h1>
               <span className="text-xs text-muted">{currentPin.site}</span>
               {current && (
@@ -525,6 +528,64 @@ function PlayerSearch({
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+/** A gear at the top right opening the filters; a dot when some are active. */
+function FiltersMenu({
+  filters,
+  limits,
+  onChange,
+}: {
+  filters: HudFilters;
+  limits: Pt4Limit[];
+  onChange: (f: HudFilters) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = filters.limits.length > 0 || filters.lastHands > 0 || filters.days > 0;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label="HUD filters"
+        title="Filters: stakes, last hands, last days"
+        className={[
+          "relative flex h-8 w-8 items-center justify-center rounded-md border text-muted hover:text-foreground",
+          open ? "border-accent text-foreground" : "border-line bg-surface",
+        ].join(" ")}
+      >
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4" aria-hidden>
+          <path d="M3 5h9M15 5h2M3 10h3M9 10h8M3 15h7M13 15h4" strokeLinecap="round" />
+          <circle cx="13.5" cy="5" r="1.6" />
+          <circle cx="7.5" cy="10" r="1.6" />
+          <circle cx="11.5" cy="15" r="1.6" />
+        </svg>
+        {active && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-[36rem] max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-surface p-3 shadow-xl">
+          <Filters filters={filters} limits={limits} onChange={onChange} />
+        </div>
       )}
     </div>
   );
