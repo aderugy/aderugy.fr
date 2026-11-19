@@ -84,6 +84,10 @@ export type ShownStat = {
   /** Fewer opportunities than the stat's minimum sample. */
   thin: boolean;
   title: string;
+  /** For the hover card: stat name with its position filter ("VPIP · BTN"). */
+  label: string;
+  /** For the hover card: "12 / 48" (occurrences / opportunities) or "48 hands". */
+  sample: string;
 };
 
 /** Everything needed to draw one stat of the HUD. */
@@ -92,23 +96,36 @@ export function showStat(
   stats: Record<string, StatValues> | undefined,
   playerName = "",
 ): ShownStat {
-  if (item.stat === "Player") return { text: playerName, thin: false, title: playerName };
+  if (item.stat === "Player") return { text: playerName, thin: false, title: playerName, label: "Player", sample: "" };
   const v = stats?.[item.stat]?.[item.pos];
   const value = statValue(item.stat, v);
   const text = formatStat(item.stat, value);
   const den = v?.[1] ?? 0;
   const kind = statKind(item.stat);
+  const num = v?.[0] ?? 0;
   const sample =
-    kind === "pct" || kind === "ratio" ? ` (${Math.round(v?.[0] ?? 0)}/${Math.round(den)})` : kind === "bb100" ? ` (${den} hands)` : "";
+    kind === "pct" || kind === "ratio"
+      ? `${round2(num)} / ${round2(den)}`
+      : kind === "bb100" || kind === "sum"
+        ? `${den.toLocaleString("en")} hands`
+        : "";
+  const label = `${item.stat}${POS_SUFFIX[item.pos]}`;
   return {
     text,
     color: statColor(item, value),
     thin: item.minSample !== undefined && kind === "pct" && den < item.minSample,
-    title: `${item.stat}${POS_SUFFIX[item.pos]}: ${text}${sample}`,
+    title: `${label}: ${text}${sample ? ` (${sample})` : ""}`,
+    label,
+    sample,
   };
 }
 
 const POS_SUFFIX = ["", " · BB", " · SB", " · EP", " · MP", " · CO", " · BTN"];
+
+/** Counts are whole numbers; amounts (River Call Efficiency) keep 2 decimals. */
+function round2(x: number): string {
+  return Number.isInteger(x) ? x.toLocaleString("en") : (Math.round(x * 100) / 100).toLocaleString("en");
+}
 
 /** Query parameters for /pt4/hud. */
 export function filterParams(f: HudFilters): Record<string, string | undefined> {
