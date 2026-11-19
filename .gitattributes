@@ -1,0 +1,4 @@
+# Scripts run inside Linux (Docker build, tests): keep LF even on a Windows checkout,
+# or "#!/usr/bin/env python3\r" cannot start.
+*.py text eol=lf
+*.sh text eol=lf
