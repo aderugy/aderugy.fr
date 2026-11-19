@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"aderugy.fr/pio-bridge/internal/pt4"
 )
 
 // App is the whole bridge minus the tray: config, solver manager, HTTP server.
@@ -20,6 +22,7 @@ type App struct {
 
 	cfgPath string
 	m       *Manager
+	pt4     *pt4.Service
 	srv     *http.Server
 	addr    string
 	token   string // CSRF token for the status page forms (per run)
@@ -44,6 +47,8 @@ func NewApp(cfg Config, cfgPath, version string) *App {
 	a := &App{Version: version, cfgPath: cfgPath, token: hex.EncodeToString(b)}
 	a.m = NewManager(cfg)
 	a.m.Logf = a.Logf
+	a.pt4 = pt4.NewService(cfg.PT4)
+	a.pt4.Logf = a.Logf
 	return a
 }
 
@@ -116,6 +121,9 @@ func (a *App) SaveConfig(c Config) (note string, err error) {
 		return "", err
 	}
 	a.m.SetConfig(c)
+	if c.PT4 != old.PT4 {
+		a.pt4.Configure(c.PT4)
+	}
 	a.Logf("settings saved")
 	if c.Port != old.Port {
 		return fmt.Sprintf("Saved. The new port %d applies after restarting PioBridge.", c.Port), nil

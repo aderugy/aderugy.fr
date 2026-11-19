@@ -27,6 +27,11 @@ import (
 //	GET  /api/hand-order                     the 1326 combos in solver order
 //	GET  /api/node?file=&id=                 a node and its children
 //	GET  /api/decision?file=&id=&stats=1     strategy + range (+ equity, EV, EV per action)
+//	GET  /pt4/status                         PokerTracker 4 database state (see pt4.go)
+//	GET  /pt4/players?q=                     search players
+//	GET  /pt4/limits                         stakes with hands
+//	GET  /pt4/hud?ids=&limits=&last=&days=   HUDs of players
+//	GET  /pt4/verify?id=                     a player's stats vs PT4's cash_cache
 //	GET  /                                   status page (same origin only)
 //	GET  /api/status                         data for the status page (same origin only)
 //	POST /settings, /restart                 status page forms (same origin + token)
@@ -41,6 +46,11 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/node", a.node)
 	mux.HandleFunc("GET /api/decision", a.decision)
 	mux.HandleFunc("GET /api/runouts", a.runouts)
+	mux.HandleFunc("GET /pt4/status", a.pt4Status)
+	mux.HandleFunc("GET /pt4/players", a.pt4Players)
+	mux.HandleFunc("GET /pt4/limits", a.pt4Limits)
+	mux.HandleFunc("GET /pt4/hud", a.pt4HUD)
+	mux.HandleFunc("GET /pt4/verify", a.pt4Verify)
 	mux.HandleFunc("GET /api/status", a.sameOrigin(a.statusJSON))
 	mux.HandleFunc("GET /{$}", a.sameOrigin(a.statusPage))
 	mux.HandleFunc("POST /settings", a.sameOrigin(a.formGuard(a.saveSettings)))
@@ -717,6 +727,7 @@ func (a *App) statusJSON(w http.ResponseWriter, r *http.Request) {
 		"status":   a.m.Status(),
 		"requests": reqs,
 		"log":      tail,
+		"pt4":      a.pt4.Status(),
 	})
 }
 
@@ -730,6 +741,7 @@ func (a *App) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if m, err := strconv.Atoi(strings.TrimSpace(r.PostForm.Get("idleMinutes"))); err == nil {
 		c.IdleMinutes = m
 	}
+	c.PT4 = strings.TrimSpace(r.PostForm.Get("pt4"))
 	c.AllowedOrigins = nil
 	for _, o := range strings.Split(r.PostForm.Get("allowedOrigins"), "\n") {
 		if o = strings.TrimSpace(o); o != "" {
