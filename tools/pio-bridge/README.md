@@ -59,8 +59,9 @@ Errors: `{error, message}` with a code:
 ## PokerTracker 4 (the HUD on /poker/hud)
 
 The bridge also reads the local PokerTracker 4 database (PostgreSQL) so the site can show the HUD of the players
-at the table. Read-only: a role with `SELECT` only, and every session opened with
-`default_transaction_read_only = on`.
+at the table, and reads/writes their PT4 notes. A role with `SELECT`, plus `INSERT, UPDATE` on `notes` only; every
+session opens with `default_transaction_read_only = on`, and only the note save switches its own transaction to
+read-write.
 
 1. Create the role once (pgAdmin, or `psql -U postgres -d "PT4 DB"`):
    ```sql
@@ -70,6 +71,8 @@ at the table. Read-only: a role with `SELECT` only, and every session opened wit
    GRANT SELECT ON ALL TABLES IN SCHEMA public TO aderugy_ro;
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO aderugy_ro;
    ALTER ROLE aderugy_ro SET default_transaction_read_only = on;
+   -- player notes (optional: without it, saving a note answers pt4_no_write)
+   GRANT INSERT, UPDATE ON public.notes TO aderugy_ro;
    ```
 2. Status page → Settings → *PokerTracker 4 database*:
    `postgres://aderugy_ro:PASSWORD@localhost:5432/PT4%20DB` (space = `%20`, `@` in the password = `%40`).
@@ -97,6 +100,13 @@ How it works (`internal/pt4/`):
 | `/pt4/limits` | stakes that have hands |
 | `/pt4/hud?ids=1,2&limits=3,4&last=500&days=30` | per player: `name`, `site`, `hands` (matching), `total`, `stats`: `{name: [[num, den] × 7]}` — index 0 all positions, then BB, SB, EP, MP, CO, BTN |
 | `/pt4/verify?id=` | the check against `cash_cache` |
+| `/pt4/notes?ids=1,2` | PT4 player notes: `{notes: {"1": {id, color, date, text, rich}}}` (players without one absent) |
+| `POST /pt4/notes` `{player, color, text, expected}` | saves a note (JSON only); `expected` = the `date` it was loaded with (`""` for a new one), 409 `note_changed` with PT4's current note if it changed meanwhile |
+
+Notes (`notes.go`): table `notes`, `enum_type = 'P'`, `id_x` = player, one per player. The text is wxWidgets rich text;
+the site edits plain text (one line per paragraph) and a save keeps the note's `<paragraphlayout>` (font, margins)
+but drops inline formatting — `rich: true` warns about it. A new note takes `max(id_note) + 1` under
+`LOCK TABLE notes IN EXCLUSIVE MODE`; every save moves `date_note`, which is the version checked against `expected`.
 
 Errors: `pt4_not_configured`, `pt4_error` (with the database's message).
 
@@ -110,7 +120,8 @@ Errors: `pt4_not_configured`, `pt4_error` (with the database's message).
 - No raw-command endpoint.
 - Status page and settings: same origin + per-run token.
 - PT4: read-only role and read-only sessions; the search text is quoted (and its `%` / `_` escaped), every other
-  parameter is a number.
+  parameter is a number. The one write (`POST /pt4/notes`) needs JSON, so a browser sends a preflight the guard
+  only answers for allowed sites; it touches only `notes`.
 - The solver runs hidden, inside a job object: it dies with the bridge.
 
 ## Layout

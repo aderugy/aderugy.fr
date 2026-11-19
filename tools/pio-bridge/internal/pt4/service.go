@@ -171,6 +171,24 @@ func (s *Service) query(sql string) (*Rows, error) {
 	return r, err
 }
 
+// withConn runs fn on one pooled connection (for a transaction).
+func (s *Service) withConn(fn func(c *Conn) error) error {
+	c, pool, err := s.acquire()
+	if err != nil {
+		return err
+	}
+	err = fn(c)
+	var pe *PGError
+	broken := err != nil && !errors.As(err, &pe) && !errors.Is(err, ErrNoteChanged) && !isUserErr(err)
+	s.release(c, pool, broken)
+	return err
+}
+
+// isUserErr: an error decided before or without talking to the server.
+func isUserErr(err error) bool {
+	return strings.HasPrefix(err.Error(), "no player ")
+}
+
 func (s *Service) ensurePositions() (Positions, error) {
 	s.mu.Lock()
 	p := s.positions

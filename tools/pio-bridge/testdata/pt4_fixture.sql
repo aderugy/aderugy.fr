@@ -62,3 +62,22 @@ VALUES
 INSERT INTO cash_cache (id_player, id_gametype, id_limit, cnt_players, position_type, flg_has_position_f, flg_has_position_t,
   flg_has_position_r, date_played_year_week, cnt_hands, cnt_walks, cnt_vpip, cnt_pfr, cnt_pfr_opp, cnt_f_cbet, cnt_f_cbet_opp)
 VALUES (1, 1, 1, 6, 0, false, false, false, 202645, 4, 1, 3, 2, 3, 1, 1);
+
+-- Notes: Villain has one (PT4's own XML, as exported), plus a hand note to ignore.
+INSERT INTO notes (id_note, id_x, enum_type, flg_tournament, id_gametype, date_note, id_color, note, note_tsvector) VALUES
+(1327, 1, 'P', false, 0, '2026-10-27 19:28:19', 6, '<?xml version="1.0" encoding="UTF-8"?>
+<richtext version="1.0.0.0" xmlns="http://www.wxwidgets.org">
+  <paragraphlayout textcolor="#000000" fontpointsize="9" fontfamily="70" fontstyle="90" fontweight="400" fontunderlined="0" fontface="Segoe UI" alignment="1" parspacingafter="10" parspacingbefore="0" linespacing="10" margin-left="5,4098" margin-right="5,4098" margin-top="5,4098" margin-bottom="5,4098">
+    <paragraph>
+      <text>C4B = QQ</text>
+    </paragraph>
+    <paragraph>
+      <text></text>
+    </paragraph>
+    <paragraph>
+      <text>4BP &lt;= ccbet ip = C33 2ndPf s. Kxxss, C66 br T, X/X FoB R =&gt; MV bluff</text>
+    </paragraph>
+  </paragraphlayout>
+</richtext>
+', ''),
+(1330, 101, 'H', false, 0, '2026-11-11 21:23:12', 0, '<?xml version="1.0" encoding="UTF-8"?><richtext/>', '');

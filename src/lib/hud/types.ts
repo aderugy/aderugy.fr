@@ -73,3 +73,16 @@ export type HudFilters = {
 };
 
 export const NO_FILTERS: HudFilters = { limits: [], lastHands: 0, days: 0 };
+
+/** A PokerTracker 4 player note (plain text: one line per PT4 paragraph). */
+export type Pt4Note = {
+  player: number;
+  id: number;
+  /** PT4 colour label, 0 = none. */
+  color: number;
+  /** PT4's date_note: the version a save must start from. */
+  date: string;
+  text: string;
+  /** Has PT4 formatting (bold, colours…) that saving from the site drops. */
+  rich: boolean;
+};
