@@ -7,7 +7,7 @@
 
 import { OFFLINE_MESSAGE, PIO_BRIDGE_URL, PioBridgeError } from "@/lib/solver/pioBridge";
 import { filterParams } from "./format";
-import type { HudFilters, PlayerHud, Pt4Limit, Pt4Note, Pt4Player, Pt4Status } from "./types";
+import type { HudFilters, PlayerHud, Pt4AutoNote, Pt4Limit, Pt4Note, Pt4Player, Pt4Status } from "./types";
 
 /** Saving a note PT4 changed meanwhile: `current` is PT4's version. */
 export class NoteConflictError extends PioBridgeError {
@@ -69,4 +69,7 @@ export const pt4 = {
   notes: (ids: number[]) =>
     call<{ notes: Record<string, Pt4Note> }>("/pt4/notes", { ids: ids.join(",") }).then((r) => r.notes),
   saveNote,
+  /** PT4's auto-notes; players without any are absent. */
+  autoNotes: (ids: number[]) =>
+    call<{ autonotes: Record<string, Pt4AutoNote[]> }>("/pt4/autonotes", { ids: ids.join(",") }).then((r) => r.autonotes),
 };

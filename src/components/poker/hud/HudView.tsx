@@ -5,7 +5,16 @@ import { pt4 } from "@/lib/hud/client";
 import { describeFilters, popupTabs, shortCount, showStat } from "@/lib/hud/format";
 import layoutJson from "@/lib/hud/layout.json";
 import { NO_FILTERS } from "@/lib/hud/types";
-import type { HudFilters, HudLayout, PlayerHud, Pt4Limit, Pt4Note, Pt4Player, Pt4Status } from "@/lib/hud/types";
+import type {
+  HudFilters,
+  HudLayout,
+  PlayerHud,
+  Pt4AutoNote,
+  Pt4Limit,
+  Pt4Note,
+  Pt4Player,
+  Pt4Status,
+} from "@/lib/hud/types";
 import { PioBridgeError } from "@/lib/solver/pioBridge";
 import { HudPanel } from "./HudPanel";
 import { NotesBox } from "./NotesBox";
@@ -62,6 +71,7 @@ export function HudView() {
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<Pt4Limit[]>([]);
   const [notes, setNotes] = useState<Record<number, Pt4Note>>({});
+  const [autos, setAutos] = useState<Record<number, Pt4AutoNote[]>>({});
   const [loading, setLoading] = useState(false);
   const maxHand = useRef(0);
 
@@ -136,6 +146,21 @@ export function HudView() {
     }
   }, []);
 
+  // PT4's auto-notes change only when hands are imported.
+  const fetchAutos = useCallback(async (which: number[]) => {
+    if (!which.length) return;
+    try {
+      const a = await pt4.autoNotes(which);
+      setAutos((prev) => {
+        const next = { ...prev };
+        for (const id of which) next[id] = a[String(id)] ?? [];
+        return next;
+      });
+    } catch {
+      // the HUD fetch reports bridge errors
+    }
+  }, []);
+
   // Pins or filters changed: refresh every pinned HUD (debounced for typing).
   const idsKey = ids.join(",");
   const idsRef = useRef(ids);
@@ -146,11 +171,12 @@ export function HudView() {
     const t = setTimeout(() => {
       void fetchHuds(ids, filters);
       void fetchNotes(ids);
+      void fetchAutos(ids);
     }, 150);
     return () => clearTimeout(t);
     // ids / filters are compared by value (idsKey, key), not identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey, key, fetchHuds, fetchNotes]);
+  }, [idsKey, key, fetchHuds, fetchNotes, fetchAutos]);
 
   // Poll the bridge: connection state, and new hands → refresh quietly.
   useEffect(() => {
@@ -165,6 +191,7 @@ export function HudView() {
         if (s.connected && s.maxHand > maxHand.current) {
           maxHand.current = s.maxHand;
           void fetchHuds(idsRef.current, filtersRef.current, true);
+          void fetchAutos(idsRef.current);
         }
       } catch (e) {
         if (!stop) {
@@ -179,7 +206,7 @@ export function HudView() {
       stop = true;
       clearTimeout(timer);
     };
-  }, [fetchHuds, fetchNotes]);
+  }, [fetchHuds, fetchNotes, fetchAutos]);
 
   // Stakes, once connected.
   const connected = !!status?.connected;
@@ -304,6 +331,7 @@ export function HudView() {
                         <NotesBox
                           player={p.id}
                           note={notes[p.id]}
+                          autos={autos[p.id]}
                           onSaved={(n) => setNotes((prev) => ({ ...prev, [p.id]: n }))}
                         />
                       </div>

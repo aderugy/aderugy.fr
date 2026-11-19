@@ -86,3 +86,15 @@ export type Pt4Note = {
   /** Has PT4 formatting (bold, colours…) that saving from the site drops. */
   rich: boolean;
 };
+
+/** One of PT4's auto-generated notes (read-only). */
+export type Pt4AutoNote = {
+  /** 1 preflop, 2 flop, 3 turn, 4 river (as far as the data shows). */
+  category: number;
+  /** e.g. "3Bet range {cardrange:QQ-KK,AQs+,AKo}". */
+  text: string;
+  /** Times it triggered. */
+  count: number;
+  hands: number;
+  updated: string;
+};

@@ -81,3 +81,10 @@ INSERT INTO notes (id_note, id_x, enum_type, flg_tournament, id_gametype, date_n
 </richtext>
 ', ''),
 (1330, 101, 'H', false, 0, '2026-11-11 21:23:12', 0, '<?xml version="1.0" encoding="UTF-8"?><richtext/>', '');
+
+-- Auto-notes (PT4 generates them): two for Villain, one for Hero.
+INSERT INTO notes_auto (id_autonote, id_player, uuid_name, id_category, flg_tournament, id_gametype, note, cnt_times, id_hands, date_added, date_updated) VALUES
+(1, 1, '92cc9e95-28df-8ed4-ada2-9bc149bd7985', 1, false, 0, '3Bet range {cardrange:QQ-KK,AQs+,AKo}', 9, '101;102;104;', '2026-11-01', '2026-11-19'),
+(2, 1, '4c4ee887-9d98-8449-c471-2852247869e9', 2, false, 0, 'Raised Flop Cbet w/Overpair or less & no draw', 2, '102;', '2026-11-01', '2026-11-19'),
+(3, 1, 'fbfd6831-397b-1975-a655-4889effb63e4', 1, false, 0, 'Called 2Bet from blinds range {cardrange:55,A5s,K2s,A9o-ATo,KJo}', 11, '104;', '2026-11-01', '2026-11-18'),
+(4, 2, 'fbfd6831-397b-1975-a655-4889effb63e4', 1, false, 0, 'Called 2Bet from blinds range {cardrange:97s,A8o,QJo}', 3, '103;', '2026-11-01', '2026-11-19');

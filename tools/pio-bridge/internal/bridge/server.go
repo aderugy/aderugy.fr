@@ -34,6 +34,7 @@ import (
 //	GET  /pt4/verify?id=                     a player's stats vs PT4's cash_cache
 //	GET  /pt4/notes?ids=                     PT4 player notes
 //	POST /pt4/notes                          save one (the only write; see pt4.go)
+//	GET  /pt4/autonotes?ids=                 PT4's auto-generated notes (read-only)
 //	GET  /                                   status page (same origin only)
 //	GET  /api/status                         data for the status page (same origin only)
 //	POST /settings, /restart                 status page forms (same origin + token)
@@ -55,6 +56,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /pt4/verify", a.pt4Verify)
 	mux.HandleFunc("GET /pt4/notes", a.pt4Notes)
 	mux.HandleFunc("POST /pt4/notes", a.pt4SaveNote)
+	mux.HandleFunc("GET /pt4/autonotes", a.pt4AutoNotes)
 	mux.HandleFunc("GET /api/status", a.sameOrigin(a.statusJSON))
 	mux.HandleFunc("GET /{$}", a.sameOrigin(a.statusPage))
 	mux.HandleFunc("POST /settings", a.sameOrigin(a.formGuard(a.saveSettings)))
