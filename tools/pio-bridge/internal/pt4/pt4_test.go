@@ -121,6 +121,7 @@ func TestPostflopStats(t *testing.T) {
 	f.Act = [4]string{"C", "B", "", ""}
 	f.Aggr = [4]string{"89", "0", "", ""}
 	f.Actors = [4]string{"90", "90", "", ""}
+	f.PfaSaw[Flop] = true
 	f.derive()
 
 	v := Compute(SortedCatalogue(), []Hand{h, f})
@@ -426,4 +427,36 @@ func TestLimperStats(t *testing.T) {
 	eq(t, v, "Raise With Previous Limpers", 0, 1, 2)
 	eq(t, v, "Raise With Previous Limpers", 1, 1, 2) // BB column
 	eq(t, v, "Limp With Previous Limpers", 0, 0, 0)  // the BB can't limp
+}
+
+func TestFacingCheckRaise(t *testing.T) {
+	// BTN (0) bets the flop, the BB (8) — who acts first, so checked — raises: BTN folds.
+	xrFold := hand(0, 6, FFSaw, FFOpenOpp, FFBet, FFFaceRaise, FFFold)
+	xrFold.Act[Flop], xrFold.Aggr[Flop], xrFold.RaiserPos[Flop] = "BF", "08", 8
+	// Same, BTN calls.
+	xrCall := xrFold
+	xrCall.flags = [2]uint64{}
+	for _, f := range []Flag{FFSaw, FFOpenOpp, FFBet, FFFaceRaise} {
+		xrCall.set(f)
+	}
+	xrCall.Act[Flop] = "BC"
+	// The BB (8) leads, the BTN (0) raises: a raise, not a check-raise.
+	lead := hand(8, 1, FFSaw, FFOpenOpp, FFBet, FFFaceRaise, FFFold)
+	lead.Act[Flop], lead.Aggr[Flop], lead.RaiserPos[Flop] = "BF", "80", 0
+	// UTG (5) bets, CO (1) — acting after him — raises: not a check-raise.
+	ip := hand(5, 3, FFSaw, FFOpenOpp, FFBet, FFFaceRaise)
+	ip.Act[Flop], ip.Aggr[Flop], ip.RaiserPos[Flop] = "BC", "51", 1
+	// MP (2) bets the turn, the SB (9) check-raises: re-raised.
+	sb := hand(2, 4, FTSaw, FTOpenOpp, FTBet, FTFaceRaise)
+	sb.Act[Turn], sb.Aggr[Turn], sb.RaiserPos[Turn] = "BR", "292", 9
+
+	v := Compute(SortedCatalogue(), []Hand{xrFold, xrCall, lead, ip, sb})
+	eq(t, v, "Fold to F Check Raise", 0, 1, 2)
+	eq(t, v, "Call F Check Raise", 0, 1, 2)
+	eq(t, v, "3Bet F Check Raise", 0, 0, 2)
+	eq(t, v, "3Bet T Check Raise", 0, 1, 1)
+	eq(t, v, "Fold to F 2Bet", 0, 2, 4) // every raise faced after betting
+	if !(actsBefore('9', '8') && actsBefore('8', '7') && actsBefore('5', '1') && actsBefore('1', '0') && !actsBefore('0', '9')) {
+		t.Error("postflop order")
+	}
 }
