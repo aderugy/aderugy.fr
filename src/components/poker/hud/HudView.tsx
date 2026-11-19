@@ -295,19 +295,20 @@ export function HudView() {
                       <HudPanel group={SIDE} hud={current.hud} compact onPopup={setPopup} />
                     </div>
                   )}
-                </div>
-                <div className="mt-4 max-w-3xl">
-                  {/* One box per pinned player, inactive ones hidden: a note being
+                  {/* The note: as tall as the panels, expands on hover / while typing.
+                      One box per pinned player, inactive ones hidden: a note being
                       typed survives switching players. */}
-                  {pins.map((p) => (
-                    <div key={p.id} hidden={p.id !== selected}>
-                      <NotesBox
-                        player={p.id}
-                        note={notes[p.id]}
-                        onSaved={(n) => setNotes((prev) => ({ ...prev, [p.id]: n }))}
-                      />
-                    </div>
-                  ))}
+                  <div className="relative min-h-24 w-64 self-stretch">
+                    {pins.map((p) => (
+                      <div key={p.id} hidden={p.id !== selected} className="absolute inset-0">
+                        <NotesBox
+                          player={p.id}
+                          note={notes[p.id]}
+                          onSaved={(n) => setNotes((prev) => ({ ...prev, [p.id]: n }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="mt-4 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
                   {TABS.map(({ label, group: g }) => (

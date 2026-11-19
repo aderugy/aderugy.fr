@@ -11,8 +11,9 @@ const COLORS = [1, 2, 3, 4, 5, 6, 7, 8];
 type Draft = { text: string; color: number; base: string };
 
 /**
- * The PokerTracker 4 note of one player, editable. Saving writes it to PT4
- * (Ctrl/⌘+Enter). If PT4 changed the note since it was loaded, the save is
+ * The PokerTracker 4 note of one player, editable, sized for the HUD row:
+ * collapsed it fills its slot; hovering or typing expands it over the page.
+ * Saving writes it to PT4 (Ctrl/⌘+Enter). If PT4 changed the note since it was loaded, the save is
  * refused and both versions are offered. While nothing is being edited, the
  * box follows the note as the page polls it.
  */
@@ -55,16 +56,32 @@ export function NotesBox({
     }
   };
 
+  // Collapsed: fills its slot next to the HUD panels (colour + text in small).
+  // Hover or focus: grows over the page below with the chips and buttons.
+  const open = "group-hover:flex group-focus-within:flex";
   return (
-    <div className="rounded-lg border border-line bg-surface p-2.5">
-      <div className="mb-2 flex flex-wrap items-center gap-1">
-        <span className="mr-1 text-xs text-muted">Note</span>
-        <ColorChip value={0} active={color === 0} onClick={() => edit({ color: 0 })} />
-        {COLORS.map((c) => (
-          <ColorChip key={c} value={c} active={color === c} onClick={() => edit({ color: c })} />
-        ))}
-        <span className="ml-auto text-[11px] text-muted">
-          {saving ? "saving…" : dirty ? "not saved · Ctrl+Enter" : note ? `saved ${note.date.replace("T", " ").slice(0, 16)}` : ""}
+    <div
+      className={[
+        "group absolute left-0 top-0 flex h-full w-full flex-col overflow-hidden rounded-lg bg-neutral-950 p-2 font-mono text-neutral-100",
+        "hover:z-30 hover:h-auto hover:min-h-full hover:w-[30rem] hover:shadow-xl",
+        "focus-within:z-30 focus-within:h-auto focus-within:min-h-full focus-within:w-[30rem] focus-within:shadow-xl",
+        conflict !== undefined ? "ring-1 ring-amber-500" : "",
+      ].join(" ")}
+    >
+      <div className="mb-1 flex items-center gap-1 text-[11px] text-neutral-400">
+        <span
+          className={`group-hover:hidden group-focus-within:hidden ${color > 0 ? "rounded bg-neutral-800 px-1 text-neutral-200" : ""}`}
+        >
+          {color > 0 ? color : "note"}
+        </span>
+        <span className={`hidden flex-wrap gap-1 ${open}`}>
+          <ColorChip value={0} active={color === 0} onClick={() => edit({ color: 0 })} />
+          {COLORS.map((c) => (
+            <ColorChip key={c} value={c} active={color === c} onClick={() => edit({ color: c })} />
+          ))}
+        </span>
+        <span className={`ml-auto ${dirty ? "text-amber-400" : ""}`}>
+          {saving ? "saving…" : dirty ? "not saved" : ""}
         </span>
       </div>
       <textarea
@@ -74,24 +91,29 @@ export function NotesBox({
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             if (dirty) void save();
-          } else if (e.key === "Escape" && dirty) {
-            setDraft(null);
-            setConflict(undefined);
+          } else if (e.key === "Escape") {
+            if (dirty) {
+              setDraft(null);
+              setConflict(undefined);
+            }
+            e.currentTarget.blur();
           }
         }}
-        rows={Math.min(10, Math.max(3, text.split("\n").length + 1))}
-        placeholder="No note on this player"
+        placeholder="No note · hover to write"
         spellCheck={false}
-        className="w-full resize-y rounded-md border border-line bg-background px-2.5 py-1.5 font-mono text-sm leading-6 outline-none focus:border-accent"
+        className={[
+          "min-h-0 w-full flex-1 resize-none bg-transparent text-xs leading-5 text-neutral-100 outline-none placeholder:text-neutral-600",
+          "group-hover:min-h-40 group-focus-within:min-h-40",
+        ].join(" ")}
       />
-      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-        {dirty && (
+      <div className={`mt-1 hidden flex-wrap items-center gap-2 font-sans text-xs ${open}`}>
+        {dirty ? (
           <>
             <button
               type="button"
               disabled={saving}
               onClick={() => void save()}
-              className="rounded-md bg-accent px-2.5 py-1 font-medium text-white disabled:opacity-60"
+              className="rounded-md bg-accent px-2 py-0.5 font-medium text-white disabled:opacity-60"
             >
               Save to PT4
             </button>
@@ -101,29 +123,30 @@ export function NotesBox({
                 setDraft(null);
                 setConflict(undefined);
               }}
-              className="text-muted hover:text-foreground"
+              className="text-neutral-400 hover:text-neutral-100"
             >
               Cancel
             </button>
+            <span className="text-neutral-500">Ctrl+Enter · Esc</span>
           </>
+        ) : (
+          note && <span className="text-neutral-500">saved {note.date.replace("T", " ").slice(0, 16)}</span>
         )}
-        {note?.rich && (
-          <span className="text-muted">This note has PT4 formatting (bold, colours…): saving here keeps the text only.</span>
-        )}
-        {error && <span className="text-red-600">{error}</span>}
+        {note?.rich && <span className="text-neutral-500">PT4 formatting is dropped on save.</span>}
+        {error && <span className="text-red-400">{error}</span>}
       </div>
       {conflict !== undefined && (
-        <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
-          <p className="font-medium">Changed in PokerTracker since you started editing.</p>
+        <div className="mt-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 font-sans text-xs">
+          <p className="font-medium text-amber-300">Changed in PokerTracker since you started editing.</p>
           {conflict ? (
-            <pre className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap font-mono text-muted">
+            <pre className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono text-neutral-300">
               {conflict.text || "(empty)"}
             </pre>
           ) : (
-            <p className="mt-1 text-muted">PT4 has no note on this player any more.</p>
+            <p className="mt-1 text-neutral-400">PT4 has no note on this player any more.</p>
           )}
           <div className="mt-1.5 flex gap-3">
-            <button type="button" onClick={() => void save(conflict?.date ?? "")} className="font-medium text-accent">
+            <button type="button" onClick={() => void save(conflict?.date ?? "")} className="font-medium text-amber-300">
               Keep mine
             </button>
             <button
@@ -133,7 +156,7 @@ export function NotesBox({
                 setDraft(null);
                 setConflict(undefined);
               }}
-              className="text-muted hover:text-foreground"
+              className="text-neutral-400 hover:text-neutral-100"
             >
               Take PT4&apos;s
             </button>
@@ -151,8 +174,8 @@ function ColorChip({ value, active, onClick }: { value: number; active: boolean;
       onClick={onClick}
       title={value === 0 ? "No colour" : `PT4 colour ${value}`}
       className={[
-        "h-6 min-w-6 rounded-md border px-1 font-mono text-[11px] tabular-nums",
-        active ? "border-accent bg-accent text-white" : "border-line text-muted hover:text-foreground",
+        "h-5 min-w-5 rounded border px-1 font-mono text-[11px] tabular-nums",
+        active ? "border-accent bg-accent text-white" : "border-neutral-700 text-neutral-400 hover:text-neutral-100",
       ].join(" ")}
     >
       {value === 0 ? "–" : value}
