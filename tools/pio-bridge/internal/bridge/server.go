@@ -32,6 +32,7 @@ import (
 //	GET  /pt4/limits                         stakes with hands
 //	GET  /pt4/hud?ids=&limits=&last=&days=   HUDs of players
 //	GET  /pt4/verify?id=                     a player's stats vs PT4's cash_cache
+//	GET  /pt4/verify-all?n=20                the same for the n most-played players, by stat
 //	GET  /pt4/notes?ids=                     PT4 player notes
 //	POST /pt4/notes                          save one (the only write; see pt4.go)
 //	GET  /pt4/autonotes?ids=                 PT4's auto-generated notes (read-only)
@@ -54,6 +55,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /pt4/limits", a.pt4Limits)
 	mux.HandleFunc("GET /pt4/hud", a.pt4HUD)
 	mux.HandleFunc("GET /pt4/verify", a.pt4Verify)
+	mux.HandleFunc("GET /pt4/verify-all", a.pt4VerifyAll)
 	mux.HandleFunc("GET /pt4/notes", a.pt4Notes)
 	mux.HandleFunc("POST /pt4/notes", a.pt4SaveNote)
 	mux.HandleFunc("GET /pt4/autonotes", a.pt4AutoNotes)

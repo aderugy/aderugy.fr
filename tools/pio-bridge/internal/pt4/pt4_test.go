@@ -251,6 +251,19 @@ func TestIntegration(t *testing.T) {
 		}
 	}
 	t.Logf("verify: %d/%d match, %d stats without a PT4 counter", rep.Matching, rep.Checked, len(rep.Missing))
+
+	all, err := s.VerifyAll(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Players) != 1 || all.Players[0].Name != "Villain" || len(all.Stats) == 0 {
+		t.Fatalf("verify-all %+v", all.Players)
+	}
+	for _, st := range all.Stats {
+		if st.Stat == "VPIP" && (st.Players != 1 || st.Matching != 1 || st.Mine != [2]float64{3, 3}) {
+			t.Errorf("VPIP %+v", st)
+		}
+	}
 }
 
 const ptNote = `<?xml version="1.0" encoding="UTF-8"?>
