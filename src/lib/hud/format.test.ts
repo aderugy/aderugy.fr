@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import layout from "./layout.json" with { type: "json" };
-import { describeFilters, filterParams, formatStat, popupTabs, shortCount, showStat, statValue } from "./format";
+import { describeFilters, filterParams, gridCells, formatStat, popupTabs, shortCount, showStat, statValue } from "./format";
 import type { HudItem, HudLayout } from "./types";
 
 type StatItem = Extract<HudItem, { t: "stat" }>;
@@ -95,4 +95,24 @@ test("popup tabs: the HUD's menu first, then the popups its stats open", () => {
     ],
   );
   assert.ok(!tabs.some((t) => t.group.name === "Preflop2"), "unlinked groups are left out");
+});
+
+test("grid placement: spans push cells to their column (PT4's triangle)", () => {
+  const g = (layout as HudLayout).groups.find((x) => x.name === "3bet position vs position")!;
+  const { cells, columns } = gridCells(g.items);
+  assert.equal(columns, 7);
+  const at = (stat: string, pos: number) =>
+    cells.find((c) => c.kind === "cell" && c.item.t === "stat" && c.item.stat === stat && c.item.pos === pos);
+  const bbVsSb = at("BB vs SB Open - 3Bet", 0);
+  assert.ok(bbVsSb && bbVsSb.kind === "cell");
+  assert.equal(bbVsSb.col, 7); // under "BB"
+  const coFromBtn = at("3Bet vs CO Open", 6);
+  assert.ok(coFromBtn && coFromBtn.kind === "cell" && coFromBtn.col === 5); // under "BTN"
+  const header = cells.filter((c) => c.kind === "cell" && c.row === 1);
+  assert.equal(header.length, 7);
+  assert.ok(cells.some((c) => c.kind === "hr" && c.row === 2));
+  // Every row fills exactly the 7 columns.
+  const widths = new Map<number, number>();
+  for (const c of cells) if (c.kind === "cell") widths.set(c.row, (widths.get(c.row) ?? 0) + c.span);
+  assert.deepEqual([...new Set(widths.values())], [7]);
 });

@@ -12,17 +12,22 @@ export type HudPos = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type HudItem =
   | { t: "br" }
   | { t: "hr" }
-  | { t: "text"; text: string }
+  | { t: "text"; text: string; span?: number; align?: HudAlign }
   | {
       t: "stat";
       stat: string;
       pos: HudPos;
+      /** Columns this cell spans in the group's grid (default 1). */
+      span?: number;
+      align?: HudAlign;
       prefix?: string;
       popup?: string;
       minSample?: number;
       color?: string;
       ranges?: [number, number, string][];
     };
+
+export type HudAlign = "center" | "right";
 
 export type HudGroup = {
   name: string;
