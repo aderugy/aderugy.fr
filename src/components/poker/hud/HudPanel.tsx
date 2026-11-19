@@ -1,29 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { showStat, type ShownStat } from "@/lib/hud/format";
+import { useMemo, useState } from "react";
+import { gridCells, showStat, type GridCell, type ShownStat } from "@/lib/hud/format";
 import type { HudGroup, HudItem, PlayerHud } from "@/lib/hud/types";
-
-type Row = { kind: "row"; items: HudItem[] } | { kind: "hr" };
-
-/** Splits a PT4 stat group into rows: "New Line" breaks, "Horizontal Line" divides. */
-function rows(items: HudItem[]): Row[] {
-  const out: Row[] = [];
-  let cur: HudItem[] = [];
-  const flush = () => {
-    if (cur.length) out.push({ kind: "row", items: cur });
-    cur = [];
-  };
-  for (const it of items) {
-    if (it.t === "br") flush();
-    else if (it.t === "hr") {
-      flush();
-      out.push({ kind: "hr" });
-    } else cur.push(it);
-  }
-  flush();
-  return out;
-}
 
 /** The hovered stat and where to draw its card (viewport coordinates). */
 type Tip = { s: ShownStat; x: number; y: number };
@@ -47,6 +26,7 @@ export function HudPanel({
   onPopup?: (name: string) => void;
 }) {
   const [tip, setTip] = useState<Tip | null>(null);
+  const { cells, columns } = useMemo(() => gridCells(group.items), [group.items]);
   const onHover: OnHover = (s, el) => {
     if (!s || !el) return setTip(null);
     const r = el.getBoundingClientRect();
@@ -62,24 +42,39 @@ export function HudPanel({
         compact ? "px-3 py-2 text-[15px] leading-7" : "overflow-x-auto px-3 py-2 text-xs leading-6",
       ].join(" ")}
     >
-      {rows(group.items).map((r, i) =>
-        r.kind === "hr" ? (
-          <div key={i} className="my-1 border-t border-neutral-700" />
-        ) : (
-          <div key={i} className={compact ? "flex flex-wrap items-baseline gap-x-3" : "flex items-baseline"}>
-            {r.items.map((it, j) => (
-              <Cell
-                key={j}
-                item={it}
-                hud={hud}
-                compact={compact}
-                first={j === 0}
-                onPopup={onPopup}
-                onHover={onHover}
-              />
-            ))}
-          </div>
-        ),
+      {compact ? (
+        // Panels at the table (main line, Avancé): one flowing line per row.
+        rowsOf(cells).map((r, i) =>
+          r === "hr" ? (
+            <div key={i} className="my-1 border-t border-neutral-700" />
+          ) : (
+            <div key={i} className="flex flex-wrap items-baseline gap-x-3">
+              {r.map((c, j) => (
+                <Cell key={j} item={c.item} hud={hud} onPopup={onPopup} onHover={onHover} />
+              ))}
+            </div>
+          ),
+        )
+      ) : (
+        // Popups: PT4's grid, cells spanning their columns.
+        <div
+          className="grid items-baseline gap-x-2"
+          style={{ gridTemplateColumns: `repeat(${columns}, minmax(2.75rem, max-content))` }}
+        >
+          {cells.map((c, i) =>
+            c.kind === "hr" ? (
+              <div key={i} style={{ gridRow: c.row, gridColumn: "1 / -1" }} className="my-1 border-t border-neutral-700" />
+            ) : (
+              <div
+                key={i}
+                style={{ gridRow: c.row, gridColumn: `${c.col} / span ${c.span}` }}
+                className={`min-w-0 whitespace-nowrap ${align(c)}`}
+              >
+                <Cell item={c.item} hud={hud} onPopup={onPopup} onHover={onHover} />
+              </div>
+            ),
+          )}
+        </div>
       )}
       {tip && (
         <div
@@ -98,40 +93,54 @@ export function HudPanel({
   );
 }
 
+type Placed = Extract<GridCell, { kind: "cell" }>;
+
+/** Cells grouped by row, for the flowing panels ("hr" = divider). */
+function rowsOf(cells: GridCell[]): (Placed[] | "hr")[] {
+  const out: (Placed[] | "hr")[] = [];
+  let row = -1;
+  for (const c of cells) {
+    if (c.kind === "hr") {
+      out.push("hr");
+      row = -1;
+    } else if (c.row !== row) {
+      out.push([c]);
+      row = c.row;
+    } else (out[out.length - 1] as Placed[]).push(c);
+  }
+  return out;
+}
+
+/**
+ * Popup alignment: PT4's when it sets one; values and short headers (EP, MP,
+ * Total…) centred so they line up; labels left.
+ */
+function align(c: Placed): string {
+  if (c.item.align === "center") return "text-center";
+  if (c.item.align === "right") return "text-right";
+  if (c.item.t === "stat") return "text-center";
+  return c.col > 1 && c.span === 1 && c.item.text.trim().length <= 6 ? "text-center" : "text-left";
+}
+
 function Cell({
   item,
   hud,
-  compact,
-  first,
   onPopup,
   onHover,
 }: {
-  item: HudItem;
+  item: Exclude<HudItem, { t: "br" } | { t: "hr" }>;
   hud: PlayerHud | undefined;
-  compact: boolean;
-  first: boolean;
   onPopup?: (name: string) => void;
   onHover: OnHover;
 }) {
   if (item.t === "text") {
-    // In popups, the first text of a row is its label; short texts after it
-    // are column headers (EP, MP…) and line up with the stat cells.
-    const width = compact
-      ? ""
-      : first
-        ? "w-48 shrink-0 truncate pr-2 text-left"
-        : item.text.trim().length <= 6
-          ? "w-12 shrink-0 text-center"
-          : "shrink-0 whitespace-nowrap px-2 text-left";
     return (
-      <span className={`${width} text-neutral-400`} title={item.text}>
+      <span className="text-neutral-400" title={item.text}>
         {item.text.trim()}
       </span>
     );
   }
-  if (item.t !== "stat") return null;
   const s = showStat(item, hud?.stats, hud?.name);
-  const width = compact ? "" : "w-12 shrink-0 text-center";
   const hover = {
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => onHover(s, e.currentTarget),
     onMouseLeave: () => onHover(null),
@@ -151,14 +160,14 @@ function Cell({
         aria-label={`${s.title} — open ${item.popup}`}
         onClick={() => onPopup(item.popup!)}
         {...hover}
-        className={`${width} rounded underline decoration-neutral-700 underline-offset-4 hover:decoration-neutral-300`}
+        className="rounded underline decoration-neutral-700 underline-offset-4 hover:decoration-neutral-300"
       >
         {body}
       </button>
     );
   }
   return (
-    <span className={`${width} cursor-default rounded hover:bg-neutral-800`} aria-label={s.title} {...hover}>
+    <span className="cursor-default rounded hover:bg-neutral-800" aria-label={s.title} {...hover}>
       {body}
     </span>
   );

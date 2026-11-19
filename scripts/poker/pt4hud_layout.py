@@ -61,16 +61,28 @@ def rgb(argb: str) -> str | None:
 
 
 # Element kinds: 1 stat · 2 "New Line" / "Horizontal Line" · 4 text label.
+# A group is a grid: "New Line" starts a row, each element spans e[14] columns.
+# e[7] is the wxWidgets alignment (0x100 centre, 0x200 right, else left).
 # e[13] is the position filter: 0 all · 1 BB · 2 SB · 3 EP · 4 MP · 5 CO · 6 BTN.
+def cell(e, item):
+    if e[14] and e[14] != 1:
+        item["span"] = e[14]
+    if e[7] & 0x100:
+        item["align"] = "center"
+    elif e[7] & 0x200:
+        item["align"] = "right"
+    return item
+
+
 def element(e):
     name, kind = e[0], e[1]
     if kind == 2:
         return {"t": "hr"} if name == "Horizontal Line" else {"t": "br"}
     if kind == 4:
-        return {"t": "text", "text": name}
+        return cell(e, {"t": "text", "text": name})
     if name == "Note Editor":
         return None
-    item = {"t": "stat", "stat": name, "pos": e[13]}
+    item = cell(e, {"t": "stat", "stat": name, "pos": e[13]})
     if e[5].strip():
         item["prefix"] = e[5]
     if e[8]:

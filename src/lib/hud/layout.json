@@ -611,7 +611,8 @@
     },
     {
      "t": "text",
-     "text": "Went to Showdown"
+     "text": "Went to Showdown",
+     "span": 2
     },
     {
      "t": "stat",
@@ -620,7 +621,8 @@
     },
     {
      "t": "text",
-     "text": "Won At Showdown"
+     "text": "Won At Showdown",
+     "span": 2
     },
     {
      "t": "stat",
@@ -883,11 +885,13 @@
     },
     {
      "t": "text",
-     "text": "3Bet VS Position"
+     "text": "3Bet VS Position",
+     "span": 2
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "align": "center"
     },
     {
      "t": "stat",
@@ -1080,7 +1084,8 @@
     },
     {
      "t": "text",
-     "text": "Préflop 5bet"
+     "text": "Préflop 5bet",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1207,7 +1212,9 @@
     },
     {
      "t": "text",
-     "text": "Flop"
+     "text": "Flop",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
@@ -1215,7 +1222,9 @@
     },
     {
      "t": "text",
-     "text": "General Post Flop"
+     "text": "General Post Flop",
+     "span": 6,
+     "align": "center"
     },
     {
      "t": "br"
@@ -1228,11 +1237,13 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 3
     },
     {
      "t": "text",
-     "text": "CBet Turn"
+     "text": "CBet Turn",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1259,7 +1270,8 @@
     },
     {
      "t": "text",
-     "text": "Donk"
+     "text": "Donk",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1269,7 +1281,8 @@
     },
     {
      "t": "text",
-     "text": "Check Raise"
+     "text": "Check Raise",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1296,7 +1309,8 @@
     },
     {
      "t": "text",
-     "text": "Fold to Donk"
+     "text": "Fold to Donk",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1306,7 +1320,8 @@
     },
     {
      "t": "text",
-     "text": "3Bet Check Raise"
+     "text": "3Bet Check Raise",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1333,7 +1348,8 @@
     },
     {
      "t": "text",
-     "text": "Call Donk"
+     "text": "Call Donk",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1343,7 +1359,8 @@
     },
     {
      "t": "text",
-     "text": "Call Check Raise"
+     "text": "Call Check Raise",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1384,7 +1401,8 @@
     },
     {
      "t": "text",
-     "text": "Fold to Check Raise"
+     "text": "Fold to Check Raise",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1411,7 +1429,8 @@
     },
     {
      "t": "text",
-     "text": "Raise Donk"
+     "text": "Raise Donk",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1438,7 +1457,8 @@
     },
     {
      "t": "text",
-     "text": "Float Flop "
+     "text": "Float Flop ",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1465,7 +1485,8 @@
     },
     {
      "t": "text",
-     "text": "Float Turn"
+     "text": "Float Turn",
+     "span": 2
     },
     {
      "t": "stat",
@@ -1706,15 +1727,21 @@
     },
     {
      "t": "text",
-     "text": "Flop Bets & Raises"
+     "text": "Flop Bets & Raises",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "Flop Calls"
+     "text": "Flop Calls",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "Flop Folds"
+     "text": "Flop Folds",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "br"
@@ -2001,7 +2028,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "br"
@@ -2018,7 +2046,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "br"
@@ -2077,15 +2106,20 @@
     },
     {
      "t": "text",
-     "text": "3Bet+ Pots"
+     "text": "3Bet+ Pots",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
-     "text": "Non-3Bet Pots"
+     "text": "Non-3Bet Pots",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "br"
@@ -2108,7 +2142,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2135,7 +2170,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2162,7 +2198,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2189,7 +2226,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2216,7 +2254,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2243,7 +2282,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2270,7 +2310,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2361,15 +2402,21 @@
     },
     {
      "t": "text",
-     "text": "Turn Bets & Raises"
+     "text": "Turn Bets & Raises",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "Turn Calls"
+     "text": "Turn Calls",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "Turn Folds"
+     "text": "Turn Folds",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "br"
@@ -2623,7 +2670,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2738,11 +2786,13 @@
     },
     {
      "t": "text",
-     "text": "3Bet+ Pots"
+     "text": "3Bet+ Pots",
+     "span": 4
     },
     {
      "t": "text",
-     "text": "Non-3Bet Pots"
+     "text": "Non-3Bet Pots",
+     "span": 2
     },
     {
      "t": "br"
@@ -2765,7 +2815,8 @@
     },
     {
      "t": "text",
-     "text": "  "
+     "text": "  ",
+     "span": 2
     },
     {
      "t": "text",
@@ -2792,7 +2843,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -2819,7 +2871,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -2846,7 +2899,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -2873,7 +2927,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -2900,7 +2955,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -2927,7 +2983,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3018,15 +3075,21 @@
     },
     {
      "t": "text",
-     "text": "River Bets & Raises"
+     "text": "River Bets & Raises",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "River Calls"
+     "text": "River Calls",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "River Folds"
+     "text": "River Folds",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "br"
@@ -3280,7 +3343,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -3340,7 +3404,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "text",
@@ -3409,11 +3474,13 @@
     },
     {
      "t": "text",
-     "text": "3Bet+ Pots"
+     "text": "3Bet+ Pots",
+     "span": 4
     },
     {
      "t": "text",
-     "text": "Non-3Bet Pots"
+     "text": "Non-3Bet Pots",
+     "span": 2
     },
     {
      "t": "br"
@@ -3436,7 +3503,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3463,7 +3531,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3490,7 +3559,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3517,7 +3587,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3544,7 +3615,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3571,7 +3643,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3598,7 +3671,8 @@
     },
     {
      "t": "text",
-     "text": ""
+     "text": "",
+     "span": 2
     },
     {
      "t": "text",
@@ -3669,7 +3743,9 @@
    "items": [
     {
      "t": "text",
-     "text": "3bet par position"
+     "text": "3bet par position",
+     "span": 2,
+     "align": "center"
     },
     {
      "t": "br"
@@ -3800,19 +3876,23 @@
     },
     {
      "t": "text",
-     "text": "Bataille de blinds"
+     "text": "Bataille de blinds",
+     "span": 12
     },
     {
      "t": "br"
     },
     {
      "t": "text",
-     "text": "BB vs SB"
+     "text": "BB vs SB",
+     "align": "center"
     },
     {
      "t": "stat",
      "stat": "3Bet vs SB 2Bet",
-     "pos": 0
+     "pos": 0,
+     "span": 2,
+     "align": "right"
     },
     {
      "t": "br"
@@ -3824,7 +3904,8 @@
     {
      "t": "stat",
      "stat": "3Bet vs BTN 2Bet",
-     "pos": 1
+     "pos": 1,
+     "span": 2
     },
     {
      "t": "br"
@@ -3836,7 +3917,8 @@
     {
      "t": "stat",
      "stat": "3Bet vs CO 2Bet",
-     "pos": 1
+     "pos": 1,
+     "span": 2
     }
    ]
   },
@@ -3866,7 +3948,8 @@
     },
     {
      "t": "text",
-     "text": "Fold to DB BTN"
+     "text": "Fold to DB BTN",
+     "span": 2
     },
     {
      "t": "stat",
@@ -3878,7 +3961,8 @@
     },
     {
      "t": "text",
-     "text": "Fold to Raise DB"
+     "text": "Fold to Raise DB",
+     "span": 2
     },
     {
      "t": "stat",
@@ -3890,7 +3974,8 @@
     },
     {
      "t": "text",
-     "text": "Raise DB"
+     "text": "Raise DB",
+     "span": 2
     },
     {
      "t": "stat",
@@ -3902,7 +3987,8 @@
     },
     {
      "t": "text",
-     "text": "Raise DB BTN"
+     "text": "Raise DB BTN",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4007,12 +4093,14 @@
    "items": [
     {
      "t": "text",
-     "text": "Float Flop"
+     "text": "Float Flop",
+     "span": 2
     },
     {
      "t": "stat",
      "stat": "Float Flop",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "text",
@@ -4021,19 +4109,22 @@
     {
      "t": "stat",
      "stat": "Fold to F Float Bet",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "br"
     },
     {
      "t": "text",
-     "text": "Float Turn"
+     "text": "Float Turn",
+     "span": 2
     },
     {
      "t": "stat",
      "stat": "Float Turn",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "text",
@@ -4042,19 +4133,22 @@
     {
      "t": "stat",
      "stat": "Fold to T Float Bet",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "br"
     },
     {
      "t": "text",
-     "text": "Float River"
+     "text": "Float River",
+     "span": 2
     },
     {
      "t": "stat",
      "stat": "Float River",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "text",
@@ -4063,7 +4157,8 @@
     {
      "t": "stat",
      "stat": "Fold to R Float Bet",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "br"
@@ -4076,7 +4171,8 @@
     },
     {
      "t": "text",
-     "text": "Pots 3bet"
+     "text": "Pots 3bet",
+     "span": 6
     },
     {
      "t": "br"
@@ -4086,7 +4182,8 @@
     },
     {
      "t": "text",
-     "text": "Float Flop"
+     "text": "Float Flop",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4098,7 +4195,8 @@
     },
     {
      "t": "text",
-     "text": "Float Turn"
+     "text": "Float Turn",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4110,7 +4208,8 @@
     },
     {
      "t": "text",
-     "text": "Float River"
+     "text": "Float River",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4128,7 +4227,8 @@
     },
     {
      "t": "text",
-     "text": "Move contre float"
+     "text": "Move contre float",
+     "span": 6
     },
     {
      "t": "br"
@@ -4138,7 +4238,8 @@
     },
     {
      "t": "text",
-     "text": "Fold X/R Flop"
+     "text": "Fold X/R Flop",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4150,7 +4251,8 @@
     },
     {
      "t": "text",
-     "text": "Fold X/R Turn"
+     "text": "Fold X/R Turn",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4162,7 +4264,8 @@
     },
     {
      "t": "text",
-     "text": "Fold X/R River"
+     "text": "Fold X/R River",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4180,7 +4283,8 @@
     },
     {
      "t": "text",
-     "text": "Cbet Pots Multiway"
+     "text": "Cbet Pots Multiway",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4195,7 +4299,8 @@
    "items": [
     {
      "t": "text",
-     "text": "3bet SB Open"
+     "text": "3bet SB Open",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4207,7 +4312,8 @@
     },
     {
      "t": "text",
-     "text": "Call SB Open"
+     "text": "Call SB Open",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4219,7 +4325,8 @@
     },
     {
      "t": "text",
-     "text": "Call BTN Open in SB"
+     "text": "Call BTN Open in SB",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4231,7 +4338,8 @@
     },
     {
      "t": "text",
-     "text": "Call BTN Open in BB"
+     "text": "Call BTN Open in BB",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4243,7 +4351,8 @@
     },
     {
      "t": "text",
-     "text": "Call CO Open in SB"
+     "text": "Call CO Open in SB",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4255,7 +4364,8 @@
     },
     {
      "t": "text",
-     "text": "Call CO Open in BB"
+     "text": "Call CO Open in BB",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4270,7 +4380,9 @@
    "items": [
     {
      "t": "text",
-     "text": "Stats de Check Raise Flop"
+     "text": "Stats de Check Raise Flop",
+     "span": 3,
+     "align": "center"
     },
     {
      "t": "br"
@@ -4283,7 +4395,8 @@
     },
     {
      "t": "text",
-     "text": "Check Raise Flop"
+     "text": "Check Raise Flop",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4295,7 +4408,8 @@
     },
     {
      "t": "text",
-     "text": "Fold to Check Raise Flop"
+     "text": "Fold to Check Raise Flop",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4307,7 +4421,8 @@
     },
     {
      "t": "text",
-     "text": "Call Flop Check Raise "
+     "text": "Call Flop Check Raise ",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4319,7 +4434,8 @@
     },
     {
      "t": "text",
-     "text": "3bet Flop Check Raise"
+     "text": "3bet Flop Check Raise",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4334,7 +4450,9 @@
     },
     {
      "t": "text",
-     "text": "Stats de Check Raise Turn"
+     "text": "Stats de Check Raise Turn",
+     "span": 3,
+     "align": "center"
     },
     {
      "t": "br"
@@ -4347,7 +4465,8 @@
     },
     {
      "t": "text",
-     "text": "Check Raise Turn"
+     "text": "Check Raise Turn",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4359,7 +4478,8 @@
     },
     {
      "t": "text",
-     "text": "Fold to Check Raise Turn"
+     "text": "Fold to Check Raise Turn",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4371,7 +4491,8 @@
     },
     {
      "t": "text",
-     "text": "Call Turn Check Raise"
+     "text": "Call Turn Check Raise",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4383,7 +4504,8 @@
     },
     {
      "t": "text",
-     "text": "3bet Turn Check Raise"
+     "text": "3bet Turn Check Raise",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4414,7 +4536,8 @@
     },
     {
      "t": "text",
-     "text": "Fold River"
+     "text": "Fold River",
+     "span": 3
     },
     {
      "t": "stat",
@@ -4435,7 +4558,8 @@
     },
     {
      "t": "text",
-     "text": "Fold River Cbet"
+     "text": "Fold River Cbet",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4466,7 +4590,8 @@
     },
     {
      "t": "text",
-     "text": "Fold River bet oop"
+     "text": "Fold River bet oop",
+     "span": 3
     },
     {
      "t": "stat",
@@ -4487,7 +4612,8 @@
     },
     {
      "t": "text",
-     "text": "Fold River Cbet oop"
+     "text": "Fold River Cbet oop",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4511,7 +4637,8 @@
     },
     {
      "t": "text",
-     "text": "Fold River bet ip"
+     "text": "Fold River bet ip",
+     "span": 3
     },
     {
      "t": "stat",
@@ -4532,7 +4659,8 @@
     },
     {
      "t": "text",
-     "text": "Fold River Cbet ip"
+     "text": "Fold River Cbet ip",
+     "span": 2
     },
     {
      "t": "stat",
@@ -4958,11 +5086,13 @@
     },
     {
      "t": "text",
-     "text": "3Bet VS Position"
+     "text": "3Bet VS Position",
+     "span": 2
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "align": "center"
     },
     {
      "t": "stat",
@@ -5175,7 +5305,8 @@
     },
     {
      "t": "text",
-     "text": "Raise Cbet"
+     "text": "Raise Cbet",
+     "span": 2
     },
     {
      "t": "stat",
@@ -5189,7 +5320,8 @@
     {
      "t": "stat",
      "stat": "Fold to Raise After F CBet",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "text",
@@ -5198,7 +5330,8 @@
     {
      "t": "stat",
      "stat": "3Bet Flop",
-     "pos": 0
+     "pos": 0,
+     "span": 2
     },
     {
      "t": "text",
@@ -5691,7 +5824,8 @@
    "items": [
     {
      "t": "text",
-     "text": "PF Agression Factor"
+     "text": "PF Agression Factor",
+     "span": 2
     },
     {
      "t": "stat",
@@ -5700,7 +5834,8 @@
     },
     {
      "t": "text",
-     "text": "PF Agression Frequency"
+     "text": "PF Agression Frequency",
+     "span": 2
     },
     {
      "t": "stat",
@@ -6182,7 +6317,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "br"
@@ -6269,7 +6405,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "stat",
@@ -6318,7 +6455,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "stat",
@@ -6391,7 +6529,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "stat",
@@ -6450,7 +6589,8 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 2
     },
     {
      "t": "stat",
@@ -6477,7 +6617,9 @@
     },
     {
      "t": "text",
-     "text": " "
+     "text": " ",
+     "span": 3,
+     "align": "center"
     },
     {
      "t": "stat",
@@ -6595,7 +6737,8 @@
     },
     {
      "t": "text",
-     "text": "Préflop 5bet"
+     "text": "Préflop 5bet",
+     "span": 2
     },
     {
      "t": "stat",
@@ -6631,27 +6774,33 @@
     },
     {
      "t": "text",
-     "text": "EP"
+     "text": "EP",
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "MP"
+     "text": "MP",
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "CO"
+     "text": "CO",
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "BTN"
+     "text": "BTN",
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "SB"
+     "text": "SB",
+     "align": "center"
     },
     {
      "t": "text",
-     "text": "BB"
+     "text": "BB",
+     "align": "center"
     },
     {
      "t": "br"
@@ -6664,7 +6813,8 @@
     },
     {
      "t": "text",
-     "text": "SB"
+     "text": "SB",
+     "span": 6
     },
     {
      "t": "stat",
@@ -6698,7 +6848,8 @@
     },
     {
      "t": "text",
-     "text": "BTN"
+     "text": "BTN",
+     "span": 5
     },
     {
      "t": "stat",
@@ -6759,7 +6910,8 @@
     },
     {
      "t": "text",
-     "text": "CO"
+     "text": "CO",
+     "span": 4
     },
     {
      "t": "stat",
@@ -6847,7 +6999,8 @@
     },
     {
      "t": "text",
-     "text": "MP"
+     "text": "MP",
+     "span": 3
     },
     {
      "t": "stat",
@@ -6962,7 +7115,8 @@
     },
     {
      "t": "text",
-     "text": "UTG"
+     "text": "UTG",
+     "span": 2
     },
     {
      "t": "stat",

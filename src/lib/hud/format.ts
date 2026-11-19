@@ -169,3 +169,39 @@ export function popupTabs(layout: HudLayout): { label: string; group: HudGroup }
     for (const it of out[i].group.items) if (it.t === "stat" && it.popup) push(it.popup, it.popup);
   return out;
 }
+
+export type GridCell =
+  | { kind: "cell"; item: Exclude<HudItem, { t: "br" } | { t: "hr" }>; row: number; col: number; span: number }
+  | { kind: "hr"; row: number };
+
+/**
+ * Places a PT4 stat group on its grid, as PT4 does: "New Line" starts a row,
+ * each element takes `span` columns from where the previous one ended, a
+ * "Horizontal Line" is a row of its own. Rows and columns are 1-based (CSS).
+ */
+export function gridCells(items: HudItem[]): { cells: GridCell[]; columns: number } {
+  const cells: GridCell[] = [];
+  let row = 1;
+  let col = 1;
+  let columns = 1;
+  const newRow = () => {
+    if (col > 1) {
+      row++;
+      col = 1;
+    }
+  };
+  for (const it of items) {
+    if (it.t === "br") newRow();
+    else if (it.t === "hr") {
+      newRow();
+      cells.push({ kind: "hr", row });
+      row++;
+    } else {
+      const span = Math.max(1, it.span ?? 1);
+      cells.push({ kind: "cell", item: it, row, col, span });
+      col += span;
+      columns = Math.max(columns, col - 1);
+    }
+  }
+  return { cells, columns };
+}
