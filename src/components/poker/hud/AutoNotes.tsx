@@ -17,8 +17,9 @@ export function AutoNotes({ notes }: { notes: Pt4AutoNote[] }) {
   for (const n of notes) groups.set(n.category, [...(groups.get(n.category) ?? []), n]);
 
   return (
-    <div className="mt-1.5 border-t border-neutral-800 pt-1.5 font-sans text-[11px] leading-[18px]">
-      <div className="max-h-56 overflow-y-auto pr-1 [scrollbar-width:thin]">
+    <div className="mt-2.5 border-t border-neutral-800 pt-2 font-sans text-[11px] leading-[18px]">
+      <div className="mb-1 text-[10px] text-neutral-500">PT4 auto-notes · {notes.length}</div>
+      <div>
         {[...groups.entries()]
           .sort(([a], [b]) => a - b)
           .map(([cat, list]) => (
