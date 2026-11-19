@@ -82,6 +82,11 @@ export function HudView() {
   useEffect(() => save(STORE.popup, popup), [popup]);
 
   const ids = useMemo(() => pins.map((p) => p.id), [pins]);
+  // Shown alphabetically (case and accents ignored); 1–9 follow this order.
+  const sortedPins = useMemo(
+    () => [...pins].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })),
+    [pins],
+  );
   const key = filterKey(filters);
 
   // Fetch the HUDs of `which` (default: every pinned player) for the filters.
@@ -238,13 +243,13 @@ export function HudView() {
         e.preventDefault();
         searchRef.current?.focus();
       } else if (/^[1-9]$/.test(e.key)) {
-        const p = pins[Number(e.key) - 1];
+        const p = sortedPins[Number(e.key) - 1];
         if (p) setSelected(p.id);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pins]);
+  }, [sortedPins]);
 
   const current = selected !== null ? huds[selected] : undefined;
   const currentPin = pins.find((p) => p.id === selected);
@@ -262,7 +267,7 @@ export function HudView() {
           {pins.length === 0 && (
             <li className="text-xs text-muted">Search a player and press Enter to add him to the table.</li>
           )}
-          {pins.map((p, i) => (
+          {sortedPins.map((p, i) => (
             <PinnedPlayer
               key={p.id}
               index={i}
