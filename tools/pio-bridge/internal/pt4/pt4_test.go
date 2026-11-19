@@ -367,3 +367,26 @@ func TestNotesIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAutoNotesIntegration(t *testing.T) {
+	dsn := os.Getenv("PT4_TEST_DSN")
+	if dsn == "" {
+		t.Skip("PT4_TEST_DSN not set")
+	}
+	s := NewService(dsn)
+	got, err := s.AutoNotes([]int64{1, 2, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := got[1]
+	if len(got) != 2 || len(v) != 3 || len(got[2]) != 1 {
+		t.Fatalf("%+v", got)
+	}
+	// Category 1 first, most frequent first inside it.
+	if v[0].Count != 11 || v[1].Text != "3Bet range {cardrange:QQ-KK,AQs+,AKo}" || v[1].Hands != 3 || v[2].Category != 2 {
+		t.Errorf("%+v", v)
+	}
+	if v[1].Updated != "2026-11-19T00:00:00" {
+		t.Errorf("updated %q", v[1].Updated)
+	}
+}

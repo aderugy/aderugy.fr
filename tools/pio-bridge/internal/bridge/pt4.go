@@ -99,6 +99,21 @@ func (a *App) pt4Notes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"notes": notes})
 }
 
+// /pt4/autonotes?ids=1,2 → {autonotes: {"1": [...]}}; players without any are absent.
+func (a *App) pt4AutoNotes(w http.ResponseWriter, r *http.Request) {
+	ids, err := intList(r.URL.Query().Get("ids"), 40)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_ids", "ids: up to 40 player ids, comma separated")
+		return
+	}
+	notes, err := a.pt4.AutoNotes(ids)
+	if err != nil {
+		writePT4Error(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"autonotes": notes})
+}
+
 // POST /pt4/notes {player, color, text, expected} → {note}; 409 note_changed
 // with the current note if PT4 changed it since `expected` (its date).
 func (a *App) pt4SaveNote(w http.ResponseWriter, r *http.Request) {

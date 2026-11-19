@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { NoteConflictError, pt4 } from "@/lib/hud/client";
-import type { Pt4Note } from "@/lib/hud/types";
+import type { Pt4AutoNote, Pt4Note } from "@/lib/hud/types";
+import { AutoNotes } from "./AutoNotes";
 import { PioBridgeError } from "@/lib/solver/pioBridge";
 
 /** PT4's colour labels offered here (0 = none). Their names live in PT4's settings. */
@@ -20,10 +21,13 @@ type Draft = { text: string; color: number; base: string };
 export function NotesBox({
   player,
   note,
+  autos = [],
   onSaved,
 }: {
   player: number;
   note: Pt4Note | undefined;
+  /** PT4's auto-notes, shown read-only under the note when expanded. */
+  autos?: Pt4AutoNote[];
   onSaved: (n: Pt4Note) => void;
 }) {
   // A draft exists only while editing; otherwise the stored note is shown.
@@ -83,6 +87,11 @@ export function NotesBox({
         <span className={`ml-auto ${dirty ? "text-amber-400" : ""}`}>
           {saving ? "saving…" : dirty ? "not saved" : ""}
         </span>
+        {autos.length > 0 && (
+          <span title={`${autos.length} PT4 auto-notes: hover to see them`} className="text-sky-400/80">
+            auto ×{autos.length}
+          </span>
+        )}
       </div>
       <textarea
         value={text}
@@ -103,7 +112,7 @@ export function NotesBox({
         spellCheck={false}
         className={[
           "min-h-0 w-full flex-1 resize-none bg-transparent text-xs leading-5 text-neutral-100 outline-none placeholder:text-neutral-600",
-          "group-hover:min-h-40 group-focus-within:min-h-40",
+          "group-hover:min-h-24 group-focus-within:min-h-24",
         ].join(" ")}
       />
       <div className={`mt-1 hidden flex-wrap items-center gap-2 font-sans text-xs ${open}`}>
@@ -135,6 +144,11 @@ export function NotesBox({
         {note?.rich && <span className="text-neutral-500">PT4 formatting is dropped on save.</span>}
         {error && <span className="text-red-400">{error}</span>}
       </div>
+      {autos.length > 0 && (
+        <div className={`hidden ${open} flex-col`}>
+          <AutoNotes notes={autos} />
+        </div>
+      )}
       {conflict !== undefined && (
         <div className="mt-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 font-sans text-xs">
           <p className="font-medium text-amber-300">Changed in PokerTracker since you started editing.</p>
