@@ -13,6 +13,7 @@ export const config = {
     "/",
     "/agenda/:path*",
     "/poker/live/:path*",
+    "/poker/hud/:path*",
     "/poker/spots/:path*",
     "/poker/trainers/:path*",
     "/maths/:path*",

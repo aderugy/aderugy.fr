@@ -56,6 +56,50 @@ Errors: `{error, message}` with a code:
 - `pio_missing` · `solver_unavailable` · `solver_error`
 - `origin_not_allowed`
 
+## PokerTracker 4 (the HUD on /poker/hud)
+
+The bridge also reads the local PokerTracker 4 database (PostgreSQL) so the site can show the HUD of the players
+at the table. Read-only: a role with `SELECT` only, and every session opened with
+`default_transaction_read_only = on`.
+
+1. Create the role once (pgAdmin, or `psql -U postgres -d "PT4 DB"`):
+   ```sql
+   CREATE ROLE aderugy_ro LOGIN PASSWORD '…';
+   GRANT CONNECT ON DATABASE "PT4 DB" TO aderugy_ro;
+   GRANT USAGE ON SCHEMA public TO aderugy_ro;
+   GRANT SELECT ON ALL TABLES IN SCHEMA public TO aderugy_ro;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO aderugy_ro;
+   ALTER ROLE aderugy_ro SET default_transaction_read_only = on;
+   ```
+2. Status page → Settings → *PokerTracker 4 database*:
+   `postgres://aderugy_ro:PASSWORD@localhost:5432/PT4%20DB` (space = `%20`, `@` in the password = `%40`).
+   The status card then shows `connected · … · last hand #N`.
+3. Check the stats against PT4 for a regular: `http://127.0.0.1:7878/pt4/verify?id=<id_player>` (the id is in
+   `/pt4/players?q=name`). It compares the unfiltered totals with PT4's own `cash_cache` counters, mismatches first.
+
+How it works (`internal/pt4/`):
+- A small built-in PostgreSQL client (`pgwire.go`: protocol 3, SCRAM-SHA-256 / MD5, simple queries): no driver to
+  download.
+- The first time a player is asked for, all his hands are loaded (one indexed query on
+  `cash_hand_player_statistics`, about 0.6 s for 60 000 hands) and kept in memory; afterwards only hands with a
+  higher `id_hand` are fetched, when `max(id_hand)` moves (checked at most every 2 s). Up to 200 players stay
+  cached.
+- A HUD for a filter (stakes, last N hands, last N days) is computed from those hands in a few ms and cached until
+  new hands arrive.
+- `stats.go` re-derives every stat of the HUD layout by its PT4 name from the `flg_*` / `enum_*` columns and
+  `cash_hand_summary.str_aggressors_*` / `str_actors_*`. The four custom stats exported with the HUD use PT4's own
+  formulas. Positions come from PT4's `lookup_positions`.
+
+| Endpoint | Returns |
+|---|---|
+| `/pt4/status` | `configured`, `connected`, `database` (no password), `error`, `maxHand`, `cachedPlayers` |
+| `/pt4/players?q=` | up to 25 cash players whose name contains `q` (prefix matches first) with their hand count |
+| `/pt4/limits` | stakes that have hands |
+| `/pt4/hud?ids=1,2&limits=3,4&last=500&days=30` | per player: `name`, `site`, `hands` (matching), `total`, `stats`: `{name: [[num, den] × 7]}` — index 0 all positions, then BB, SB, EP, MP, CO, BTN |
+| `/pt4/verify?id=` | the check against `cash_cache` |
+
+Errors: `pt4_not_configured`, `pt4_error` (with the database's message).
+
 ## Security
 
 - Listens on `127.0.0.1` only (no firewall prompt, not reachable from the LAN).
@@ -65,6 +109,8 @@ Errors: `{error, message}` with a code:
 - Node ids limited to `r`, digits, `c`, `f`, `bN`, cards: nothing else reaches the solver.
 - No raw-command endpoint.
 - Status page and settings: same origin + per-run token.
+- PT4: read-only role and read-only sessions; the search text is quoted (and its `%` / `_` escaped), every other
+  parameter is a number.
 - The solver runs hidden, inside a job object: it dies with the bridge.
 
 ## Layout
@@ -75,7 +121,9 @@ Errors: `{error, message}` with a code:
 | `cmd/probe/` | PioProbe, the phase 0 recorder |
 | `internal/upi/` | UPI client: start (hidden, job object), `set_end_string`, one command at a time, `show_node` parsing |
 | `internal/bridge/` | config, solver manager (start on demand, reload on change, retry once after a crash, idle stop), HTTP API, status page |
+| `internal/pt4/` | PokerTracker 4: PostgreSQL client, hand loading and cache, stat catalogue, check against `cash_cache` |
 | `internal/tray/`, `internal/winutil/` | tray icon and menu; single instance, start with Windows, open URL / folder |
+| `testdata/pt4_fixture.sql` | four hands with known stats for the PT4 integration test |
 | `testdata/` | real solver transcripts (`probe-8h5d3d*.txt`, licence line redacted) + `replay_pio.py` that replays them + `fake_pio.py` |
 
 ## Build and test
@@ -94,3 +142,6 @@ Errors: `{error, message}` with a code:
   - solver crash → restart + retry;
   - idle stop / restart;
   - PioSOLVER missing.
+- PT4: unit tests on the stats, and every stat of the site's layout (`src/lib/hud/layout.json`) must be in the
+  catalogue. The integration test runs when `PT4_TEST_DSN` points to a PostgreSQL holding an empty PT4 schema
+  (`pg_dump -s` of a real database) plus `testdata/pt4_fixture.sql`.

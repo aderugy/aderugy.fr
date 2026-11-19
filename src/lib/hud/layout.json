@@ -1,0 +1,7582 @@
+{
+ "name": "Cash - HUD Cash Game Freudinou",
+ "groups": [
+  {
+   "name": "Stat Group 1",
+   "main": true,
+   "items": [
+    {
+     "t": "br"
+    },
+    {
+     "t": "stat",
+     "stat": "Hands Abbreviated",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 0,
+     "prefix": "VP ",
+     "ranges": [
+      [
+       0.0,
+       22.99,
+       "#00ffff"
+      ],
+      [
+       23.0,
+       27.99,
+       "#ff8000"
+      ],
+      [
+       28.0,
+       31.99,
+       "#ff0000"
+      ],
+      [
+       32.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 0,
+     "popup": "RFI",
+     "ranges": [
+      [
+       0.0,
+       20.99,
+       "#00ffff"
+      ],
+      [
+       21.0,
+       24.99,
+       "#ff8000"
+      ],
+      [
+       25.0,
+       27.99,
+       "#ff0000"
+      ],
+      [
+       28.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "WWSF",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       41.99,
+       "#00ffff"
+      ],
+      [
+       42.0,
+       47.99,
+       "#ff8000"
+      ],
+      [
+       48.0,
+       53.99,
+       "#ff0000"
+      ],
+      [
+       54.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Fold",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       24.99,
+       "#00ff00"
+      ],
+      [
+       25.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 0,
+     "prefix": "3B ",
+     "popup": "3bet position vs position",
+     "ranges": [
+      [
+       0.0,
+       5.99,
+       "#00ffff"
+      ],
+      [
+       6.0,
+       8.99,
+       "#ff8000"
+      ],
+      [
+       9.0,
+       11.99,
+       "#ff0000"
+      ],
+      [
+       12.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 0,
+     "popup": "Vs 3bet",
+     "ranges": [
+      [
+       0.0,
+       56.99,
+       "#ff0000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet Preflop",
+     "pos": 0,
+     "prefix": "4B ",
+     "popup": "Fold 5bet",
+     "minSample": 20,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 0,
+     "popup": "F4bet",
+     "minSample": 10,
+     "ranges": [
+      [
+       0.0,
+       59.99,
+       "#ff0000"
+      ],
+      [
+       60.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 0,
+     "prefix": "SQ ",
+     "popup": "Squeeze",
+     "minSample": 20
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 6,
+     "minSample": 10,
+     "color": "#00ffff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop in non-3Bet+ Pot",
+     "pos": 0,
+     "prefix": "CB ",
+     "popup": "Float",
+     "minSample": 6,
+     "ranges": [
+      [
+       0.0,
+       59.99,
+       "#00ffff"
+      ],
+      [
+       60.0,
+       74.99,
+       "#ff8000"
+      ],
+      [
+       75.0,
+       84.99,
+       "#ff0000"
+      ],
+      [
+       85.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop in non-3Bet+ Pot",
+     "pos": 2,
+     "popup": "Float",
+     "minSample": 6,
+     "ranges": [
+      [
+       0.0,
+       34.99,
+       "#00ffff"
+      ],
+      [
+       35.0,
+       49.99,
+       "#ff8000"
+      ],
+      [
+       50.0,
+       64.99,
+       "#ff0000"
+      ],
+      [
+       65.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "popup": "Probe bet",
+     "minSample": 10,
+     "ranges": [
+      [
+       0.0,
+       39.99,
+       "#ff0080"
+      ],
+      [
+       40.0,
+       46.99,
+       "#ff0000"
+      ],
+      [
+       47.0,
+       53.99,
+       "#ff8000"
+      ],
+      [
+       54.0,
+       100.0,
+       "#00ffff"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn in non-3Bet+ Pot",
+     "pos": 0,
+     "prefix": "T ",
+     "popup": "Probe bet",
+     "minSample": 6,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#00ffff"
+      ],
+      [
+       50.0,
+       59.99,
+       "#ff8000"
+      ],
+      [
+       60.0,
+       74.99,
+       "#ff0000"
+      ],
+      [
+       75.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn in non-3Bet+ Pot",
+     "pos": 0,
+     "minSample": 6,
+     "ranges": [
+      [
+       0.0,
+       44.99,
+       "#00ffff"
+      ],
+      [
+       45.0,
+       59.99,
+       "#ff8000"
+      ],
+      [
+       60.0,
+       74.99,
+       "#ff0000"
+      ],
+      [
+       75.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "minSample": 10,
+     "ranges": [
+      [
+       0.0,
+       24.99,
+       "#ff0080"
+      ],
+      [
+       25.0,
+       29.99,
+       "#ff0000"
+      ],
+      [
+       30.0,
+       39.99,
+       "#ff8000"
+      ],
+      [
+       40.0,
+       100.0,
+       "#00ffff"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "CBet River in non-3Bet+ Pot",
+     "pos": 0,
+     "prefix": "R ",
+     "popup": "Situation River",
+     "minSample": 20,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#00ffff"
+      ],
+      [
+       50.0,
+       59.99,
+       "#ff8000"
+      ],
+      [
+       60.0,
+       74.99,
+       "#ff0000"
+      ],
+      [
+       75.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Flop in non-3Bet+ Pot",
+     "pos": 0,
+     "popup": "Donk bet",
+     "color": "#00ffff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "stat",
+     "stat": "Att To Steal - SB",
+     "pos": 2,
+     "prefix": "ST ",
+     "ranges": [
+      [
+       0.0,
+       34.99,
+       "#00ffff"
+      ],
+      [
+       35.0,
+       44.99,
+       "#ff8000"
+      ],
+      [
+       45.0,
+       54.99,
+       "#ff0000"
+      ],
+      [
+       55.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Att To Steal",
+     "pos": 6,
+     "ranges": [
+      [
+       0.0,
+       39.99,
+       "#00ffff"
+      ],
+      [
+       40.0,
+       49.99,
+       "#ff8000"
+      ],
+      [
+       50.0,
+       59.99,
+       "#ff0000"
+      ],
+      [
+       60.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold vs BTN Open",
+     "pos": 1,
+     "popup": "Blinds vs Blinds",
+     "ranges": [
+      [
+       0.0,
+       54.99,
+       "#ff0000"
+      ],
+      [
+       55.0,
+       61.99,
+       "#ff8000"
+      ],
+      [
+       62.0,
+       100.0,
+       "#00ffff"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop in 3Bet+ Pot",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F CBet in 3Bet+ Pot",
+     "pos": 0,
+     "minSample": 10,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn in 3Bet+ Pot",
+     "pos": 0,
+     "minSample": 10,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T CBet in 3Bet+ Pot",
+     "pos": 0,
+     "minSample": 10,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Check Raise Flop",
+     "pos": 0,
+     "popup": "Check Raise",
+     "minSample": 10,
+     "color": "#8000ff"
+    }
+   ],
+   "menu": [
+    {
+     "title": "Tools",
+     "group": "Tools"
+    },
+    {
+     "title": "Preflop3",
+     "group": "Preflop3"
+    },
+    {
+     "title": "Flop",
+     "group": "Flop"
+    },
+    {
+     "title": "Turn",
+     "group": "Turn"
+    },
+    {
+     "title": "River",
+     "group": "River"
+    }
+   ]
+  },
+  {
+   "name": "Tools",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "BB/100"
+    },
+    {
+     "t": "stat",
+     "stat": "BB/100",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "text",
+     "text": "BB Won"
+    },
+    {
+     "t": "stat",
+     "stat": "BB Won",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Won When Saw Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "WWSF",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Went to Showdown"
+    },
+    {
+     "t": "stat",
+     "stat": "WTSD",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Won At Showdown"
+    },
+    {
+     "t": "stat",
+     "stat": "WSD",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "VPIP"
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "PFR"
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise First In"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 0,
+     "color": "#0080c0"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 3,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 4,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 5,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 6,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 2,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 1,
+     "color": "#0080c0"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet BY Position"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 3,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 4,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 5,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 6,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 2,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 1,
+     "color": "#ff0000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet VS Position"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs MP 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs SB 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BB 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 3Bet After Raising"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "4Bet+ After Raising"
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 4Bet After 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call PF 4bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Préflop 5bet"
+    },
+    {
+     "t": "stat",
+     "stat": "5Bet+ Preflop",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "text",
+     "text": "  "
+    },
+    {
+     "t": "text",
+     "text": "Fold to PF 5bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Squeeze"
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Limp & Call Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Call",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Call",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Call",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Call",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Call",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Call",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Limp Call",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Flop"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "General Post Flop"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "CBet Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold F Cbet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Flop",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Check Raise Flop",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "3Bet Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet F Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet in 3Bet+ Pot"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Call Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Call Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet in 3Bet+ Pot"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Fold R Donk"
+    },
+    {
+     "t": "text",
+     "text": "         "
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F Donk",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet in 3Bet+ Pot"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Raise Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Float Flop "
+    },
+    {
+     "t": "stat",
+     "stat": "Float Flop",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Float Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Turn",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    }
+   ]
+  },
+  {
+   "name": "Preflop",
+   "main": false,
+   "items": [
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 0,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 3,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 4,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 5,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 6,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 2,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 1,
+     "color": "#0080c0"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Cold Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 3,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 4,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 5,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 6,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 2,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 1,
+     "color": "#00ffff"
+    }
+   ]
+  },
+  {
+   "name": "Flop",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "F Aggression Factor"
+    },
+    {
+     "t": "stat",
+     "stat": "Flop AF",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       1.99,
+       "#00ffff"
+      ],
+      [
+       2.0,
+       3.49,
+       "#ff8000"
+      ],
+      [
+       3.5,
+       4.99,
+       "#ff0000"
+      ],
+      [
+       5.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": "F Aggression Frequency"
+    },
+    {
+     "t": "stat",
+     "stat": "Flop AFq",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       34.99,
+       "#00ffff"
+      ],
+      [
+       35.0,
+       54.99,
+       "#ff8000"
+      ],
+      [
+       55.0,
+       64.99,
+       "#ff0000"
+      ],
+      [
+       65.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Flop Bets & Raises"
+    },
+    {
+     "t": "text",
+     "text": "Flop Calls"
+    },
+    {
+     "t": "text",
+     "text": "Flop Folds"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Bet Flop",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Flop",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Call Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Flop",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Call Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F Float Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Float Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "2Bet Flop",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F 2Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F 2Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Flop",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Check Raise Flop",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "text",
+     "text": "Call Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "text",
+     "text": "Raise Cbet & Bet Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Bet Turn After Raise F CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Bet (limp pot)"
+    },
+    {
+     "t": "stat",
+     "stat": "Bet Flop (limp pot)",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet In Position"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet In Position"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet Out of Position"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet Out of Position"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet+ Pots"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Non-3Bet Pots"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call F CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Flop in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Flop in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Donk Bet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Donk Bet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    }
+   ]
+  },
+  {
+   "name": "Turn",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "T Aggression Factor"
+    },
+    {
+     "t": "stat",
+     "stat": "Turn AF",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       1.99,
+       "#00ffff"
+      ],
+      [
+       2.0,
+       3.49,
+       "#ff8000"
+      ],
+      [
+       3.5,
+       4.99,
+       "#ff0000"
+      ],
+      [
+       5.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": "T Aggression Frequency"
+    },
+    {
+     "t": "stat",
+     "stat": "Turn AFq",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       34.99,
+       "#00ffff"
+      ],
+      [
+       35.0,
+       54.99,
+       "#ff8000"
+      ],
+      [
+       55.0,
+       64.99,
+       "#ff0000"
+      ],
+      [
+       65.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Turn Bets & Raises"
+    },
+    {
+     "t": "text",
+     "text": "Turn Calls"
+    },
+    {
+     "t": "text",
+     "text": "Turn Folds"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Bet Turn",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Turn",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Call Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Turn",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Call Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T Float Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Float Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "2Bet Turn",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T 2Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T 2Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Turn",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Check Raise Turn",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "text",
+     "text": "Call Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise T CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After T CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise T Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Probe bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Probe Turn",
+     "pos": 0,
+     "color": "#808000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise T Float Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Folt to Probe bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Probe Bet",
+     "pos": 0,
+     "color": "#808000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet In Position"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet In Position"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet Out of Position"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet Out of Position"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet+ Pots"
+    },
+    {
+     "t": "text",
+     "text": "Non-3Bet Pots"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "  "
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Turn in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise T CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise T CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Turn in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Turn in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Donk Bet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Donk Bet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After T CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After T CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    }
+   ]
+  },
+  {
+   "name": "River",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "R Aggression Factor"
+    },
+    {
+     "t": "stat",
+     "stat": "River AF",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       1.99,
+       "#00ffff"
+      ],
+      [
+       2.0,
+       3.49,
+       "#ff8000"
+      ],
+      [
+       3.5,
+       4.99,
+       "#ff0000"
+      ],
+      [
+       5.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": "R Aggression Frequency"
+    },
+    {
+     "t": "stat",
+     "stat": "River AFq",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       34.99,
+       "#00ffff"
+      ],
+      [
+       35.0,
+       54.99,
+       "#ff8000"
+      ],
+      [
+       55.0,
+       64.99,
+       "#ff0000"
+      ],
+      [
+       65.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "River Bets & Raises"
+    },
+    {
+     "t": "text",
+     "text": "River Calls"
+    },
+    {
+     "t": "text",
+     "text": "River Folds"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Bet River",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "text",
+     "text": "Call Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Bet",
+     "pos": 0,
+     "color": "#ffff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet River",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk River",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Call Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Float River",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R Float Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Float Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "2Bet River",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R 2Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R 2Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet River",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Check Raise River",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "text",
+     "text": "Call Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Check Raise",
+     "pos": 0,
+     "color": "#8000ff"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise R CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After R CBet",
+     "pos": 0,
+     "color": "#ff8000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise R Donk Bet",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "text",
+     "text": "Saw River"
+    },
+    {
+     "t": "stat",
+     "stat": "Saw River Percentage",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call River Eff."
+    },
+    {
+     "t": "stat",
+     "stat": "River Call Efficiency",
+     "pos": 0,
+     "color": "#ff0080"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise R Float Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "WSDWRR"
+    },
+    {
+     "t": "stat",
+     "stat": "WSDWRR",
+     "pos": 0,
+     "color": "#ff0080"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet In Pos"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet River",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet In Pos"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet Out of Pos"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet River",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet Out of Pos"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R CBet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet+ Pots"
+    },
+    {
+     "t": "text",
+     "text": "Non-3Bet Pots"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet River in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet River in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Call CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise R CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Raise CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise R CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Fold to CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk River in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk River in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Donk Bet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Fold to Donk"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Donk Bet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After R CBet in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": ""
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise After CBet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After R CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#c6ffc6"
+    }
+   ]
+  },
+  {
+   "name": "RFI",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 3
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 4
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 5
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 6
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise First In",
+     "pos": 2
+    }
+   ]
+  },
+  {
+   "name": "Stats de 3bet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "3bet par position"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 3
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 4
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 5
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 6
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 2
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3bet vs position"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Vs EP"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Vs MP"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs MP 2Bet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Vs CO"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO 2Bet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Vs BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN 2Bet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Vs SB"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs SB 2Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Bataille de blinds"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "BB vs SB"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs SB 2Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "BB vs BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN 2Bet",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "BB vs CO"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO 2Bet",
+     "pos": 1
+    }
+   ]
+  },
+  {
+   "name": "Donk bet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Donk bet"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "        "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to DB BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Donk Bet",
+     "pos": 6
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise DB"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F Donk",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise DB"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F Donk Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise DB BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F Donk Bet",
+     "pos": 6
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "       "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Pots 3bet"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "          "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk bet Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Flop in 3Bet+ Pot",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to DB Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Donk Bet in 3Bet+ Pot",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk bet Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk Turn in 3Bet+ Pot",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to DB Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Donk Bet in 3Bet+ Pot",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Donk bet River"
+    },
+    {
+     "t": "stat",
+     "stat": "Donk River in 3Bet+ Pot",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to DB River"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Donk Bet in 3Bet+ Pot",
+     "pos": 0
+    }
+   ]
+  },
+  {
+   "name": "Float",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Float Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Flop",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to Flop Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Float Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Turn",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to Turn Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Float Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float River"
+    },
+    {
+     "t": "stat",
+     "stat": "Float River",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to River Float"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Float Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Pots 3bet"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Flop in 3Bet Pot",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Turn in 3Bet+ Pot",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Float River"
+    },
+    {
+     "t": "stat",
+     "stat": "Float River in 3Bet+ Pot",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Move contre float"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold X/R Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F Float Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold X/R Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After T Float Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold X/R River"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After R Float Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Cbet Pots Multiway"
+    },
+    {
+     "t": "stat",
+     "stat": "CBet Flop Multiway",
+     "pos": 0
+    }
+   ]
+  },
+  {
+   "name": "Blinds vs Blinds",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "3bet SB Open"
+    },
+    {
+     "t": "stat",
+     "stat": "BB vs SB Open - 3Bet",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call SB Open"
+    },
+    {
+     "t": "stat",
+     "stat": "BB vs SB Open - Call",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call BTN Open in SB"
+    },
+    {
+     "t": "stat",
+     "stat": "Call vs BTN Open",
+     "pos": 2
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call BTN Open in BB"
+    },
+    {
+     "t": "stat",
+     "stat": "Call vs BTN Open",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call CO Open in SB"
+    },
+    {
+     "t": "stat",
+     "stat": "Call vs CO Open",
+     "pos": 2
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call CO Open in BB"
+    },
+    {
+     "t": "stat",
+     "stat": "Call vs CO Open",
+     "pos": 1
+    }
+   ]
+  },
+  {
+   "name": "Check Raise",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Stats de Check Raise Flop"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Check Raise Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "Check Raise Flop",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Check Raise Flop"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Check Raise",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call Flop Check Raise "
+    },
+    {
+     "t": "stat",
+     "stat": "Call F Check Raise",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3bet Flop Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet F Check Raise",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Stats de Check Raise Turn"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Check Raise Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Check Raise Turn",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Check Raise Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Check Raise",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call Turn Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T Check Raise",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3bet Turn Check Raise"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet T Check Raise",
+     "pos": 0
+    }
+   ]
+  },
+  {
+   "name": "Situation River",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Folds River"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold River"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Bet",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       56.99,
+       "#ff0000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": "Fold River Cbet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R CBet",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       56.99,
+       "#ff0000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "               "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold River bet oop"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Bet",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       56.99,
+       "#ff0000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": "Fold River Cbet oop"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       56.99,
+       "#ff0000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold River bet ip"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Bet",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       56.99,
+       "#ff0000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": "Fold River Cbet ip"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R CBet in non-3Bet+ Pot",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       56.99,
+       "#ff0000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Probe bet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Probe Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Probe Total",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "          "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Probe bet Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Probe Turn in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Probe bet Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Probe Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Call Probet bet Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Call T Probe Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Probe bet River"
+    },
+    {
+     "t": "stat",
+     "stat": "Probe River in non-3Bet+ Pot",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Probet bet River"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Probe Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Call Probet bet River"
+    },
+    {
+     "t": "stat",
+     "stat": "Call R Probe Bet",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "           "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to raise after Turn PB"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After T Probe",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "text",
+     "text": "Fold to raise after River PB"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After R Probe",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "         "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Pots 3bet"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "        "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Probe bet Turn"
+    },
+    {
+     "t": "stat",
+     "stat": "Probe Turn in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Probe bet River"
+    },
+    {
+     "t": "stat",
+     "stat": "Probe River in 3Bet+ Pot",
+     "pos": 0,
+     "color": "#00ff00"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Delayed Cbet oop"
+    },
+    {
+     "t": "stat",
+     "stat": "Delayed Turn CBet",
+     "pos": 2
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Delayed Cbet ip"
+    },
+    {
+     "t": "stat",
+     "stat": "Delayed Turn CBet",
+     "pos": 0
+    }
+   ]
+  },
+  {
+   "name": "Stats Hero",
+   "main": false,
+   "items": [
+    {
+     "t": "stat",
+     "stat": "VPIP",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       16.99,
+       "#00ffff"
+      ],
+      [
+       17.0,
+       23.99,
+       "#ff8000"
+      ],
+      [
+       24.0,
+       29.99,
+       "#ff0000"
+      ],
+      [
+       30.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "PFR",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       14.99,
+       "#00ffff"
+      ],
+      [
+       15.0,
+       20.99,
+       "#ff8000"
+      ],
+      [
+       21.0,
+       29.99,
+       "#ff0000"
+      ],
+      [
+       30.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       2.99,
+       "#00ffff"
+      ],
+      [
+       3.0,
+       5.99,
+       "#ff8000"
+      ],
+      [
+       6.0,
+       9.99,
+       "#ff0000"
+      ],
+      [
+       10.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "3bet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet BY Position"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 3,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 4,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 5,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 6,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 2,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Preflop",
+     "pos": 1,
+     "color": "#ff0000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet VS Position"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs MP 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs SB 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BB 2Bet",
+     "pos": 0,
+     "color": "#ff00ff"
+    }
+   ]
+  },
+  {
+   "name": "Vs 3bet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 3Bet After Raising"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 3,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 4,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 5,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 6,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 2,
+     "color": "#ff0000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Raise",
+     "pos": 1,
+     "color": "#ff0000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call 3bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet After Raise",
+     "pos": 0,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet After Raise",
+     "pos": 3,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet After Raise",
+     "pos": 4,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet After Raise",
+     "pos": 5,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet After Raise",
+     "pos": 6,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet After Raise",
+     "pos": 2,
+     "color": "#ff00ff"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet After Raise",
+     "pos": 1,
+     "color": "#ff00ff"
+    }
+   ]
+  },
+  {
+   "name": "Raise Cbet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Raise Cbet Flop"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise Cbet"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise F CBet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to Raise Cbet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Raise After F CBet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "3bet"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Flop",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Fold to 3bet"
+    }
+   ]
+  },
+  {
+   "name": "Avancé",
+   "main": false,
+   "items": [
+    {
+     "t": "stat",
+     "stat": "Float Flop",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#00ff00"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to F Float Bet",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#00ff00"
+    },
+    {
+     "t": "stat",
+     "stat": "Float Turn in non-3Bet+ Pot",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#00ff00"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Float Bet",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#00ff00"
+    },
+    {
+     "t": "stat",
+     "stat": "Probe Turn in non-3Bet+ Pot",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#808000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to T Probe Bet",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#808000"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "stat",
+     "stat": "BB vs SB Open - 3Bet",
+     "pos": 0,
+     "minSample": 10,
+     "ranges": [
+      [
+       0.0,
+       11.99,
+       "#00ffff"
+      ],
+      [
+       12.0,
+       16.99,
+       "#ff8000"
+      ],
+      [
+       17.0,
+       20.99,
+       "#ff0000"
+      ],
+      [
+       21.0,
+       100.0,
+       "#ff00ff"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN Open",
+     "pos": 1,
+     "minSample": 10,
+     "ranges": [
+      [
+       0.0,
+       5.99,
+       "#00ffff"
+      ],
+      [
+       6.0,
+       9.99,
+       "#ff8000"
+      ],
+      [
+       10.0,
+       11.99,
+       "#ff0000"
+      ],
+      [
+       12.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN Open",
+     "pos": 2,
+     "minSample": 10,
+     "ranges": [
+      [
+       0.0,
+       8.99,
+       "#00ffff"
+      ],
+      [
+       9.0,
+       14.99,
+       "#ff8000"
+      ],
+      [
+       15.0,
+       19.99,
+       "#ff0000"
+      ],
+      [
+       20.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 6,
+     "minSample": 10,
+     "ranges": [
+      [
+       0.0,
+       7.99,
+       "#00ffff"
+      ],
+      [
+       8.0,
+       11.99,
+       "#ff8000"
+      ],
+      [
+       12.0,
+       14.99,
+       "#ff0000"
+      ],
+      [
+       15.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Probe River in non-3Bet+ Pot",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#808000"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to R Probe Bet",
+     "pos": 0,
+     "minSample": 6,
+     "color": "#808000"
+    }
+   ]
+  },
+  {
+   "name": "Call PF 2bet",
+   "main": false,
+   "items": [
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 0,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 3,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 4,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 5,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 6,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 2,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 1,
+     "color": "#0080c0"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Cold Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 3,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 4,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 5,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 6,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 2,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 1,
+     "color": "#00ffff"
+    }
+   ]
+  },
+  {
+   "name": "Preflop2",
+   "main": false,
+   "items": [
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 0,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 3,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 4,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 5,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 6,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 2,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 1,
+     "color": "#0080c0"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Cold Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 0,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 3,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 4,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 5,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 6,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 2,
+     "color": "#00ffff"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 1,
+     "color": "#00ffff"
+    }
+   ]
+  },
+  {
+   "name": "Preflop3",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "PF Agression Factor"
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop AF",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "PF Agression Frequency"
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop AFq",
+     "pos": 0
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 0,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 3,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 4,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 5,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 6,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 2,
+     "color": "#0080c0"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 2Bet",
+     "pos": 1,
+     "color": "#0080c0"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Cold Call 2Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 2Bet PF",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call Any 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 3Bet",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Cold Call 3Bet+"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 3Bet+ PF",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 3Bet+ PF",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 3Bet+ PF",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 3Bet+ PF",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 3Bet+ PF",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 3Bet+ PF",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Cold Call 3Bet+ PF",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to Squeeze"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF Squeeze",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF Squeeze",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF Squeeze",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF Squeeze",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF Squeeze",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF Squeeze",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF Squeeze",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call Squeeze"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF Squeeze",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF Squeeze",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF Squeeze",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF Squeeze",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF Squeeze",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF Squeeze",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF Squeeze",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise Squeeze"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise PF Squeeze",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise PF Squeeze",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Raise PF Squeeze",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Raise PF Squeeze",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Raise PF Squeeze",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Raise PF Squeeze",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Raise PF Squeeze",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Limp w/Prev Limpers"
+    },
+    {
+     "t": "stat",
+     "stat": "Limp With Previous Limpers",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Limp With Previous Limpers",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Limp With Previous Limpers",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Limp With Previous Limpers",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Limp With Previous Limpers",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Limp With Previous Limpers",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Limp With Previous Limpers",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Raise w/Prev Limpers"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise With Previous Limpers",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Raise With Previous Limpers",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Raise With Previous Limpers",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Raise With Previous Limpers",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Raise With Previous Limpers",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Raise With Previous Limpers",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Raise With Previous Limpers",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Steals"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Attempt to Steal"
+    },
+    {
+     "t": "stat",
+     "stat": "Att To Steal",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Att To Steal",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Att To Steal",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Att To Steal",
+     "pos": 2
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold Steal to 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Steal",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Steal",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Steal",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 3Bet After Steal",
+     "pos": 2
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold Blind to Steal"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Steal",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Steal",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to Steal",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call Steal"
+    },
+    {
+     "t": "stat",
+     "stat": "Call Steal",
+     "pos": 0,
+     "color": "#ff80c0",
+     "ranges": [
+      [
+       0.0,
+       8.99,
+       "#00ffff"
+      ],
+      [
+       9.0,
+       12.99,
+       "#ff8000"
+      ],
+      [
+       13.0,
+       16.99,
+       "#ff0000"
+      ],
+      [
+       17.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Call Steal",
+     "pos": 2,
+     "color": "#ff80c0",
+     "ranges": [
+      [
+       0.0,
+       8.99,
+       "#00ffff"
+      ],
+      [
+       9.0,
+       12.99,
+       "#ff8000"
+      ],
+      [
+       13.0,
+       16.99,
+       "#ff0000"
+      ],
+      [
+       17.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Call Steal",
+     "pos": 1,
+     "color": "#ff80c0",
+     "ranges": [
+      [
+       0.0,
+       8.99,
+       "#00ffff"
+      ],
+      [
+       9.0,
+       12.99,
+       "#ff8000"
+      ],
+      [
+       13.0,
+       16.99,
+       "#ff0000"
+      ],
+      [
+       17.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet Steal"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Steal",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Steal",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet Steal",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet vs Cutoff Open"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet vs Button Open"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN Open",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN Open",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN Open",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "3Bet vs SB Open "
+    },
+    {
+     "t": "stat",
+     "stat": "BB vs SB Open - 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "BB vs SB Open - 3Bet",
+     "pos": 0
+    }
+   ]
+  },
+  {
+   "name": "Préflop 4bet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "4Bet+ After Raising"
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "4Bet+ Preflop After Raising",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 4Bet After 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call PF 4bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "Préflop 5bet"
+    },
+    {
+     "t": "stat",
+     "stat": "5Bet+ Preflop",
+     "pos": 0,
+     "color": "#ff0000"
+    },
+    {
+     "t": "text",
+     "text": "  "
+    },
+    {
+     "t": "text",
+     "text": "Fold to PF 5bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 0,
+     "color": "#00ffff"
+    }
+   ]
+  },
+  {
+   "name": "3bet position vs position",
+   "main": false,
+   "items": [
+    {
+     "t": "stat",
+     "stat": "Player",
+     "pos": 0,
+     "color": "#00a8a8"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "stat",
+     "stat": "BB vs SB Open - 3Bet",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       16.99,
+       "#00ffff"
+      ],
+      [
+       17.0,
+       22.99,
+       "#ff8000"
+      ],
+      [
+       23.0,
+       26.99,
+       "#ff0000"
+      ],
+      [
+       27.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN Open",
+     "pos": 2,
+     "ranges": [
+      [
+       0.0,
+       13.99,
+       "#00ffff"
+      ],
+      [
+       14.0,
+       17.99,
+       "#ff8000"
+      ],
+      [
+       18.0,
+       24.99,
+       "#ff0000"
+      ],
+      [
+       25.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs BTN Open",
+     "pos": 1,
+     "ranges": [
+      [
+       0.0,
+       9.99,
+       "#00ffff"
+      ],
+      [
+       10.0,
+       13.99,
+       "#ff8000"
+      ],
+      [
+       14.0,
+       15.99,
+       "#ff0000"
+      ],
+      [
+       16.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 6,
+     "ranges": [
+      [
+       0.0,
+       9.99,
+       "#00ffff"
+      ],
+      [
+       10.0,
+       13.99,
+       "#ff8000"
+      ],
+      [
+       14.0,
+       15.99,
+       "#ff0000"
+      ],
+      [
+       16.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 2,
+     "ranges": [
+      [
+       0.0,
+       9.99,
+       "#00ffff"
+      ],
+      [
+       10.0,
+       11.99,
+       "#ff8000"
+      ],
+      [
+       12.0,
+       13.99,
+       "#ff0000"
+      ],
+      [
+       14.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs CO Open",
+     "pos": 1,
+     "ranges": [
+      [
+       0.0,
+       6.99,
+       "#00ffff"
+      ],
+      [
+       7.0,
+       9.99,
+       "#ff8000"
+      ],
+      [
+       10.0,
+       11.99,
+       "#ff0000"
+      ],
+      [
+       12.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs MP 2Bet",
+     "pos": 5,
+     "ranges": [
+      [
+       0.0,
+       5.99,
+       "#00ffff"
+      ],
+      [
+       6.0,
+       7.49,
+       "#ff8000"
+      ],
+      [
+       7.5,
+       10.49,
+       "#ff0000"
+      ],
+      [
+       10.5,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs MP 2Bet",
+     "pos": 6,
+     "ranges": [
+      [
+       0.0,
+       7.99,
+       "#00ffff"
+      ],
+      [
+       8.0,
+       10.99,
+       "#ff8000"
+      ],
+      [
+       11.0,
+       12.99,
+       "#ff0000"
+      ],
+      [
+       13.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs MP 2Bet",
+     "pos": 2,
+     "ranges": [
+      [
+       0.0,
+       5.99,
+       "#00ffff"
+      ],
+      [
+       6.0,
+       7.49,
+       "#ff8000"
+      ],
+      [
+       7.5,
+       9.99,
+       "#ff0000"
+      ],
+      [
+       10.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs MP 2Bet",
+     "pos": 1,
+     "ranges": [
+      [
+       0.0,
+       5.99,
+       "#00ffff"
+      ],
+      [
+       6.0,
+       7.49,
+       "#ff8000"
+      ],
+      [
+       7.5,
+       9.99,
+       "#ff0000"
+      ],
+      [
+       10.0,
+       100.0,
+       "#ff0080"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "UTG"
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "3Bet vs EP 2Bet",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    }
+   ]
+  },
+  {
+   "name": "F4bet",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Fold to 4Bet After 3Bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 0,
+     "color": "#c6ffc6",
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#ff0000"
+      ],
+      [
+       50.0,
+       56.99,
+       "#ff8000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 3,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#ff0000"
+      ],
+      [
+       50.0,
+       56.99,
+       "#ff8000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 4,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#ff0000"
+      ],
+      [
+       50.0,
+       56.99,
+       "#ff8000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 5,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#ff0000"
+      ],
+      [
+       50.0,
+       56.99,
+       "#ff8000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 6,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#ff0000"
+      ],
+      [
+       50.0,
+       56.99,
+       "#ff8000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 2,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#ff0000"
+      ],
+      [
+       50.0,
+       56.99,
+       "#ff8000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet",
+     "pos": 1,
+     "ranges": [
+      [
+       0.0,
+       49.99,
+       "#ff0000"
+      ],
+      [
+       50.0,
+       56.99,
+       "#ff8000"
+      ],
+      [
+       57.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Call PF 4bet"
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 0
+    },
+    {
+     "t": "text",
+     "text": "  "
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Call PF 4Bet",
+     "pos": 1
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "F4bet BTN vs CO"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 4Bet After 3Bet BTN vs CO",
+     "pos": 0,
+     "ranges": [
+      [
+       0.0,
+       54.99,
+       "#ff0000"
+      ],
+      [
+       55.0,
+       100.0,
+       "#00ff00"
+      ]
+     ]
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "5bet BB"
+    },
+    {
+     "t": "stat",
+     "stat": "5Bet+ Preflop",
+     "pos": 1
+    },
+    {
+     "t": "text",
+     "text": "5bet SB"
+    },
+    {
+     "t": "stat",
+     "stat": "5Bet+ Preflop",
+     "pos": 2
+    },
+    {
+     "t": "text",
+     "text": "5bet BTN"
+    },
+    {
+     "t": "stat",
+     "stat": "5Bet+ Preflop",
+     "pos": 6
+    },
+    {
+     "t": "text",
+     "text": "Avg AI Eq PF"
+    },
+    {
+     "t": "stat",
+     "stat": "Avg All-In Equity PF",
+     "pos": 0
+    }
+   ]
+  },
+  {
+   "name": "Squeeze",
+   "main": false,
+   "items": [
+    {
+     "t": "text",
+     "text": "Preflop"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "br"
+    },
+    {
+     "t": "text",
+     "text": "Squeeze"
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "text",
+     "text": " "
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 6
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Preflop Squeeze",
+     "pos": 1
+    }
+   ]
+  },
+  {
+   "name": "Fold 5bet",
+   "main": false,
+   "items": [
+    {
+     "t": "stat",
+     "stat": "Player",
+     "pos": 0,
+     "color": "#00a8a8"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "text",
+     "text": "Fold to PF 5Bet+"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 1
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 6
+    },
+    {
+     "t": "br"
+    }
+   ]
+  },
+  {
+   "name": "Fold 5bet2",
+   "main": false,
+   "items": [
+    {
+     "t": "stat",
+     "stat": "Player",
+     "pos": 0,
+     "color": "#00a8a8"
+    },
+    {
+     "t": "text",
+     "text": "Total"
+    },
+    {
+     "t": "text",
+     "text": "SB"
+    },
+    {
+     "t": "text",
+     "text": "BB"
+    },
+    {
+     "t": "text",
+     "text": "EP"
+    },
+    {
+     "t": "text",
+     "text": "MP"
+    },
+    {
+     "t": "text",
+     "text": "CO"
+    },
+    {
+     "t": "text",
+     "text": "BTN"
+    },
+    {
+     "t": "hr"
+    },
+    {
+     "t": "text",
+     "text": "Fold to PF 5Bet+"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 0,
+     "color": "#c6ffc6"
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 2
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 1
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 3
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 4
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 5
+    },
+    {
+     "t": "stat",
+     "stat": "Fold to PF 5Bet+",
+     "pos": 6
+    },
+    {
+     "t": "br"
+    }
+   ]
+  }
+ ],
+ "customStats": [
+  "Bet Turn After Raise F CBet",
+  "CBet Flop Multiway",
+  "Delayed Turn CBet",
+  "Fold to PF 4Bet After 3Bet BTN vs CO"
+ ]
+}

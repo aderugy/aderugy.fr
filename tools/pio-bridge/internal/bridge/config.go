@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"aderugy.fr/pio-bridge/internal/pt4"
 )
 
 // Config is stored as JSON in %APPDATA%\PioBridge\config.json.
@@ -18,6 +20,9 @@ type Config struct {
 	// IdleMinutes: the solver is stopped after this long without a request
 	// (it restarts in ~0.3 s on the next one). 0 = never.
 	IdleMinutes int `json:"idleMinutes"`
+	// PT4: PokerTracker 4 database, postgres://user:password@host:port/db
+	// (a read-only role). Empty = the /pt4 endpoints are off.
+	PT4 string `json:"pt4"`
 }
 
 func DefaultConfig() Config {
@@ -31,6 +36,7 @@ func DefaultConfig() Config {
 			"http://localhost:3000",
 		},
 		IdleMinutes: 15,
+		PT4:         "postgres://aderugy_ro@localhost:5432/PT4%20DB",
 	}
 }
 
@@ -87,6 +93,11 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.SolvesDir) == "" {
 		errs = append(errs, "solvesDir is empty")
+	}
+	if strings.TrimSpace(c.PT4) != "" {
+		if _, err := pt4.ParseDSN(c.PT4); err != nil {
+			errs = append(errs, "PokerTracker 4 database: "+err.Error())
+		}
 	}
 	for _, o := range c.AllowedOrigins {
 		if !strings.HasPrefix(o, "http://") && !strings.HasPrefix(o, "https://") {

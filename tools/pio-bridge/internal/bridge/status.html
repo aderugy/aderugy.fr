@@ -76,6 +76,9 @@
         <div><label for="port">Port</label><input id="port" name="port" value="{{.Config.Port}}"></div>
         <div><label for="idle">Stop the solver after (minutes idle, 0 = never)</label><input id="idle" name="idleMinutes" value="{{.Config.IdleMinutes}}"></div>
       </div>
+      <label for="pt4">PokerTracker 4 database (read-only role)</label>
+      <input id="pt4" name="pt4" type="password" autocomplete="off" value="{{.Config.PT4}}">
+      <div class="hint">postgres://aderugy_ro:PASSWORD@localhost:5432/PT4%20DB — a space in the database name is written %20, special characters in the password too (@ → %40). Empty = off.</div>
       <label for="origins">Sites allowed to use the bridge (one per line)</label>
       <textarea id="origins" name="allowedOrigins">{{.Origins}}</textarea>
       <div class="hint">The first time aderugy.fr calls the bridge, Chrome asks whether the site may access apps and devices on this computer / your local network: allow it. To undo: site settings of aderugy.fr → Local network access.</div>
@@ -112,6 +115,10 @@ async function refresh() {
     text($("pio"), s.pioVersion);
     text($("file"), s.file);
     text($("board"), (s.board || []).join(" "));
+    const p = d.pt4 || {};
+    text($("pt4state"), !p.configured ? (p.error || "not configured")
+      : p.connected ? `connected · ${p.database} · last hand #${p.maxHand} · ${p.cachedPlayers} players in memory`
+      : `not connected · ${p.database} · ${p.error || ""}`);
     const rows = (d.requests || []).slice(0, 30).map(q => {
       const tr = document.createElement("tr");
       const cells = [new Date(q.time).toLocaleTimeString(), q.status, q.ms, q.method + " " + q.path, q.origin || ""];
