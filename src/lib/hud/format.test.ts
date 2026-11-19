@@ -52,7 +52,11 @@ test("thin samples and titles", () => {
   const s = showStat(vpip, { VPIP: [[2, 5]] });
   assert.equal(s.text, "40");
   assert.equal(s.thin, true);
-  assert.equal(s.title, "VPIP: 40 (2/5)");
+  assert.equal(s.title, "VPIP: 40 (2 / 5)");
+  assert.equal(s.label, "VPIP");
+  assert.equal(s.sample, "2 / 5");
+  assert.equal(showStat({ ...vpip, pos: 6 }, { VPIP: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 2]] }).label, "VPIP · BTN");
+  assert.equal(showStat({ t: "stat", stat: "BB/100", pos: 0 }, { "BB/100": [[-12.5, 1234]] }).sample, "1,234 hands");
   assert.equal(showStat({ ...vpip, pos: 6 }, { VPIP: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 2]] }).text, "50");
   assert.equal(showStat({ t: "stat", stat: "Player", pos: 0 }, {}, "Villain").text, "Villain");
 });

@@ -13,6 +13,8 @@ const layout = layoutJson as HudLayout;
 const MAIN = layout.groups.find((g) => g.main) ?? layout.groups[0];
 const TABS = popupTabs(layout);
 const POPUPS = TABS.map((t) => t.group);
+/** Shown to the right of the main line. Nothing opens it in PT4, so it isn't a tab. */
+const SIDE = layout.groups.find((g) => g.name === "Avancé");
 
 const STORE = { pins: "poker.hud.pins", selected: "poker.hud.selected", filters: "poker.hud.filters", popup: "poker.hud.popup" };
 const POLL_MS = 3000;
@@ -259,8 +261,15 @@ export function HudView() {
               <p className="mt-3 text-sm text-muted">Loading his hands…</p>
             ) : (
               <div className={current.key !== key ? "opacity-60 transition-opacity" : undefined}>
-                <div className="mt-3">
-                  <HudPanel group={MAIN} hud={current.hud} compact onPopup={setPopup} />
+                <div className="mt-3 flex flex-wrap items-start gap-3">
+                  <div className="min-w-0">
+                    <HudPanel group={MAIN} hud={current.hud} compact onPopup={setPopup} />
+                  </div>
+                  {SIDE && (
+                    <div className="min-w-0">
+                      <HudPanel group={SIDE} hud={current.hud} compact onPopup={setPopup} />
+                    </div>
+                  )}
                 </div>
                 <div className="mt-4 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
                   {TABS.map(({ label, group: g }) => (
