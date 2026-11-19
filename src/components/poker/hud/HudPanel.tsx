@@ -18,11 +18,14 @@ export function HudPanel({
   group,
   hud,
   compact = false,
+  dense = false,
   onPopup,
 }: {
   group: HudGroup;
   hud: PlayerHud | undefined;
   compact?: boolean;
+  /** A small grid panel for the HUD row (narrow columns, small type). */
+  dense?: boolean;
   onPopup?: (name: string) => void;
 }) {
   const [tip, setTip] = useState<Tip | null>(null);
@@ -39,7 +42,11 @@ export function HudPanel({
       onMouseLeave={() => setTip(null)}
       className={[
         "rounded-lg bg-neutral-950 font-mono tabular-nums text-neutral-100",
-        compact ? "px-3 py-2 text-[15px] leading-7" : "overflow-x-auto px-3 py-2 text-xs leading-6",
+        compact
+          ? "px-3 py-2 text-[15px] leading-7"
+          : dense
+            ? "overflow-x-auto px-2.5 py-1.5 text-[11px] leading-5"
+            : "overflow-x-auto px-3 py-2 text-xs leading-6",
       ].join(" ")}
     >
       {compact ? (
@@ -58,8 +65,8 @@ export function HudPanel({
       ) : (
         // Popups: PT4's grid, cells spanning their columns.
         <div
-          className="grid items-baseline gap-x-2"
-          style={{ gridTemplateColumns: `repeat(${columns}, minmax(2.75rem, max-content))` }}
+          className={dense ? "grid items-baseline gap-x-1.5" : "grid items-baseline gap-x-2"}
+          style={{ gridTemplateColumns: `repeat(${columns}, minmax(${dense ? "1.75rem" : "2.75rem"}, max-content))` }}
         >
           {cells.map((c, i) =>
             c.kind === "hr" ? (

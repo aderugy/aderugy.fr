@@ -16,6 +16,7 @@ import type {
   Pt4Status,
 } from "@/lib/hud/types";
 import { PioBridgeError } from "@/lib/solver/pioBridge";
+import { LIMPERS } from "@/lib/hud/extra";
 import { HudPanel } from "./HudPanel";
 import { NotesBox } from "./NotesBox";
 
@@ -328,6 +329,9 @@ export function HudView() {
                           <HudPanel group={SIDE} hud={current.hud} compact onPopup={setPopup} />
                         </div>
                       )}
+                      <div className="min-w-0">
+                        <HudPanel group={LIMPERS} hud={current.hud} dense onPopup={setPopup} />
+                      </div>
                     </div>
                     <div className="mt-4 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
                       {TABS.map(({ label, group: g }) => (

@@ -165,12 +165,16 @@ func Catalogue() map[string]*Stat {
 		return h.Face3bet && !h.F(FP3betDefOpp) && !h.F(FPSqueezeDefOpp) && !h.F(FPLimp) &&
 			!h.F(FPFirstRaise) && h.PCall <= 1 && !blind(h)
 	}, is(first, 'C'))
+	// Facing limpers and no raise yet: limp, raise (iso), fold, or check (BB).
 	limpersDen := func(h *Hand) bool {
-		return h.PFaceLimpers > 0 && !blind(h) &&
-			(h.F(FPLimp) || h.F(FPFirstRaise) || (h.First() == 'F' && !h.Face2bet))
+		return h.PFaceLimpers > 0 && !h.Face2bet &&
+			(h.F(FPLimp) || h.F(FPFirstRaise) || h.First() == 'F' || h.First() == 'X')
 	}
-	p("Limp With Previous Limpers", limpersDen, flag(FPLimp))
+	p("Limp With Previous Limpers", and(limpersDen, func(h *Hand) bool { return h.Cat != 1 }), flag(FPLimp))
 	p("Raise With Previous Limpers", limpersDen, flag(FPFirstRaise))
+	// 3bet vs an iso-raise: someone limped, another player raised over the
+	// limp(s), and this player (who hadn't limped) faces that raise.
+	p("3Bet vs Iso-Raise", and(face2bet, flag(FP3betOpp), func(h *Hand) bool { return h.IsoRaised() }), flag(FP3bet))
 	limpFaced := and(flag(FPLimp), flag(FPFaceRaise))
 	second := func(h *Hand) byte {
 		if len(h.Act[Pre]) < 2 {

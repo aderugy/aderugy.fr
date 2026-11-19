@@ -379,6 +379,16 @@ func (h *Hand) pfaChar() byte {
 	return a[len(a)-1]
 }
 
+// IsoRaised: the first preflop raise came after at least one limp — someone
+// put money in voluntarily before the raiser did.
+func (h *Hand) IsoRaised() bool {
+	a := h.Aggr[Pre]
+	if len(a) < 2 {
+		return false
+	}
+	return strings.IndexByte(h.Actors[Pre], a[1]) > 0
+}
+
 // Walk: the big blind won without acting.
 func (h *Hand) Walk() bool { return h.Act[Pre] == "" }
 

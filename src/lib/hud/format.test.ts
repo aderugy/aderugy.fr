@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import layout from "./layout.json" with { type: "json" };
 import { describeFilters, filterParams, gridCells, formatStat, popupTabs, shortCount, showStat, statValue } from "./format";
+import { LIMPERS } from "./extra";
 import type { HudItem, HudLayout } from "./types";
 
 type StatItem = Extract<HudItem, { t: "stat" }>;
@@ -115,4 +116,13 @@ test("grid placement: spans push cells to their column (PT4's triangle)", () => 
   const widths = new Map<number, number>();
   for (const c of cells) if (c.kind === "cell") widths.set(c.row, (widths.get(c.row) ?? 0) + c.span);
   assert.deepEqual([...new Set(widths.values())], [7]);
+});
+
+test("the Limpers panel: header + two rows of 7 positions on one grid", () => {
+  const { cells, columns } = gridCells(LIMPERS.items);
+  assert.equal(columns, 8);
+  const stats = cells.filter((c) => c.kind === "cell" && c.item.t === "stat");
+  assert.equal(stats.length, 14);
+  const btnIso = stats.find((c) => c.kind === "cell" && c.item.t === "stat" && c.item.stat === "Raise With Previous Limpers" && c.item.pos === 6);
+  assert.ok(btnIso && btnIso.kind === "cell" && btnIso.col === 6); // under "BTN"
 });
