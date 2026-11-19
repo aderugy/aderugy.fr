@@ -1,6 +1,9 @@
 package bridge
 
 import (
+	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,8 +12,9 @@ import (
 	"aderugy.fr/pio-bridge/internal/pt4"
 )
 
-// PokerTracker 4 endpoints. Read-only: every query runs in a read-only
-// session, with the role the user configured (aderugy_ro).
+// PokerTracker 4 endpoints. Read-only sessions with the role the user
+// configured (aderugy_ro), except POST /pt4/notes which writes one player
+// note in a READ WRITE transaction (it needs INSERT, UPDATE on notes).
 
 func (a *App) pt4Status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, a.pt4.Status())
@@ -78,6 +82,59 @@ func (a *App) pt4Verify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, rep)
+}
+
+// /pt4/notes?ids=1,2 → {notes: {"1": {...}}}; players without a note are absent.
+func (a *App) pt4Notes(w http.ResponseWriter, r *http.Request) {
+	ids, err := intList(r.URL.Query().Get("ids"), 40)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_ids", "ids: up to 40 player ids, comma separated")
+		return
+	}
+	notes, err := a.pt4.Notes(ids)
+	if err != nil {
+		writePT4Error(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"notes": notes})
+}
+
+// POST /pt4/notes {player, color, text, expected} → {note}; 409 note_changed
+// with the current note if PT4 changed it since `expected` (its date).
+func (a *App) pt4SaveNote(w http.ResponseWriter, r *http.Request) {
+	// A cross-site form can't send JSON without a preflight, and the guard
+	// already refused origins not in the allow-list.
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		writeErr(w, http.StatusUnsupportedMediaType, "bad_content_type", "JSON expected")
+		return
+	}
+	var body struct {
+		Player   int64  `json:"player"`
+		Color    int    `json:"color"`
+		Text     string `json:"text"`
+		Expected string `json:"expected"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&body); err != nil || body.Player <= 0 {
+		writeErr(w, http.StatusBadRequest, "bad_note", "player, color, text, expected")
+		return
+	}
+	n, err := a.pt4.SaveNote(body.Player, body.Color, body.Text, body.Expected)
+	var conflict pt4.NoteConflict
+	switch {
+	case errors.As(err, &conflict):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "note_changed",
+			"message": "This note was changed in PokerTracker meanwhile", "note": conflict.Current})
+	case err != nil:
+		if strings.Contains(err.Error(), "permission denied") {
+			writeErr(w, http.StatusForbidden, "pt4_no_write",
+				"The PT4 role can't write notes yet: GRANT INSERT, UPDATE ON public.notes TO aderugy_ro;")
+			return
+		}
+		writePT4Error(w, err)
+	default:
+		a.Logf("pt4: note saved for player %d", body.Player)
+		writeJSON(w, 200, map[string]any{"note": n})
+	}
 }
 
 func writePT4Error(w http.ResponseWriter, err error) {

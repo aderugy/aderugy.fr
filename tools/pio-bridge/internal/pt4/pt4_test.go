@@ -2,9 +2,12 @@ package pt4
 
 import (
 	"encoding/json"
+	"encoding/xml"
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -239,4 +242,128 @@ func TestIntegration(t *testing.T) {
 		}
 	}
 	t.Logf("verify: %d/%d match, %d stats without a PT4 counter", rep.Matching, rep.Checked, len(rep.Missing))
+}
+
+const ptNote = `<?xml version="1.0" encoding="UTF-8"?>
+<richtext version="1.0.0.0" xmlns="http://www.wxwidgets.org">
+  <paragraphlayout textcolor="#000000" fontface="Segoe UI" margin-left="5,4098">
+    <paragraph>
+      <text>C4B = QQ</text>
+    </paragraph>
+    <paragraph>
+      <text></text>
+    </paragraph>
+    <paragraph>
+      <text>4BP &lt;= ccbet ip =&gt; MV bluff</text>
+    </paragraph>
+    <paragraph>
+      <text></text>
+    </paragraph>
+  </paragraphlayout>
+</richtext>
+`
+
+func TestNoteText(t *testing.T) {
+	text, rich := NoteText(ptNote)
+	if text != "C4B = QQ\n\n4BP <= ccbet ip => MV bluff" || rich {
+		t.Errorf("%q rich=%v", text, rich)
+	}
+	empty := `<?xml version="1.0" encoding="UTF-8"?>
+<richtext version="1.0.0.0" xmlns="http://www.wxwidgets.org">
+  <paragraphlayout margin-left="4,4098"><paragraph><text></text></paragraph></paragraphlayout>
+</richtext>`
+	if text, _ := NoteText(empty); text != "" {
+		t.Errorf("empty: %q", text)
+	}
+	bold := `<richtext><paragraphlayout><paragraph><text>a </text><text fontweight="700">fish</text></paragraph></paragraphlayout></richtext>`
+	if text, rich := NoteText(bold); text != "a fish" || !rich {
+		t.Errorf("bold: %q %v", text, rich)
+	}
+	if text, rich := NoteText("plain"); text != "plain" || rich {
+		t.Errorf("plain: %q", text)
+	}
+}
+
+func TestNoteXMLRoundTrip(t *testing.T) {
+	in := "line <1> & \"2\"\r\n\nlast\x01"
+	x := NoteXML(in, ptNote)
+	if !strings.Contains(x, `fontface="Segoe UI"`) {
+		t.Error("layout of the previous version not kept")
+	}
+	if !strings.Contains(x, "<text>line &lt;1&gt; &amp; &quot;2&quot;</text>") {
+		t.Error(x)
+	}
+	out, rich := NoteText(x)
+	if out != "line <1> & \"2\"\n\nlast" || rich {
+		t.Errorf("%q", out)
+	}
+	if !strings.Contains(NoteXML("x", ""), defaultLayout) {
+		t.Error("default layout")
+	}
+	var v struct{}
+	if err := xml.Unmarshal([]byte(x), &v); err != nil {
+		t.Errorf("not valid XML: %v", err)
+	}
+}
+
+// Notes against the fixture database (PT4_TEST_DSN). The role needs
+// GRANT INSERT, UPDATE ON notes; the test grants nothing itself.
+func TestNotesIntegration(t *testing.T) {
+	dsn := os.Getenv("PT4_TEST_DSN")
+	if dsn == "" {
+		t.Skip("PT4_TEST_DSN not set")
+	}
+	s := NewService(dsn)
+	notes, err := s.Notes([]int64{1, 2, 101})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, ok := notes[1]
+	if len(notes) != 1 || !ok || n.Color != 6 || n.Date != "2026-10-27T19:28:19" || !strings.HasPrefix(n.Text, "C4B = QQ\n\n4BP <=") {
+		t.Fatalf("notes %+v", notes)
+	}
+	// Stale version → conflict with the current note.
+	_, err = s.SaveNote(1, 6, "x", "2020-01-01T00:00:00")
+	var c NoteConflict
+	if !errors.As(err, &c) || c.Current == nil || c.Current.ID != 1327 {
+		t.Fatalf("want a conflict, got %v", err)
+	}
+	// Update keeps the id and the layout, changes colour and date.
+	saved, err := s.SaveNote(1, 8, "C4B = QQ\nnew line", n.Date)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.ID != 1327 || saved.Color != 8 || saved.Text != "C4B = QQ\nnew line" || saved.Date == n.Date {
+		t.Fatalf("saved %+v", saved)
+	}
+	// Twice in the same second: the version still moves.
+	again, err := s.SaveNote(1, 8, "C4B = QQ", saved.Date)
+	if err != nil || again.Date == saved.Date {
+		t.Fatalf("second save %+v %v", again, err)
+	}
+	// New note for a player without one: next id, read back.
+	created, err := s.SaveNote(2, 3, "reg", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ID != 1331 || created.Color != 3 || created.Text != "reg" {
+		t.Fatalf("created %+v", created)
+	}
+	if _, err := s.SaveNote(2, 3, "dup", ""); !errors.As(err, &c) {
+		t.Fatalf("creating twice should conflict: %v", err)
+	}
+	if _, err := s.SaveNote(999, 1, "x", ""); err == nil || !strings.Contains(err.Error(), "no player") {
+		t.Fatalf("unknown player: %v", err)
+	}
+	if _, err := s.SaveNote(1, 99, "x", ""); err == nil {
+		t.Fatal("colour out of range accepted")
+	}
+	// The other sessions stay read-only.
+	if _, err := s.query("UPDATE notes SET id_color = 0"); err == nil || !strings.Contains(err.Error(), "read-only") {
+		t.Fatalf("plain query should be read-only: %v", err)
+	}
+	// Still usable after all that (connections not left in a transaction).
+	if _, err := s.Notes([]int64{1}); err != nil {
+		t.Fatal(err)
+	}
 }

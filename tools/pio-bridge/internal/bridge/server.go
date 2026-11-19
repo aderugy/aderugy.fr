@@ -32,6 +32,8 @@ import (
 //	GET  /pt4/limits                         stakes with hands
 //	GET  /pt4/hud?ids=&limits=&last=&days=   HUDs of players
 //	GET  /pt4/verify?id=                     a player's stats vs PT4's cash_cache
+//	GET  /pt4/notes?ids=                     PT4 player notes
+//	POST /pt4/notes                          save one (the only write; see pt4.go)
 //	GET  /                                   status page (same origin only)
 //	GET  /api/status                         data for the status page (same origin only)
 //	POST /settings, /restart                 status page forms (same origin + token)
@@ -51,6 +53,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /pt4/limits", a.pt4Limits)
 	mux.HandleFunc("GET /pt4/hud", a.pt4HUD)
 	mux.HandleFunc("GET /pt4/verify", a.pt4Verify)
+	mux.HandleFunc("GET /pt4/notes", a.pt4Notes)
+	mux.HandleFunc("POST /pt4/notes", a.pt4SaveNote)
 	mux.HandleFunc("GET /api/status", a.sameOrigin(a.statusJSON))
 	mux.HandleFunc("GET /{$}", a.sameOrigin(a.statusPage))
 	mux.HandleFunc("POST /settings", a.sameOrigin(a.formGuard(a.saveSettings)))
@@ -99,7 +103,7 @@ func (a *App) guard(next http.Handler) http.Handler {
 			h := sw.Header()
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Add("Vary", "Origin")
-			h.Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			h.Set("Access-Control-Allow-Headers", "Content-Type")
 			h.Set("Access-Control-Max-Age", "600")
 			if r.Header.Get("Access-Control-Request-Private-Network") == "true" {

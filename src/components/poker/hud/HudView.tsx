@@ -5,9 +5,10 @@ import { pt4 } from "@/lib/hud/client";
 import { describeFilters, popupTabs, shortCount, showStat } from "@/lib/hud/format";
 import layoutJson from "@/lib/hud/layout.json";
 import { NO_FILTERS } from "@/lib/hud/types";
-import type { HudFilters, HudLayout, PlayerHud, Pt4Limit, Pt4Player, Pt4Status } from "@/lib/hud/types";
+import type { HudFilters, HudLayout, PlayerHud, Pt4Limit, Pt4Note, Pt4Player, Pt4Status } from "@/lib/hud/types";
 import { PioBridgeError } from "@/lib/solver/pioBridge";
 import { HudPanel } from "./HudPanel";
+import { NotesBox } from "./NotesBox";
 
 const layout = layoutJson as HudLayout;
 const MAIN = layout.groups.find((g) => g.main) ?? layout.groups[0];
@@ -60,6 +61,7 @@ export function HudView() {
   const [status, setStatus] = useState<Pt4Status | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<Pt4Limit[]>([]);
+  const [notes, setNotes] = useState<Record<number, Pt4Note>>({});
   const [loading, setLoading] = useState(false);
   const maxHand = useRef(0);
 
@@ -115,6 +117,25 @@ export function HudView() {
     [],
   );
 
+  // PT4 notes of the pinned players (cheap: one indexed query).
+  const fetchNotes = useCallback(async (which: number[]) => {
+    if (!which.length) return;
+    try {
+      const n = await pt4.notes(which);
+      setNotes((prev) => {
+        const next = { ...prev };
+        for (const id of which) {
+          const v = n[String(id)];
+          if (v) next[id] = v;
+          else delete next[id];
+        }
+        return next;
+      });
+    } catch {
+      // the HUD fetch reports bridge errors
+    }
+  }, []);
+
   // Pins or filters changed: refresh every pinned HUD (debounced for typing).
   const idsKey = ids.join(",");
   const idsRef = useRef(ids);
@@ -122,11 +143,14 @@ export function HudView() {
   useEffect(() => {
     idsRef.current = ids;
     filtersRef.current = filters;
-    const t = setTimeout(() => void fetchHuds(ids, filters), 150);
+    const t = setTimeout(() => {
+      void fetchHuds(ids, filters);
+      void fetchNotes(ids);
+    }, 150);
     return () => clearTimeout(t);
     // ids / filters are compared by value (idsKey, key), not identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey, key, fetchHuds]);
+  }, [idsKey, key, fetchHuds, fetchNotes]);
 
   // Poll the bridge: connection state, and new hands → refresh quietly.
   useEffect(() => {
@@ -155,7 +179,7 @@ export function HudView() {
       stop = true;
       clearTimeout(timer);
     };
-  }, [fetchHuds]);
+  }, [fetchHuds, fetchNotes]);
 
   // Stakes, once connected.
   const connected = !!status?.connected;
@@ -216,6 +240,7 @@ export function HudView() {
               index={i}
               player={p}
               hud={huds[p.id]?.hud}
+              note={notes[p.id]}
               active={p.id === selected}
               onSelect={() => setSelected(p.id)}
               onRemove={() => unpin(p.id)}
@@ -271,6 +296,19 @@ export function HudView() {
                     </div>
                   )}
                 </div>
+                <div className="mt-4 max-w-3xl">
+                  {/* One box per pinned player, inactive ones hidden: a note being
+                      typed survives switching players. */}
+                  {pins.map((p) => (
+                    <div key={p.id} hidden={p.id !== selected}>
+                      <NotesBox
+                        player={p.id}
+                        note={notes[p.id]}
+                        onSaved={(n) => setNotes((prev) => ({ ...prev, [p.id]: n }))}
+                      />
+                    </div>
+                  ))}
+                </div>
                 <div className="mt-4 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
                   {TABS.map(({ label, group: g }) => (
                     <button
@@ -310,6 +348,7 @@ function PinnedPlayer({
   index,
   player,
   hud,
+  note,
   active,
   onSelect,
   onRemove,
@@ -317,6 +356,7 @@ function PinnedPlayer({
   index: number;
   player: Pt4Player;
   hud: PlayerHud | undefined;
+  note: Pt4Note | undefined;
   active: boolean;
   onSelect: () => void;
   onRemove: () => void;
@@ -335,6 +375,16 @@ function PinnedPlayer({
         <span className="flex items-baseline gap-1.5">
           {index < 9 && <span className="text-[10px] text-muted">{index + 1}</span>}
           <span className="truncate text-sm font-medium">{player.name}</span>
+          {note && note.color > 0 && (
+            <span title={`PT4 colour ${note.color}`} className="rounded bg-line px-1 font-mono text-[10px] text-muted">
+              {note.color}
+            </span>
+          )}
+          {note?.text && (
+            <span title={note.text} className="text-[11px] text-muted">
+              ✎
+            </span>
+          )}
         </span>
         <span className="block font-mono text-[11px] tabular-nums text-muted">
           {hud?.error ? "error" : hud ? `${quick.join(" / ")} · ${shortCount(hud.total)}` : "…"}
