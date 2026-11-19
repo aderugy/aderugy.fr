@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,14 @@ func TestCatalogueCoversLayout(t *testing.T) {
 		for _, it := range g.Items {
 			if it.T == "stat" && cat[it.Stat] == nil {
 				missing[it.Stat] = true
+			}
+		}
+	}
+	// Panels defined on the site (src/lib/hud/extra.ts): row("label", "stat").
+	if extra, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "src", "lib", "hud", "extra.ts")); err == nil {
+		for _, m := range regexp.MustCompile(`row\("[^"]*", "([^"]+)"\)`).FindAllStringSubmatch(string(extra), -1) {
+			if cat[m[1]] == nil {
+				missing[m[1]] = true
 			}
 		}
 	}
@@ -389,4 +398,32 @@ func TestAutoNotesIntegration(t *testing.T) {
 	if v[1].Updated != "2026-11-19T00:00:00" {
 		t.Errorf("updated %q", v[1].Updated)
 	}
+}
+
+func TestLimperStats(t *testing.T) {
+	// MP limps, CO isos, BTN (this player) 3bets.
+	threeB := hand(0, 6, FVpip, FP3betOpp, FP3bet)
+	threeB.Face2bet, threeB.PFaceLimpers = true, 1
+	threeB.Act[Pre], threeB.Aggr[Pre], threeB.Actors[Pre] = "R", "810", "210"
+	// Same, BTN just calls the iso.
+	call := threeB
+	call.flags = [2]uint64{}
+	call.set(FVpip)
+	call.set(FP3betOpp)
+	call.Act[Pre] = "C"
+	// A plain open (no limper) faced by the BTN: not an iso.
+	open := hand(0, 6, FP3betOpp)
+	open.Face2bet, open.Act[Pre], open.Aggr[Pre], open.Actors[Pre] = true, "F", "81", "1"
+	// BB checks behind two limpers; another BB isos them.
+	bbCheck := hand(8, 1)
+	bbCheck.PFaceLimpers, bbCheck.Act[Pre], bbCheck.Aggr[Pre], bbCheck.Actors[Pre] = 2, "X", "8", "21"
+	bbIso := hand(8, 1, FVpip, FPFirstRaise)
+	bbIso.PFaceLimpers, bbIso.PRaise, bbIso.Act[Pre], bbIso.Aggr[Pre], bbIso.Actors[Pre] = 2, 1, "R", "88", "218"
+
+	v := Compute(SortedCatalogue(), []Hand{threeB, call, open, bbCheck, bbIso})
+	eq(t, v, "3Bet vs Iso-Raise", 0, 1, 2)
+	eq(t, v, "3Bet vs Iso-Raise", 6, 1, 2) // BTN column
+	eq(t, v, "Raise With Previous Limpers", 0, 1, 2)
+	eq(t, v, "Raise With Previous Limpers", 1, 1, 2) // BB column
+	eq(t, v, "Limp With Previous Limpers", 0, 0, 0)  // the BB can't limp
 }
