@@ -4,6 +4,7 @@ import { useState } from "react";
 import { GRID_HANDS } from "@/lib/solver/cards";
 import { AUTO_CATEGORIES, parseAutoNote, rangeShare, type ParsedRange } from "@/lib/hud/ranges";
 import type { Pt4AutoNote } from "@/lib/hud/types";
+import { CardText } from "./CardText";
 
 /**
  * PT4's auto-generated notes of a player, read-only: grouped by street, most
@@ -17,22 +18,22 @@ export function AutoNotes({ notes }: { notes: Pt4AutoNote[] }) {
   for (const n of notes) groups.set(n.category, [...(groups.get(n.category) ?? []), n]);
 
   return (
-    <div className="mt-2.5 border-t border-neutral-800 pt-2 font-sans text-[11px] leading-[18px]">
-      <div className="mb-1 text-[10px] text-neutral-500">PT4 auto-notes · {notes.length}</div>
+    <div className="mt-2.5 border-t border-line pt-2 font-sans text-[11px] leading-[18px]">
+      <div className="mb-1 text-[10px] text-muted">PT4 auto-notes · {notes.length}</div>
       <div>
         {[...groups.entries()]
           .sort(([a], [b]) => a - b)
           .map(([cat, list]) => (
             <div key={cat} className="mb-1">
-              <div className="text-[10px] uppercase tracking-wide text-neutral-500">
+              <div className="text-[10px] uppercase tracking-wide text-muted">
                 {AUTO_CATEGORIES[cat] ?? `Category ${cat}`}
               </div>
               {list.map((n, i) => (
                 <div key={i} className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 text-neutral-300">
+                  <span className="min-w-0 flex-1 text-foreground">
                     {parseAutoNote(n.text).map((seg, j) =>
                       seg.t === "text" ? (
-                        <span key={j}>{seg.text}</span>
+                        <CardText key={j} text={seg.text} />
                       ) : (
                         <span
                           key={j}
@@ -46,14 +47,14 @@ export function AutoNotes({ notes }: { notes: Pt4AutoNote[] }) {
                             });
                           }}
                           onMouseLeave={() => setTip(null)}
-                          className="cursor-default rounded bg-neutral-800 px-1 font-mono text-sky-300"
+                          className="cursor-default rounded bg-line/70 px-1 font-mono font-medium text-sky-700 dark:text-sky-300"
                         >
                           {seg.raw.replaceAll(",", ", ")}
                         </span>
                       ),
                     )}
                   </span>
-                  <span className="shrink-0 font-mono tabular-nums text-neutral-500" title={`${n.count} times`}>
+                  <span className="shrink-0 font-mono tabular-nums text-muted" title={`${n.count} times`}>
                     ×{n.count}
                   </span>
                 </div>
@@ -72,7 +73,7 @@ function RangeGrid({ range, raw, x, y }: { range: ParsedRange; raw: string; x: n
     <div
       role="tooltip"
       style={{ left: x, top: y }}
-      className="pointer-events-none fixed z-50 rounded-md border border-neutral-700 bg-neutral-900 p-1.5 shadow-xl"
+      className="pointer-events-none fixed z-50 rounded-md border border-line bg-surface p-1.5 shadow-xl"
     >
       <div className="grid gap-px" style={{ gridTemplateColumns: "repeat(13, 1rem)" }}>
         {GRID_HANDS.map((h) => (
@@ -80,14 +81,14 @@ function RangeGrid({ range, raw, x, y }: { range: ParsedRange; raw: string; x: n
             key={h}
             className={[
               "flex h-4 items-center justify-center rounded-[2px] font-mono text-[7px] leading-none",
-              range.hands.has(h) ? "bg-sky-500 text-white" : "bg-neutral-800 text-neutral-500",
+              range.hands.has(h) ? "bg-sky-500 text-white" : "bg-line text-muted",
             ].join(" ")}
           >
             {h.slice(0, 2)}
           </div>
         ))}
       </div>
-      <div className="mt-1 flex justify-between font-sans text-[10px] text-neutral-400">
+      <div className="mt-1 flex justify-between font-sans text-[10px] text-muted">
         <span>
           {range.hands.size} hands · {(rangeShare(range.hands) * 100).toFixed(1)} %
         </span>
