@@ -402,6 +402,25 @@ func TestSecurity(t *testing.T) {
 	}
 }
 
+func TestPT4Reload(t *testing.T) {
+	a := newTestApp(t)
+	post := func(ct string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/pt4/reload", strings.NewReader("{}"))
+		req.Host = "127.0.0.1:7878"
+		req.Header.Set("Origin", "https://aderugy.fr")
+		req.Header.Set("Content-Type", ct)
+		rec := httptest.NewRecorder()
+		a.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := post("text/plain"); rec.Code != http.StatusUnsupportedMediaType {
+		t.Errorf("form-like post: %d", rec.Code)
+	}
+	if rec := post("application/json"); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"players":0`) {
+		t.Errorf("reload: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestPreflightPrivateNetwork(t *testing.T) {
 	a := newTestApp(t)
 	req := httptest.NewRequest("OPTIONS", "/api/decision", nil)

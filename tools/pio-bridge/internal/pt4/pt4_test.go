@@ -223,6 +223,16 @@ func TestIntegration(t *testing.T) {
 	eq(t, v, "VPIP", 6, 1, 1) // BTN
 	eq(t, v, "VPIP", 1, 0, 0) // BB: walk only
 
+	// Reload drops the cached player; the next HUD reads PT4 again.
+	if n := s.Reload(); n != 2 {
+		t.Errorf("reload dropped %d players, want 2", n)
+	}
+	huds, _, err = s.HUDs([]int64{1}, Filter{})
+	if err != nil || huds[0].Total != 4 {
+		t.Fatalf("after reload %+v %v", huds, err)
+	}
+	eq(t, huds[0].Stats, "VPIP", 0, 3, 3)
+
 	// Filters.
 	huds, _, _ = s.HUDs([]int64{1}, Filter{Limits: []int16{2}})
 	if huds[0].Hands != 1 {

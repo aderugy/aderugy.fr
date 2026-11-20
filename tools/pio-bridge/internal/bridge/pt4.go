@@ -152,6 +152,20 @@ func (a *App) pt4SaveNote(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// POST /pt4/reload → {players}: drops every cached hand and HUD (after hands
+// were deleted, re-imported or recalculated in PT4). Writes nothing to PT4.
+func (a *App) pt4Reload(w http.ResponseWriter, r *http.Request) {
+	// JSON only, like /pt4/notes: a cross-site form can't send it without a
+	// preflight, which the guard refuses for unknown origins.
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		writeErr(w, http.StatusUnsupportedMediaType, "bad_content_type", "JSON expected")
+		return
+	}
+	n := a.pt4.Reload()
+	a.Logf("pt4: cache reloaded (%d players dropped)", n)
+	writeJSON(w, 200, map[string]any{"players": n})
+}
+
 // /pt4/verify-all?n=20: the check against cash_cache for the n players with
 // the most hands, added up by stat (worst first). Takes a few seconds.
 func (a *App) pt4VerifyAll(w http.ResponseWriter, r *http.Request) {
