@@ -152,6 +152,20 @@ func (a *App) pt4SaveNote(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// /pt4/verify-all?n=20: the check against cash_cache for the n players with
+// the most hands, added up by stat (worst first). Takes a few seconds.
+func (a *App) pt4VerifyAll(w http.ResponseWriter, r *http.Request) {
+	n, _ := strconv.Atoi(r.URL.Query().Get("n"))
+	rep, err := a.pt4.VerifyAll(n)
+	if err != nil {
+		writePT4Error(w, err)
+		return
+	}
+	a.Logf("pt4: verify-all on %d players in %d ms", len(rep.Players), rep.Millis)
+	w.Header().Set("Content-Disposition", `inline; filename="pt4-verify.json"`)
+	writeJSON(w, 200, rep)
+}
+
 func writePT4Error(w http.ResponseWriter, err error) {
 	if err == pt4.ErrNotConfigured {
 		writeErr(w, http.StatusServiceUnavailable, "pt4_not_configured", "Set the PokerTracker 4 database in PioBridge's settings")

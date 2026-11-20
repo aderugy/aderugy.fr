@@ -100,6 +100,7 @@ How it works (`internal/pt4/`):
 | `/pt4/limits` | stakes that have hands |
 | `/pt4/hud?ids=1,2&limits=3,4&last=500&days=30` | per player: `name`, `site`, `hands` (matching), `total`, `stats`: `{name: [[num, den] × 7]}` — index 0 all positions, then BB, SB, EP, MP, CO, BTN |
 | `/pt4/verify?id=` | the check against `cash_cache` |
+| `/pt4/verify-all?n=20` | the same for the `n` players with the most hands, added up by stat (fewest matching players first, with the worst player for each) — save it and send it back to fix formulas |
 | `/pt4/notes?ids=1,2` | PT4 player notes: `{notes: {"1": {id, color, date, text, rich}}}` (players without one absent) |
 | `/pt4/autonotes?ids=1,2` | PT4's auto-generated notes (`notes_auto`, read-only): `{autonotes: {"1": [{category, text, count, hands, updated}]}}`, by category then most frequent |
 | `POST /pt4/notes` `{player, color, text, expected}` | saves a note (JSON only); `expected` = the `date` it was loaded with (`""` for a new one), 409 `note_changed` with PT4's current note if it changed meanwhile |

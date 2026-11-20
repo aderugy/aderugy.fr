@@ -228,3 +228,113 @@ WHERE table_schema = 'public' AND table_name = 'cash_cache'`)
 type verifyErr struct{ msg string }
 
 func (e *verifyErr) Error() string { return e.msg }
+
+/* ------------------------------------------------------------ whole report */
+
+type VerifyStat struct {
+	Stat     string     `json:"stat"`
+	Players  int        `json:"players"`  // players with an opportunity (mine or PT4's)
+	Matching int        `json:"matching"` // of those, exact matches
+	Mine     [2]float64 `json:"mine"`     // summed over the players
+	PT4      [2]float64 `json:"pt4"`
+	Note     string     `json:"note,omitempty"`
+	// Worst: the player with the biggest gap, to look at in PT4.
+	Worst *VerifyWorst `json:"worst,omitempty"`
+}
+
+type VerifyWorst struct {
+	ID   int64      `json:"id"`
+	Name string     `json:"name"`
+	Mine [2]float64 `json:"mine"`
+	PT4  [2]float64 `json:"pt4"`
+}
+
+type VerifyAllReport struct {
+	Players []VerifyPlayer `json:"players"`
+	// Stats sorted worst first: fewest matching players.
+	Stats []VerifyStat `json:"stats"`
+	// Stats of the catalogue PT4 has no counter for: check them by eye.
+	NoPt4Counter []string `json:"noPt4Counter"`
+	Millis       int64    `json:"ms"`
+}
+
+type VerifyPlayer struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Hands    int    `json:"hands"`
+	Checked  int    `json:"checked"`
+	Matching int    `json:"matching"`
+	Error    string `json:"error,omitempty"`
+}
+
+// VerifyAll runs Verify on the n players with the most cash hands and adds
+// the results up by stat.
+func (s *Service) VerifyAll(n int) (*VerifyAllReport, error) {
+	t0 := time.Now()
+	if n <= 0 || n > 100 {
+		n = 20
+	}
+	r, err := s.query(`SELECT id_player FROM cash_cache GROUP BY id_player ORDER BY sum(cnt_hands) DESC LIMIT ` + strconv.Itoa(n))
+	if err != nil {
+		return nil, err
+	}
+	rep := &VerifyAllReport{}
+	byStat := map[string]*VerifyStat{}
+	gap := map[string]float64{}
+	for _, v := range r.Values {
+		id := atoi(v[0])
+		pr, err := s.Verify(id)
+		if err != nil {
+			rep.Players = append(rep.Players, VerifyPlayer{ID: id, Error: err.Error()})
+			continue
+		}
+		rep.Players = append(rep.Players, VerifyPlayer{ID: id, Name: pr.Player.Name, Hands: pr.Player.Total,
+			Checked: pr.Checked, Matching: pr.Matching})
+		if rep.NoPt4Counter == nil {
+			rep.NoPt4Counter = pr.Missing
+		}
+		for _, row := range pr.Rows {
+			st := byStat[row.Stat]
+			if st == nil {
+				st = &VerifyStat{Stat: row.Stat, Note: row.Note}
+				byStat[row.Stat] = st
+			}
+			if row.Mine[1] == 0 && row.PT4[1] == 0 {
+				continue // no opportunity either way
+			}
+			st.Players++
+			if row.Match {
+				st.Matching++
+			}
+			for i := 0; i < 2; i++ {
+				st.Mine[i] += row.Mine[i]
+				st.PT4[i] += row.PT4[i]
+			}
+			g := math.Abs(row.Mine[1]-row.PT4[1]) + math.Abs(row.Mine[0]-row.PT4[0])
+			if !row.Match && g > gap[row.Stat] {
+				gap[row.Stat] = g
+				st.Worst = &VerifyWorst{ID: id, Name: pr.Player.Name, Mine: row.Mine, PT4: row.PT4}
+			}
+		}
+	}
+	for _, st := range byStat {
+		rep.Stats = append(rep.Stats, *st)
+	}
+	sort.Slice(rep.Stats, func(i, j int) bool {
+		a, b := rep.Stats[i], rep.Stats[j]
+		ra, rb := ratio(a.Matching, a.Players), ratio(b.Matching, b.Players)
+		if ra != rb {
+			return ra < rb
+		}
+		return a.Stat < b.Stat
+	})
+	rep.Millis = time.Since(t0).Milliseconds()
+	return rep, nil
+}
+
+func ratio(a, b int) float64 {
+	if b == 0 {
+		return 2 // nothing to compare: last
+	}
+	return float64(a) / float64(b)
+}
