@@ -54,6 +54,27 @@ async function saveNote(player: number, color: number, text: string, expected: s
   return body.note;
 }
 
+/** Makes the bridge forget its cached hands and read PT4 again. */
+async function reload(): Promise<number> {
+  let res: Response;
+  try {
+    res = await fetch(PIO_BRIDGE_URL + "/pt4/reload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+      cache: "no-store",
+      targetAddressSpace: "loopback",
+    } as RequestInit);
+  } catch {
+    throw new PioBridgeError("offline", OFFLINE_MESSAGE);
+  }
+  const body = (await res.json().catch(() => null)) as { players?: number; error?: string; message?: string } | null;
+  if (!res.ok || !body) {
+    throw new PioBridgeError(body?.error ?? `http_${res.status}`, body?.message ?? `PioBridge answered ${res.status}`);
+  }
+  return body.players ?? 0;
+}
+
 export const pt4 = {
   status: () => call<Pt4Status>("/pt4/status"),
   limits: () => call<{ limits: Pt4Limit[] }>("/pt4/limits").then((r) => r.limits),
@@ -69,6 +90,8 @@ export const pt4 = {
   notes: (ids: number[]) =>
     call<{ notes: Record<string, Pt4Note> }>("/pt4/notes", { ids: ids.join(",") }).then((r) => r.notes),
   saveNote,
+  /** Drop the bridge's cache (after deleting, re-importing or recalculating in PT4). */
+  reload,
   /** PT4's auto-notes; players without any are absent. */
   autoNotes: (ids: number[]) =>
     call<{ autonotes: Record<string, Pt4AutoNote[]> }>("/pt4/autonotes", { ids: ids.join(",") }).then((r) => r.autonotes),

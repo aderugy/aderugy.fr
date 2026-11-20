@@ -94,6 +94,28 @@ func (s *Service) Configure(dsn string) {
 	s.playersMu.Unlock()
 }
 
+// Reload forgets everything read from PT4 — players' hands and HUDs, stakes,
+// positions — so the next requests read the database again. For changes PT4
+// makes without adding hands (deleted or re-imported hands, a recalculation),
+// which the max(id_hand) check can't see. Returns how many players were
+// cached.
+func (s *Service) Reload() int {
+	s.playersMu.Lock()
+	n := len(s.players)
+	s.players = map[int64]*playerCache{}
+	s.playersMu.Unlock()
+	s.maxMu.Lock()
+	s.maxAt = time.Time{}
+	s.maxMu.Unlock()
+	s.limitsMu.Lock()
+	s.limitsAt, s.limits = time.Time{}, nil
+	s.limitsMu.Unlock()
+	s.mu.Lock()
+	s.positions = nil
+	s.mu.Unlock()
+	return n
+}
+
 /* ------------------------------------------------------------ connections */
 
 func (s *Service) acquire() (*Conn, chan *Conn, error) {
