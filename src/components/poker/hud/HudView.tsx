@@ -22,7 +22,8 @@ import { NotesBox } from "./NotesBox";
 
 const layout = layoutJson as HudLayout;
 const MAIN = layout.groups.find((g) => g.main) ?? layout.groups[0];
-const TABS = popupTabs(layout);
+// PT4's popups, then ours (play against limpers, by position).
+const TABS = [...popupTabs(layout), { label: "Limpers", group: LIMPERS }];
 const POPUPS = TABS.map((t) => t.group);
 /** Shown to the right of the main line. Nothing opens it in PT4, so it isn't a tab. */
 const SIDE = layout.groups.find((g) => g.name === "Avancé");
@@ -334,9 +335,6 @@ export function HudView() {
                           <HudPanel group={SIDE} hud={current.hud} compact onPopup={setPopup} />
                         </div>
                       )}
-                      <div className="min-w-0">
-                        <HudPanel group={LIMPERS} hud={current.hud} dense onPopup={setPopup} />
-                      </div>
                     </div>
                     <div className="mt-4 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
                       {TABS.map(({ label, group: g }) => (

@@ -118,11 +118,11 @@ test("grid placement: spans push cells to their column (PT4's triangle)", () => 
   assert.deepEqual([...new Set(widths.values())], [7]);
 });
 
-test("the Limpers panel: header + two rows of 7 positions on one grid", () => {
+test("the Limpers popup: header + three rows of 7 positions on one grid", () => {
   const { cells, columns } = gridCells(LIMPERS.items);
   assert.equal(columns, 8);
   const stats = cells.filter((c) => c.kind === "cell" && c.item.t === "stat");
-  assert.equal(stats.length, 14);
+  assert.equal(stats.length, 21);
   const btnIso = stats.find((c) => c.kind === "cell" && c.item.t === "stat" && c.item.stat === "Raise With Previous Limpers" && c.item.pos === 6);
   assert.ok(btnIso && btnIso.kind === "cell" && btnIso.col === 6); // under "BTN"
 });
