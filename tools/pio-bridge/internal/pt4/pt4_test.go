@@ -463,13 +463,28 @@ func TestFacingCheckRaise(t *testing.T) {
 	sb := hand(2, 4, FTSaw, FTOpenOpp, FTBet, FTFaceRaise)
 	sb.Act[Turn], sb.Aggr[Turn], sb.RaiserPos[Turn] = "BR", "292", 9
 
-	v := Compute(SortedCatalogue(), []Hand{xrFold, xrCall, lead, ip, sb})
+	for _, h := range []*Hand{&xrFold, &xrCall, &lead, &ip} {
+		h.Face2betS[Flop] = true
+	}
+	// The BB checks, the CO bets, the BTN raises: the BB faces a 2bet he
+	// didn't bet into, and folds.
+	cold := hand(8, 1, FFSaw, FFOpenOpp, FFCheck, FFFaceRaise, FFFold)
+	cold.Act[Flop], cold.Aggr[Flop], cold.Face2betS[Flop] = "XF", "10", true
+
+	v := Compute(SortedCatalogue(), []Hand{xrFold, xrCall, lead, ip, sb, cold})
 	eq(t, v, "Fold to F Check Raise", 0, 1, 2)
 	eq(t, v, "Call F Check Raise", 0, 1, 2)
 	eq(t, v, "3Bet F Check Raise", 0, 0, 2)
 	eq(t, v, "3Bet T Check Raise", 0, 1, 1)
-	eq(t, v, "Fold to F 2Bet", 0, 2, 4) // every raise faced after betting
-	if !(actsBefore('9', '8') && actsBefore('8', '7') && actsBefore('5', '1') && actsBefore('1', '0') && !actsBefore('0', '9')) {
+	eq(t, v, "Fold to F 2Bet", 0, 3, 5) // every raise of a bet faced, bettor or not
+	eq(t, v, "Call F 2Bet", 0, 2, 5)
+	six := Hand{Players: 6}
+	if !(six.actsBefore('9', '8') && six.actsBefore('8', '7') && six.actsBefore('5', '1') && six.actsBefore('1', '0') && !six.actsBefore('0', '9')) {
 		t.Error("postflop order")
+	}
+	// Heads-up the SB is the button: the BB acts first after the flop.
+	hu := Hand{Players: 2}
+	if !hu.actsBefore('8', '9') || hu.actsBefore('9', '8') {
+		t.Error("heads-up postflop order")
 	}
 }

@@ -162,6 +162,7 @@ type Hand struct {
 
 	Face2bet, Face3bet bool    // amt_p_2bet_facing / amt_p_3bet_facing > 0
 	FaceBet            [4]bool // amt_<st>_bet_facing > 0
+	Face2betS          [4]bool // amt_<st>_2bet_facing > 0: faced a raise of a bet
 
 	Won, BetR, BetTotal, Equity float64
 
@@ -209,9 +210,10 @@ func handColumns() []string {
 		"s.enum_allin",
 		"s.amt_p_2bet_facing > 0", "s.amt_p_3bet_facing > 0",
 		"s.amt_f_bet_facing > 0", "s.amt_t_bet_facing > 0", "s.amt_r_bet_facing > 0",
+		"s.amt_f_2bet_facing > 0", "s.amt_t_2bet_facing > 0", "s.amt_r_2bet_facing > 0",
 		"s.amt_won", "s.amt_bet_r", "s.amt_bet_ttl", "s.val_equity",
 		"ap.action", "af.action", "at.action", "ar.action",
-		"hs.str_aggressors_p", "hs.str_aggressors_f", "hs.str_aggressors_t", "hs.str_aggressors_r",
+		aggrPre, "hs.str_aggressors_f", "hs.str_aggressors_t", "hs.str_aggressors_r",
 		"hs.str_actors_p", "hs.str_actors_f", "hs.str_actors_t", "hs.str_actors_r",
 		"coalesce(s.val_f_raise_aggressor_pos, -1)", "coalesce(s.val_t_raise_aggressor_pos, -1)", "coalesce(s.val_r_raise_aggressor_pos, -1)",
 		"coalesce(pf.flg_f_saw, false)", "coalesce(pf.flg_t_saw, false)", "coalesce(pf.flg_r_saw, false)",
@@ -226,9 +228,20 @@ func boolChars(exprs []string) []string {
 	return out
 }
 
+// aggrPre is str_aggressors_p without the extra leading '8' that PT4 writes
+// for each additional big blind (a player posting to come in): with two BBs,
+// "88" means nobody raised and "885" means the BTN opened.
+const aggrPre = "coalesce(substr(hs.str_aggressors_p, d.nbb::int), hs.str_aggressors_p)"
+
 // HandsQuery selects one player's hands with an id above after, oldest first.
+//
+// Positions are not unique: a player posting a big blind out of turn also
+// gets position 8. The preflop aggressor's row is therefore picked with
+// DISTINCT ON, preferring the row that actually raised, so that each hand
+// comes out exactly once.
 func HandsQuery(player int64, after int64) string {
-	return "SELECT " + strings.Join(handColumns(), ", ") + `
+	a := strconv.FormatInt(after, 10)
+	return "SELECT * FROM (SELECT DISTINCT ON (s.id_hand) " + strings.Join(handColumns(), ", ") + `
 FROM cash_hand_player_statistics s
 JOIN cash_hand_summary hs ON hs.id_hand = s.id_hand
 JOIN cash_limit l ON l.id_limit = s.id_limit
@@ -236,11 +249,16 @@ LEFT JOIN lookup_actions ap ON ap.id_action = s.id_action_p
 LEFT JOIN lookup_actions af ON af.id_action = s.id_action_f
 LEFT JOIN lookup_actions at ON at.id_action = s.id_action_t
 LEFT JOIN lookup_actions ar ON ar.id_action = s.id_action_r
+-- hands with more than one big blind
+LEFT JOIN (SELECT id_hand, count(*) AS nbb FROM cash_hand_player_statistics
+  WHERE position = 8 AND id_hand > ` + a + ` GROUP BY id_hand HAVING count(*) > 1) d ON d.id_hand = s.id_hand
 -- the preflop aggressor's own row (last char of str_aggressors_p = his position)
-LEFT JOIN cash_hand_player_statistics pf ON pf.id_hand = s.id_hand AND length(hs.str_aggressors_p) >= 2
+LEFT JOIN cash_hand_player_statistics pf ON pf.id_hand = s.id_hand AND length(` + aggrPre + `) >= 2
   AND pf.position = right(hs.str_aggressors_p, 1)::int
-WHERE s.id_player = ` + strconv.FormatInt(player, 10) + ` AND s.id_hand > ` + strconv.FormatInt(after, 10) + `
-ORDER BY s.date_played, s.id_hand`
+LEFT JOIN lookup_actions pfa ON pfa.id_action = pf.id_action_p
+WHERE s.id_player = ` + strconv.FormatInt(player, 10) + ` AND s.id_hand > ` + a + `
+ORDER BY s.id_hand, (pfa.action LIKE '%R%') DESC NULLS LAST) q
+ORDER BY 2, 1`
 }
 
 // Positions maps (cnt_players_lookup_position, position) → HUD category.
@@ -341,6 +359,9 @@ func ParseHands(r *Rows, pos Positions) ([]Hand, error) {
 		for st := Flop; st <= River; st++ {
 			h.FaceBet[st] = enum(next()) == 't'
 		}
+		for st := Flop; st <= River; st++ {
+			h.Face2betS[st] = enum(next()) == 't'
+		}
 		h.Won, h.BetR, h.BetTotal, h.Equity = atof(next()), atof(next()), atof(next()), atof(next())
 		for st := Pre; st <= River; st++ {
 			h.Act[st] = string(next())
@@ -413,6 +434,22 @@ func (h *Hand) Walk() bool { return h.Act[Pre] == "" }
 // First is the player's first preflop action (F, C, R, X) or 0.
 func (h *Hand) First() byte { return enum([]byte(h.Act[Pre])) }
 
+// Resp2bet: the answer to a raise of a bet (a postflop 2bet) — 'R' 3bet,
+// 'F' fold, 'C' call; 0 when the player didn't face one, or made it himself.
+// PT4 counts the 2bet faced whether or not the player made the bet (a check,
+// a call then a raise behind, or a cold bet + raise).
+func (h *Hand) Resp2bet(st int) byte {
+	switch {
+	case !h.Face2betS[st] || h.F(sf(st, FFFirstRaise)):
+		return 0
+	case h.F(sf(st, FF3bet)):
+		return 'R'
+	case h.F(sf(st, FFFold)):
+		return 'F'
+	}
+	return 'C'
+}
+
 // Resp is the player's first non-check action on a street.
 func (h *Hand) Resp(st int) byte {
 	return enum([]byte(strings.TrimLeft(h.Act[st], "X")))
@@ -429,10 +466,14 @@ func (h *Hand) AfterBet(st int) byte {
 }
 
 // postflopRank: acting order after the flop — SB, BB, then the earliest
-// positions (highest numbers) down to the button.
-func postflopRank(pos byte) int {
+// positions (highest numbers) down to the button. Heads-up the SB is the
+// button and acts last.
+func postflopRank(pos byte, headsUp bool) int {
 	switch pos {
 	case '9':
+		if headsUp {
+			return 1000
+		}
 		return 0
 	case '8':
 		return 1
@@ -442,7 +483,10 @@ func postflopRank(pos byte) int {
 
 // actsBefore: on the flop, turn and river, position a acts before b.
 // (str_actors_* can't tell: it lists who put money in, not who checked.)
-func actsBefore(a, b byte) bool { return postflopRank(a) < postflopRank(b) }
+func (h *Hand) actsBefore(a, b byte) bool {
+	hu := h.Players == 2
+	return postflopRank(a, hu) < postflopRank(b, hu)
+}
 
 // FacedCheckRaise: the player bet the street and was raised by someone who
 // acts before him — who therefore checked, since the player's bet was the
@@ -451,7 +495,7 @@ func (h *Hand) FacedCheckRaise(st int) bool {
 	if !h.F(sf(st, FFBet)) || !h.F(sf(st, FFFaceRaise)) || h.RaiserPos[st] < 0 {
 		return false
 	}
-	return actsBefore('0'+byte(h.RaiserPos[st]), h.posChar())
+	return h.actsBefore('0'+byte(h.RaiserPos[st]), h.posChar())
 }
 
 // CheckRaiseOpp: the player checked and faced a bet.
@@ -464,39 +508,56 @@ func (h *Hand) FacingFirstBet(st int) bool {
 	return h.FaceBet[st] && !h.F(sf(st, FFBet))
 }
 
-// ProbeOpp (turn / river): not the preflop aggressor, the PFA is still in, the
-// previous street was checked through, and the player is first to act.
-func (h *Hand) ProbeOpp(st int) bool {
-	if st < Turn || !h.Raised() || h.PFA() || h.Aggr[st-1] != "" {
-		return false
+// checkedThrough: PT4's "probe" situation on the turn or river — the street
+// before was checked through, and on the river the PFA had bet the flop
+// (bet flop, check turn). pfa is the preflop aggressor's position.
+func (h *Hand) checkedThrough(st int, pfa byte) bool {
+	if st == Turn {
+		return h.Aggr[Flop] == ""
 	}
-	return h.F(sf(st, FFOpenOpp)) && !h.F(sf(st, FFHasPosition)) && h.PfaSaw[st]
+	return h.Aggr[Flop] == string(pfa) && h.Aggr[Turn] == ""
 }
 
-// ProbeDefOpp (turn / river): the PFA, previous street checked through, faces
-// a bet from a player who acted before him.
-func (h *Hand) ProbeDefOpp(st int) bool {
-	if st < Turn || !h.PFA() || h.Aggr[st-1] != "" || !h.FacingFirstBet(st) || h.Aggr[st] == "" {
+// ProbeOpp (turn / river): not the preflop aggressor, the PFA is still in,
+// nobody has bet the street yet and the player acts before the PFA.
+// Checked against cash_cache.cnt_<st>_probe_opp on a real database.
+func (h *Hand) ProbeOpp(st int) bool {
+	if st < Turn || !h.Raised() || h.PFA() || !h.PfaSaw[st] {
 		return false
 	}
-	return actsBefore(h.Aggr[st][0], h.posChar())
+	pfa := h.pfaChar()
+	return h.checkedThrough(st, pfa) && h.F(sf(st, FFOpenOpp)) && h.actsBefore(h.posChar(), pfa)
+}
+
+// ProbeDefOpp (turn / river): the PFA, in the probe situation, faces a bet
+// from a player who acts before him.
+func (h *Hand) ProbeDefOpp(st int) bool {
+	if st < Turn || !h.PFA() || !h.checkedThrough(st, h.posChar()) || !h.FacingFirstBet(st) || h.Aggr[st] == "" {
+		return false
+	}
+	return h.actsBefore(h.Aggr[st][0], h.posChar())
 }
 
 // derive fills the flop float flags (PT4 has them for turn and river only).
-// Float flop: not the PFA, in position on the PFA, who checked; bet or not.
+// PT4 only counts flop floats in single-raised pots (checked against
+// cash_cache.cnt_f_float_* on a real database):
+//   - float: not the PFA, called his raise, he checked, the player acts after
+//     him and nobody has bet yet; bet or not;
+//   - defence: the PFA checked and faces that bet, not already raised.
 func (h *Hand) derive() {
-	if !h.F(FFSaw) || !h.Raised() {
+	if !h.F(FFSaw) || len(h.Aggr[Pre]) != 2 {
 		return
 	}
 	pfa := h.pfaChar()
-	if !h.PFA() && h.PfaSaw[Flop] && h.F(FFHasPosition) && h.F(FFOpenOpp) && actsBefore(pfa, h.posChar()) {
+	if !h.PFA() && h.PfaSaw[Flop] && h.F(FFOpenOpp) && h.actsBefore(pfa, h.posChar()) {
 		h.set(FFFloatOpp)
 		if h.F(FFBet) {
 			h.set(FFFloat)
 		}
 	}
-	if h.PFA() && strings.HasPrefix(h.Act[Flop], "X") && h.FacingFirstBet(Flop) && h.Aggr[Flop] != "" &&
-		!actsBefore(h.Aggr[Flop][0], h.posChar()) {
+	a := h.Aggr[Flop]
+	if h.PFA() && strings.HasPrefix(h.Act[Flop], "X") && h.FacingFirstBet(Flop) && a != "" &&
+		!h.actsBefore(a[0], h.posChar()) && (len(a) == 1 || a[1] == h.posChar()) {
 		h.set(FFFloatDefOpp)
 		h.EnumFloat[Flop] = h.Resp(Flop)
 	}

@@ -9,6 +9,8 @@ package pt4
 // (str_aggressors_*, str_actors_*). `piobridge -pt4-verify` compares the
 // unfiltered totals with PT4's own cash_cache counters where one exists.
 
+import "strings"
+
 type Kind string
 
 const (
@@ -65,12 +67,18 @@ func is(get func(h *Hand) byte, c byte) func(h *Hand) bool {
 }
 
 var (
-	pot3bet    = func(h *Hand) bool { return h.Pot3bet() }
-	limpPot    = func(h *Hand) bool { return h.LimpPot() }
-	blind      = func(h *Hand) bool { return h.Cat == 1 || h.Cat == 2 }
-	first      = func(h *Hand) byte { return h.First() }
-	face2bet   = func(h *Hand) bool { return h.Face2bet && !h.F(FPLimp) && !h.F(FPFirstRaise) }
-	noLimpers  = func(h *Hand) bool { return h.PFaceLimpers == 0 }
+	pot3bet  = func(h *Hand) bool { return h.Pot3bet() }
+	limpPot  = func(h *Hand) bool { return h.LimpPot() }
+	blind    = func(h *Hand) bool { return h.Cat == 1 || h.Cat == 2 }
+	first    = func(h *Hand) byte { return h.First() }
+	face2bet = func(h *Hand) bool { return h.Face2bet && !h.F(FPLimp) && !h.F(FPFirstRaise) }
+	// unopened: the first raiser was also the first to put money in (no limper
+	// before him). cnt_p_face_limpers can't tell: it stays 0 when a raise
+	// follows the limps.
+	unopened = func(h *Hand) bool {
+		a := h.Aggr[Pre]
+		return len(a) >= 2 && h.Actors[Pre] != "" && h.Actors[Pre][0] == a[1]
+	}
 	openerIs   = func(cat int8) func(h *Hand) bool { return func(h *Hand) bool { return h.OpenerCat == cat } }
 	openerChar = func(c byte) func(h *Hand) bool {
 		return func(h *Hand) bool { return len(h.Aggr[Pre]) >= 2 && h.Aggr[Pre][1] == c }
@@ -144,7 +152,15 @@ func Catalogue() map[string]*Stat {
 	px("3Bet Preflop", flag(FP3betOpp), flag(FP3bet))
 	px("4Bet Preflop", flag(FP4betOpp), flag(FP4bet))
 	p("4Bet+ Preflop After Raising", and(flag(FP4betOpp), flag(FPFirstRaise)), flag(FP4bet))
-	p("5Bet+ Preflop", and(flag(FP4betDefOpp), flag(FP3bet)), func(h *Hand) bool { return h.Enum4bet == 'R' })
+	// 5bet+: the player had raised (open, 3bet or 4bet) and faces a re-raise
+	// at the 4bet level or above (cash_cache.cnt_p_5bet_opp); he raises again.
+	p("5Bet+ Preflop", func(h *Hand) bool {
+		a, me := h.Aggr[Pre], h.posChar()
+		first := strings.IndexByte(a[min(1, len(a)):], me) + 1
+		return len(a) >= 4 && first >= 1 && first < len(a)-1
+	}, func(h *Hand) bool {
+		return strings.LastIndexByte(h.Aggr[Pre], h.posChar()) >= 4
+	})
 	px("Preflop Squeeze", flag(FPSqueezeOpp), flag(FPSqueeze))
 	p("Fold to PF 3Bet After Raise", and(flag(FP3betDefOpp), flag(FPFirstRaise)), func(h *Hand) bool { return h.Enum3bet == 'F' })
 	p("Call PF 3Bet After Raise", and(flag(FP3betDefOpp), flag(FPFirstRaise)), func(h *Hand) bool { return h.Enum3bet == 'C' })
@@ -161,10 +177,11 @@ func Catalogue() map[string]*Stat {
 	p("Raise PF Squeeze", flag(FPSqueezeDefOpp), func(h *Hand) bool { return h.EnumSqueeze == 'R' })
 	p("Call PF 2Bet", face2bet, is(first, 'C'))
 	p("Cold Call 2Bet PF", and(face2bet, not(blind)), and(is(first, 'C'), flag(FPCCall)))
+	// Approximate: PT4 also counts some raisers here that the data can't single
+	// out. Facing a 3bet+ without having raised or limped; calls it at once.
 	p("Cold Call 3Bet+ PF", func(h *Hand) bool {
-		return h.Face3bet && !h.F(FP3betDefOpp) && !h.F(FPSqueezeDefOpp) && !h.F(FPLimp) &&
-			!h.F(FPFirstRaise) && h.PCall <= 1 && !blind(h)
-	}, is(first, 'C'))
+		return h.Face3bet && !h.F(FPFirstRaise) && !h.F(FPLimp)
+	}, func(h *Hand) bool { return h.Act[Pre] == "C" || h.Act[Pre] == "CR" })
 	// Facing limpers and no raise yet: limp, raise (iso), fold, or check (BB).
 	limpersDen := func(h *Hand) bool {
 		return h.PFaceLimpers > 0 && !h.Face2bet &&
@@ -175,7 +192,8 @@ func Catalogue() map[string]*Stat {
 	// 3bet vs an iso-raise: someone limped, another player raised over the
 	// limp(s), and this player (who hadn't limped) faces that raise.
 	p("3Bet vs Iso-Raise", and(face2bet, flag(FP3betOpp), func(h *Hand) bool { return h.IsoRaised() }), flag(FP3bet))
-	limpFaced := and(flag(FPLimp), flag(FPFaceRaise))
+	// Limped, then had to act again facing a raise (a lone "C" never did).
+	limpFaced := and(flag(FPLimp), flag(FPFaceRaise), func(h *Hand) bool { return len(h.Act[Pre]) >= 2 })
 	second := func(h *Hand) byte {
 		if len(h.Act[Pre]) < 2 {
 			return 0
@@ -189,12 +207,14 @@ func Catalogue() map[string]*Stat {
 	p("Fold to Steal", flag(FBlindDefOpp), func(h *Hand) bool { return h.F(FSbStealFold) || h.F(FBbStealFold) })
 	p("Call Steal", flag(FBlindDefOpp), is(first, 'C'))
 	p("3Bet Steal", flag(FBlindDefOpp), flag(FP3bet))
-	vsOpen := func(c byte) func(h *Hand) bool { return and(face2bet, noLimpers, openerChar(c)) }
+	// Facing an open from c, not yet 3bet (matches cash_cache's *_vs_<pos>_open
+	// and bb_v_sb columns on a real database).
+	vsOpen := func(c byte) func(h *Hand) bool { return and(face2bet, unopened, openerChar(c), flag(FP3betOpp)) }
 	p("Fold vs BTN Open", vsOpen('0'), is(first, 'F'))
 	p("Call vs BTN Open", vsOpen('0'), is(first, 'C'))
 	p("Call vs CO Open", vsOpen('1'), is(first, 'C'))
-	p("3Bet vs BTN Open", and(vsOpen('0'), flag(FP3betOpp)), flag(FP3bet))
-	p("3Bet vs CO Open", and(vsOpen('1'), flag(FP3betOpp)), flag(FP3bet))
+	p("3Bet vs BTN Open", vsOpen('0'), flag(FP3bet))
+	p("3Bet vs CO Open", vsOpen('1'), flag(FP3bet))
 	for name, cat := range map[string]int8{"EP": 3, "MP": 4, "CO": 5, "BTN": 6, "SB": 2, "BB": 1} {
 		p("3Bet vs "+name+" 2Bet", and(flag(FP3betOpp), face2bet, openerIs(cat)), flag(FP3bet))
 	}
@@ -240,7 +260,7 @@ func Catalogue() map[string]*Stat {
 		}{{"Fold to", 'F'}, {"Call", 'C'}} {
 			c := a.c
 			p(a.verb+" "+L+" Bet", func(h *Hand) bool { return h.FacingFirstBet(st) }, is(resp, c))
-			p(a.verb+" "+L+" 2Bet", and(flag(f(FFBet)), flag(f(FFFaceRaise))), is(after, c))
+			p(a.verb+" "+L+" 2Bet", func(h *Hand) bool { return h.Resp2bet(st) != 0 }, func(h *Hand) bool { return h.Resp2bet(st) == c })
 			p(a.verb+" "+L+" 3Bet", flag(f(FF3betDefOpp)), func(h *Hand) bool { return h.Enum3betS[st] == c })
 			p(a.verb+" "+L+" Check Raise", func(h *Hand) bool { return h.FacedCheckRaise(st) }, is(after, c))
 		}
