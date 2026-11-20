@@ -104,6 +104,7 @@ How it works (`internal/pt4/`):
 | `/pt4/notes?ids=1,2` | PT4 player notes: `{notes: {"1": {id, color, date, text, rich}}}` (players without one absent) |
 | `/pt4/autonotes?ids=1,2` | PT4's auto-generated notes (`notes_auto`, read-only): `{autonotes: {"1": [{category, text, count, hands, updated}]}}`, by category then most frequent |
 | `POST /pt4/notes` `{player, color, text, expected}` | saves a note (JSON only); `expected` = the `date` it was loaded with (`""` for a new one), 409 `note_changed` with PT4's current note if it changed meanwhile |
+| `POST /pt4/reload` `{}` | forgets every cached hand and HUD so the next requests read PT4 again (JSON only): after hands were deleted, re-imported or recalculated in PT4. New hands need nothing, they are picked up within 2 s. Button "Reload from PT4" in the HUD settings menu |
 
 Notes (`notes.go`): table `notes`, `enum_type = 'P'`, `id_x` = player, one per player. The text is wxWidgets rich text;
 the site edits plain text (one line per paragraph) and a save keeps the note's `<paragraphlayout>` (font, margins)

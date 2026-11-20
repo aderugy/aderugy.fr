@@ -226,6 +226,19 @@ export function HudView() {
       .catch(() => {});
   }, [connected]);
 
+  // PT4 changed hands without adding new ones (deleted, re-imported,
+  // recalculated): the bridge forgets its cache, then everything is fetched again.
+  const reload = useCallback(async () => {
+    await pt4.reload();
+    maxHand.current = 0;
+    await Promise.all([
+      fetchHuds(idsRef.current, filtersRef.current),
+      fetchNotes(idsRef.current),
+      fetchAutos(idsRef.current),
+      pt4.limits().then(setLimits, () => {}),
+    ]);
+  }, [fetchHuds, fetchNotes, fetchAutos]);
+
   const pin = (p: Pt4Player) => {
     setPins((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
     setSelected(p.id);
@@ -300,7 +313,7 @@ export function HudView() {
       <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-5">
         {/* Filters live in a menu: the HUD keeps the space while playing. */}
         <div className="absolute right-3 top-3 z-40 sm:right-5 sm:top-4">
-          <FiltersMenu filters={filters} limits={limits} onChange={setFilters} />
+          <FiltersMenu filters={filters} limits={limits} onChange={setFilters} onReload={reload} />
         </div>
         <BridgeState status={status} error={error} />
 
@@ -554,12 +567,24 @@ function FiltersMenu({
   filters,
   limits,
   onChange,
+  onReload,
 }: {
   filters: HudFilters;
   limits: Pt4Limit[];
   onChange: (f: HudFilters) => void;
+  onReload: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [reloading, setReloading] = useState<"idle" | "busy" | "done" | "failed">("idle");
+  const reload = async () => {
+    setReloading("busy");
+    try {
+      await onReload();
+      setReloading("done");
+    } catch {
+      setReloading("failed");
+    }
+  };
   const ref = useRef<HTMLDivElement>(null);
   const active = filters.limits.length > 0 || filters.lastHands > 0 || filters.days > 0;
 
@@ -581,7 +606,10 @@ function FiltersMenu({
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => !o);
+          setReloading("idle");
+        }}
         aria-expanded={open}
         aria-label="HUD filters"
         title="Filters: stakes, last hands, last days"
@@ -601,6 +629,23 @@ function FiltersMenu({
       {open && (
         <div className="absolute right-0 top-full mt-2 w-[36rem] max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-surface p-3 shadow-xl">
           <Filters filters={filters} limits={limits} onChange={onChange} />
+          <div className="mt-3 flex items-center gap-3 border-t border-line pt-3 text-xs">
+            <button
+              type="button"
+              onClick={reload}
+              disabled={reloading === "busy"}
+              className="rounded-md border border-line px-2.5 py-1 font-medium hover:border-accent disabled:opacity-60"
+            >
+              {reloading === "busy" ? "Reloading…" : "Reload from PT4"}
+            </button>
+            <span className="text-muted">
+              {reloading === "done"
+                ? "Done: every HUD was read again from PT4."
+                : reloading === "failed"
+                  ? "Failed: is PioBridge running?"
+                  : "After deleting, re-importing or recalculating hands in PT4. New hands come in on their own."}
+            </span>
+          </div>
         </div>
       )}
     </div>
