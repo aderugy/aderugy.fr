@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { Suspense } from "react";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { FocusChip } from "@/components/projects/FocusChip";
 
 const nav = [
@@ -58,6 +59,7 @@ export default async function AgendaLayout({ children }: LayoutProps<"/agenda">)
             <FocusChip db={supabase} userId={user.id} />
           </Suspense>
           <span className="hidden lg:inline">{user.email}</span>
+          <ThemeToggle />
           <SignOutButton />
         </div>
       </header>

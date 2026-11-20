@@ -4,23 +4,75 @@
    or back button, so the way home has to be on the page. */
 @custom-variant standalone (@media (display-mode: standalone));
 
+/* Theme: light, dark, or the system's (no data-theme). The choice is made by
+   ThemeToggle in the page headers, kept in localStorage and set on <html>
+   by an inline script in the root layout before the first paint. */
 :root {
+  color-scheme: light;
   --background: #fbfbfa;
   --surface: #ffffff;
   --foreground: #1a1a19;
   --muted: #6b7280;
   --border: #e5e5e3;
   --accent: #3b5bdb;
+  /* Panels that sit on the surface (HUD, notes): a step darker. */
+  --inset: #f3f3f1;
+  /* Cards, 4-colour deck. */
+  --suit-s: #1a1a19;
+  --suit-h: #dc2626;
+  --suit-d: #2563eb;
+  --suit-c: #15803d;
+  /* HUD stat colours (PT4's, made for a black HUD) are clamped to this
+     lightness range so every one reads on the theme's background. */
+  --hud-lmin: 0.3;
+  --hud-lmax: 0.52;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #111110;
+  --surface: #1a1a19;
+  --foreground: #eceae4;
+  --muted: #9a9a92;
+  --border: #2c2c2a;
+  --accent: #7c93f5;
+  --inset: #0b0b0a;
+  --suit-s: #f4f4f0;
+  --suit-h: #f87171;
+  --suit-d: #60a5fa;
+  --suit-c: #4ade80;
+  --hud-lmin: 0.72;
+  --hud-lmax: 0.92;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --background: #111110;
     --surface: #1a1a19;
     --foreground: #eceae4;
     --muted: #9a9a92;
     --border: #2c2c2a;
     --accent: #7c93f5;
+    --inset: #0b0b0a;
+    --suit-s: #f4f4f0;
+    --suit-h: #f87171;
+    --suit-d: #60a5fa;
+    --suit-c: #4ade80;
+    --hud-lmin: 0.72;
+    --hud-lmax: 0.92;
+  }
+}
+
+/* `dark:` follows the chosen theme, and the system's when none is chosen. */
+@custom-variant dark {
+  :root[data-theme="dark"] & {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) & {
+      @slot;
+    }
   }
 }
 
@@ -31,6 +83,18 @@
   --color-muted: var(--muted);
   --color-line: var(--border);
   --color-accent: var(--accent);
+  --color-inset: var(--inset);
+  --color-suit-s: var(--suit-s);
+  --color-suit-h: var(--suit-h);
+  --color-suit-d: var(--suit-d);
+  --color-suit-c: var(--suit-c);
+}
+
+/* A HUD value in its PT4 colour (--hud-c), its lightness clamped for the
+   theme so pale PT4 colours stay readable on a light page. */
+.hud-c {
+  color: var(--hud-c);
+  color: oklch(from var(--hud-c) clamp(var(--hud-lmin), l, var(--hud-lmax)) c h);
 }
 
 /* System stack on purpose: no webfont round-trip, nothing to self-host, and it

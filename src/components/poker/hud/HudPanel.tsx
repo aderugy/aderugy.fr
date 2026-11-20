@@ -41,7 +41,7 @@ export function HudPanel({
     <div
       onMouseLeave={() => setTip(null)}
       className={[
-        "rounded-lg bg-neutral-950 font-mono tabular-nums text-neutral-100",
+        "rounded-lg border border-line bg-inset font-mono tabular-nums text-foreground",
         compact
           ? "px-3 py-2 text-[15px] leading-7"
           : dense
@@ -53,7 +53,7 @@ export function HudPanel({
         // Panels at the table (main line, Avancé): one flowing line per row.
         rowsOf(cells).map((r, i) =>
           r === "hr" ? (
-            <div key={i} className="my-1 border-t border-neutral-700" />
+            <div key={i} className="my-1 border-t border-line" />
           ) : (
             <div key={i} className="flex flex-wrap items-baseline gap-x-3">
               {r.map((c, j) => (
@@ -70,7 +70,7 @@ export function HudPanel({
         >
           {cells.map((c, i) =>
             c.kind === "hr" ? (
-              <div key={i} style={{ gridRow: c.row, gridColumn: "1 / -1" }} className="my-1 border-t border-neutral-700" />
+              <div key={i} style={{ gridRow: c.row, gridColumn: "1 / -1" }} className="my-1 border-t border-line" />
             ) : (
               <div
                 key={i}
@@ -87,12 +87,14 @@ export function HudPanel({
         <div
           role="tooltip"
           style={{ left: tip.x, top: tip.y }}
-          className="pointer-events-none fixed z-50 w-max max-w-60 rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-sans text-xs leading-5 text-neutral-100 shadow-lg"
+          className="pointer-events-none fixed z-50 w-max max-w-60 rounded-md border border-line bg-surface px-2.5 py-1.5 font-sans text-xs leading-5 text-foreground shadow-lg"
         >
           <div className="font-medium">{tip.s.label}</div>
           <div className="font-mono tabular-nums">
-            <span style={{ color: tip.s.color }}>{tip.s.text}</span>
-            {tip.s.sample && <span className="text-neutral-400"> · {tip.s.sample}</span>}
+            <span style={tip.s.color ? ({ "--hud-c": tip.s.color } as React.CSSProperties) : undefined} className={tip.s.color ? "hud-c font-semibold" : undefined}>
+              {tip.s.text}
+            </span>
+            {tip.s.sample && <span className="text-muted"> · {tip.s.sample}</span>}
           </div>
         </div>
       )}
@@ -142,7 +144,7 @@ function Cell({
 }) {
   if (item.t === "text") {
     return (
-      <span className="text-neutral-400" title={item.text}>
+      <span className="text-muted" title={item.text}>
         {item.text.trim()}
       </span>
     );
@@ -154,8 +156,12 @@ function Cell({
   };
   const body = (
     <>
-      {item.prefix && <span className="text-neutral-500">{item.prefix.trim()} </span>}
-      <span style={{ color: s.color }} className={s.thin ? "opacity-50" : undefined}>
+      {item.prefix && <span className="text-muted">{item.prefix.trim()} </span>}
+      {/* PT4's colour, clamped for the theme (globals.css .hud-c). */}
+      <span
+        style={s.color ? ({ "--hud-c": s.color } as React.CSSProperties) : undefined}
+        className={[s.color ? "hud-c font-semibold" : "", s.thin ? "opacity-50" : ""].join(" ").trim() || undefined}
+      >
         {s.text}
       </span>
     </>
@@ -167,14 +173,14 @@ function Cell({
         aria-label={`${s.title} — open ${item.popup}`}
         onClick={() => onPopup(item.popup!)}
         {...hover}
-        className="rounded underline decoration-neutral-700 underline-offset-4 hover:decoration-neutral-300"
+        className="rounded underline decoration-line underline-offset-4 hover:decoration-foreground"
       >
         {body}
       </button>
     );
   }
   return (
-    <span className="cursor-default rounded hover:bg-neutral-800" aria-label={s.title} {...hover}>
+    <span className="cursor-default rounded hover:bg-line/60" aria-label={s.title} {...hover}>
       {body}
     </span>
   );
