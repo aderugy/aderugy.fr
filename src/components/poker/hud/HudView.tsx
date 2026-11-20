@@ -17,6 +17,7 @@ import type {
 } from "@/lib/hud/types";
 import { PioBridgeError } from "@/lib/solver/pioBridge";
 import { LIMPERS } from "@/lib/hud/extra";
+import { noteColor } from "@/lib/hud/noteColors";
 import { HudPanel } from "./HudPanel";
 import { NotesBox } from "./NotesBox";
 
@@ -420,10 +421,12 @@ function PinnedPlayer({
         <span className="flex items-baseline gap-1.5">
           {index < 9 && <span className="text-[10px] text-muted">{index + 1}</span>}
           <span className="truncate text-sm font-medium">{player.name}</span>
-          {note && note.color > 0 && (
-            <span title={`PT4 colour ${note.color}`} className="rounded bg-line px-1 font-mono text-[10px] text-muted">
-              {note.color}
-            </span>
+          {note && noteColor(note.color) && (
+            <span
+              title={noteColor(note.color)!.name}
+              style={{ backgroundColor: noteColor(note.color)!.hex }}
+              className="h-2.5 w-2.5 shrink-0 self-center rounded-full"
+            />
           )}
           {note?.text && (
             <span title={note.text} className="text-[11px] text-muted">

@@ -4,10 +4,9 @@ import { useState } from "react";
 import { NoteConflictError, pt4 } from "@/lib/hud/client";
 import type { Pt4AutoNote, Pt4Note } from "@/lib/hud/types";
 import { AutoNotes } from "./AutoNotes";
+import { NOTE_COLORS, noteColor } from "@/lib/hud/noteColors";
 import { PioBridgeError } from "@/lib/solver/pioBridge";
 
-/** PT4's colour labels offered here (0 = none). Their names live in PT4's settings. */
-const COLORS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 type Draft = { text: string; color: number; base: string };
 
@@ -69,8 +68,8 @@ export function NotesBox({
     >
       <div className="mb-1.5 flex flex-wrap items-center gap-1 text-[11px] text-neutral-400">
         <ColorChip value={0} active={color === 0} onClick={() => edit({ color: 0 })} />
-        {COLORS.map((c) => (
-          <ColorChip key={c} value={c} active={color === c} onClick={() => edit({ color: c })} />
+        {NOTE_COLORS.map((c) => (
+          <ColorChip key={c.id} value={c.id} active={color === c.id} onClick={() => edit({ color: c.id })} />
         ))}
         <span className={`ml-auto ${dirty ? "text-amber-400" : ""}`}>
           {saving ? "saving…" : dirty ? "not saved" : note ? `saved ${note.date.replace("T", " ").slice(0, 16)}` : ""}
@@ -159,17 +158,22 @@ export function NotesBox({
 }
 
 function ColorChip({ value, active, onClick }: { value: number; active: boolean; onClick: () => void }) {
+  const c = noteColor(value);
   return (
     <button
       type="button"
       onClick={onClick}
-      title={value === 0 ? "No colour" : `PT4 colour ${value}`}
+      title={c ? c.name : "No colour"}
+      aria-label={c ? c.name : "No colour"}
+      aria-pressed={active}
+      style={c ? { backgroundColor: c.hex } : undefined}
       className={[
-        "h-5 min-w-5 rounded border px-1 font-mono text-[11px] tabular-nums",
-        active ? "border-accent bg-accent text-white" : "border-neutral-700 text-neutral-400 hover:text-neutral-100",
+        "flex h-5 w-5 items-center justify-center rounded-full text-[11px] leading-none",
+        c ? "" : "border border-neutral-600 text-neutral-400",
+        active ? "ring-2 ring-white ring-offset-1 ring-offset-neutral-950" : "opacity-70 hover:opacity-100",
       ].join(" ")}
     >
-      {value === 0 ? "–" : value}
+      {c ? null : "–"}
     </button>
   );
 }
