@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { MathsNav } from "@/components/maths/MathsNav";
 import { loadGraph } from "@/lib/maths/graph/load";
 import { compteursRevision } from "@/lib/maths/revision/queue";
@@ -93,6 +94,7 @@ export default async function MathsLayout({ children }: LayoutProps<"/maths">) {
             <Rythme />
           </Suspense>
           <span className="hidden lg:inline">{user.email}</span>
+          <ThemeToggle />
           <SignOutButton />
         </div>
       </header>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import type { RunningSession } from "@/server/live/data";
 import { PokerNav } from "./PokerNav";
 import { RunningSessionLink } from "./RunningSessionLink";
@@ -26,6 +27,7 @@ export function PokerHeader({ email, running }: { email?: string | null; running
       <PokerNav />
       <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-muted">
         <RunningSessionLink initial={running} />
+        <ThemeToggle />
         {email !== undefined && (
           <>
             {email && <span className="hidden lg:inline">{email}</span>}

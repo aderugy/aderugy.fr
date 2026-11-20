@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LegalFooter } from "@/components/legal/LegalPage";
 import { NowPanel, TodayHeading } from "@/components/home/NowPanel";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 type Tool = {
   href: string;
@@ -85,7 +86,10 @@ const groups: { title: string; tools: Tool[] }[] = [
 export default function Home() {
   return (
     <main className="mx-auto w-full max-w-3xl px-5 pt-[max(3rem,env(safe-area-inset-top))] pb-12 sm:px-6 sm:pt-20">
-      <h1 className="text-2xl font-semibold tracking-tight">aderugy.fr</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">aderugy.fr</h1>
+        <ThemeToggle />
+      </div>
       <TodayHeading />
 
       {/* Signed in: the live session to get back to, and today. Nothing otherwise. */}

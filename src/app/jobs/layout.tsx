@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const nav = [
   { href: "/jobs", label: "Applications" },
@@ -37,6 +38,7 @@ export default async function JobsLayout({ children }: LayoutProps<"/jobs">) {
           ))}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-muted">
+          <ThemeToggle />
           <SignOutButton />
         </div>
       </header>

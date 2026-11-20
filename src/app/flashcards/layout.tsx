@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient, userFromClaims } from "@/lib/supabase/server";
 import { LOGIN_PATH } from "@/lib/supabase/session";
 import { SignOutButton } from "@/components/agenda/SignOutButton";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import "katex/dist/katex.min.css";
 import "./flashcards.css";
 
@@ -40,8 +41,11 @@ export default async function FlashcardsLayout({ children }: LayoutProps<"/flash
             </Link>
           ))}
         </nav>
-        <div className="ml-auto hidden shrink-0 items-center gap-3 text-xs text-muted sm:flex">
-          <SignOutButton />
+        <div className="ml-auto flex shrink-0 items-center gap-3 text-xs text-muted">
+          <ThemeToggle />
+          <span className="hidden sm:contents">
+            <SignOutButton />
+          </span>
         </div>
       </header>
       <div className="flex flex-1 flex-col">{children}</div>
