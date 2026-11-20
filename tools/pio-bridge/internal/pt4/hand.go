@@ -165,6 +165,13 @@ type Hand struct {
 
 	Won, BetR, BetTotal, Equity float64
 
+	// RaiserPos: position of the raise the player faced on each street
+	// (val_<st>_raise_aggressor_pos), -1 if none.
+	RaiserPos [4]int8
+	// PfaSaw: the preflop aggressor saw the flop / turn / river (from his own
+	// row of the hand).
+	PfaSaw [4]bool
+
 	Act    [4]string // lookup_actions.action per street
 	Aggr   [4]string // cash_hand_summary.str_aggressors_*
 	Actors [4]string // cash_hand_summary.str_actors_*
@@ -206,6 +213,8 @@ func handColumns() []string {
 		"ap.action", "af.action", "at.action", "ar.action",
 		"hs.str_aggressors_p", "hs.str_aggressors_f", "hs.str_aggressors_t", "hs.str_aggressors_r",
 		"hs.str_actors_p", "hs.str_actors_f", "hs.str_actors_t", "hs.str_actors_r",
+		"coalesce(s.val_f_raise_aggressor_pos, -1)", "coalesce(s.val_t_raise_aggressor_pos, -1)", "coalesce(s.val_r_raise_aggressor_pos, -1)",
+		"coalesce(pf.flg_f_saw, false)", "coalesce(pf.flg_t_saw, false)", "coalesce(pf.flg_r_saw, false)",
 	}
 }
 
@@ -227,6 +236,9 @@ LEFT JOIN lookup_actions ap ON ap.id_action = s.id_action_p
 LEFT JOIN lookup_actions af ON af.id_action = s.id_action_f
 LEFT JOIN lookup_actions at ON at.id_action = s.id_action_t
 LEFT JOIN lookup_actions ar ON ar.id_action = s.id_action_r
+-- the preflop aggressor's own row (last char of str_aggressors_p = his position)
+LEFT JOIN cash_hand_player_statistics pf ON pf.id_hand = s.id_hand AND length(hs.str_aggressors_p) >= 2
+  AND pf.position = right(hs.str_aggressors_p, 1)::int
 WHERE s.id_player = ` + strconv.FormatInt(player, 10) + ` AND s.id_hand > ` + strconv.FormatInt(after, 10) + `
 ORDER BY s.date_played, s.id_hand`
 }
@@ -339,6 +351,12 @@ func ParseHands(r *Rows, pos Positions) ([]Hand, error) {
 		for st := Pre; st <= River; st++ {
 			h.Actors[st] = string(next())
 		}
+		for st := Flop; st <= River; st++ {
+			h.RaiserPos[st] = int8(atoi(next()))
+		}
+		for st := Flop; st <= River; st++ {
+			h.PfaSaw[st] = enum(next()) == 't'
+		}
 		h.Cat = pos.cat(h.Players, h.Position)
 		if len(h.Aggr[Pre]) >= 2 {
 			if p, err := strconv.Atoi(h.Aggr[Pre][1:2]); err == nil {
@@ -410,26 +428,30 @@ func (h *Hand) AfterBet(st int) byte {
 	return a[i+1]
 }
 
-// ActedBefore: who acted first on the street between positions a and b.
-func (h *Hand) actedBefore(st int, a, b byte) bool {
-	s := h.Actors[st]
-	ia, ib := strings.IndexByte(s, a), strings.IndexByte(s, b)
-	return ia >= 0 && (ib < 0 || ia < ib)
+// postflopRank: acting order after the flop — SB, BB, then the earliest
+// positions (highest numbers) down to the button.
+func postflopRank(pos byte) int {
+	switch pos {
+	case '9':
+		return 0
+	case '8':
+		return 1
+	}
+	return 100 - int(pos-'0')
 }
 
+// actsBefore: on the flop, turn and river, position a acts before b.
+// (str_actors_* can't tell: it lists who put money in, not who checked.)
+func actsBefore(a, b byte) bool { return postflopRank(a) < postflopRank(b) }
+
 // FacedCheckRaise: the player bet the street and was raised by someone who
-// had checked before him.
+// acts before him — who therefore checked, since the player's bet was the
+// first one.
 func (h *Hand) FacedCheckRaise(st int) bool {
-	if !h.F(sf(st, FFBet)) || !h.F(sf(st, FFFaceRaise)) {
+	if !h.F(sf(st, FFBet)) || !h.F(sf(st, FFFaceRaise)) || h.RaiserPos[st] < 0 {
 		return false
 	}
-	a := h.Aggr[st]
-	me := h.posChar()
-	i := strings.IndexByte(a, me)
-	if i < 0 || i+1 >= len(a) {
-		return false
-	}
-	return h.actedBefore(st, a[i+1], me)
+	return actsBefore('0'+byte(h.RaiserPos[st]), h.posChar())
 }
 
 // CheckRaiseOpp: the player checked and faced a bet.
@@ -448,8 +470,7 @@ func (h *Hand) ProbeOpp(st int) bool {
 	if st < Turn || !h.Raised() || h.PFA() || h.Aggr[st-1] != "" {
 		return false
 	}
-	return h.F(sf(st, FFOpenOpp)) && !h.F(sf(st, FFHasPosition)) &&
-		strings.IndexByte(h.Actors[st-1], h.pfaChar()) >= 0
+	return h.F(sf(st, FFOpenOpp)) && !h.F(sf(st, FFHasPosition)) && h.PfaSaw[st]
 }
 
 // ProbeDefOpp (turn / river): the PFA, previous street checked through, faces
@@ -458,7 +479,7 @@ func (h *Hand) ProbeDefOpp(st int) bool {
 	if st < Turn || !h.PFA() || h.Aggr[st-1] != "" || !h.FacingFirstBet(st) || h.Aggr[st] == "" {
 		return false
 	}
-	return h.actedBefore(st, h.Aggr[st][0], h.posChar())
+	return actsBefore(h.Aggr[st][0], h.posChar())
 }
 
 // derive fills the flop float flags (PT4 has them for turn and river only).
@@ -468,15 +489,14 @@ func (h *Hand) derive() {
 		return
 	}
 	pfa := h.pfaChar()
-	if !h.PFA() && strings.IndexByte(h.Actors[Flop], pfa) >= 0 && h.F(FFHasPosition) && h.F(FFOpenOpp) &&
-		h.actedBefore(Flop, pfa, h.posChar()) {
+	if !h.PFA() && h.PfaSaw[Flop] && h.F(FFHasPosition) && h.F(FFOpenOpp) && actsBefore(pfa, h.posChar()) {
 		h.set(FFFloatOpp)
 		if h.F(FFBet) {
 			h.set(FFFloat)
 		}
 	}
 	if h.PFA() && strings.HasPrefix(h.Act[Flop], "X") && h.FacingFirstBet(Flop) && h.Aggr[Flop] != "" &&
-		!h.actedBefore(Flop, h.Aggr[Flop][0], h.posChar()) {
+		!actsBefore(h.Aggr[Flop][0], h.posChar()) {
 		h.set(FFFloatDefOpp)
 		h.EnumFloat[Flop] = h.Resp(Flop)
 	}
