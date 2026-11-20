@@ -7,7 +7,7 @@ INSERT INTO lookup_sites (id_site, site_abbrev, site_name) VALUES (1, 'WIN', 'Wi
 INSERT INTO cash_limit (id_limit, limit_name, id_gametype, limit_currency, amt_sb, amt_bb, id_filter)
 VALUES (1, 'NL200', 1, 'EUR', 1, 2, 0), (2, 'NL100', 1, 'EUR', 0.5, 1, 0);
 INSERT INTO player (id_player, id_site, player_name, player_name_search)
-VALUES (1, 1, 'Villain', 'villain'), (2, 1, 'Hero', 'hero'), (3, 1, 'Vil_lain%', 'vil_lain%');
+VALUES (1, 1, 'Villain', 'villain'), (2, 1, 'Hero', 'hero'), (3, 1, 'Vil_lain%', 'vil_lain%'), (4, 1, 'Poster', 'poster');
 INSERT INTO lookup_positions (cnt_players, position, absolute_position, description, flg_sb, flg_bb, flg_ep, flg_mp, flg_co, flg_btn)
 VALUES (6, 3, 3, 'EP', false, false, true, false, false, false),
        (6, 2, 4, 'MP', false, false, false, true, false, false),
@@ -23,12 +23,14 @@ INSERT INTO cash_hand_summary (id_hand, id_gametype, id_site, id_limit, id_table
   cnt_players, cnt_players_lookup_position, cnt_players_f, button, str_aggressors_p, str_actors_p,
   str_aggressors_f, str_actors_f, str_aggressors_t, str_actors_t, str_aggressors_r, str_actors_r)
 VALUES
-  (101, 1, 1, 1, 1, 'h101', '2026-11-01 20:00', now(), 6, 6, 0, 0, '808', '08', '', '', '', '', '', ''),
+  (101, 1, 1, 1, 1, 'h101', '2026-11-01 20:00', now(), 6, 6, 0, 0, '8808', '08', '', '', '', '', '', ''),
   (102, 1, 1, 1, 1, 'h102', '2026-11-01 20:01', now(), 6, 6, 2, 0, '81', '10', '1', '10', '0', '10', '', ''),
   (103, 1, 1, 1, 1, 'h103', '2026-11-01 20:02', now(), 6, 6, 0, 0, '8', '', '', '', '', '', '', ''),
   (104, 1, 1, 2, 2, 'h104', '2026-11-10 20:00', now(), 6, 6, 2, 0, '88', '98', '8', '98', '', '', '', '');
 
 -- H101 BTN opens, BB 3bets, Villain folds.            won -2.5 (-1.25 bb)
+--      A new player posts a big blind too: two rows at position 8, and PT4
+--      writes an extra leading 8 in str_aggressors_p ('8808', not '808').
 -- H102 CO opens, BTN calls, cbet called, check-fold turn. won -14 (-7 bb)
 -- H103 BB walk.                                         won +1 (+0.5 bb)
 -- H104 (NL100) SB limps, BB raises, call; check-fold flop vs cbet. won -3 (-3 bb)
@@ -56,7 +58,15 @@ VALUES
   (104, 1, 1, 1, 0, 2, 2, '2026-11-10 20:00', 0, 0, 0, 0, 0, 0, 0, 9, 6, 6, 13, 8, 0, 0,
    true, true, false, 0, 2, true, false, true, false, false, false, null, false,
    true, false, false, false, false, true, true, true, 'F',
-   false, false, false, false, false, 0, 2, -3, 3);
+   false, false, false, false, false, 0, 2, -3, 3),
+  (101, 1, 2, 2, 0, 1, 1, '2026-11-01 20:00', 0, 0, 0, 0, 0, 0, 0, 8, 6, 6, 14, 0, 0, 0,
+   true, false, false, 1, 0, false, false, true, false, false, false, null, false,
+   false, false, false, false, false, false, false, false, null,
+   false, false, false, false, false, 0, 0, 2.5, 6),
+  (101, 1, 4, 4, 0, 1, 1, '2026-11-01 20:00', 0, 0, 0, 0, 0, 0, 0, 8, 6, 6, 1, 0, 0, 0,
+   false, false, false, 0, 0, false, true, true, false, false, false, null, false,
+   false, false, false, false, false, false, false, false, null,
+   false, false, false, false, false, 0, 0, -2, 2);
 
 -- PT4's own counters for Villain (one week row).
 INSERT INTO cash_cache (id_player, id_gametype, id_limit, cnt_players, position_type, flg_has_position_f, flg_has_position_t,
