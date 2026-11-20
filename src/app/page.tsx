@@ -59,6 +59,11 @@ const groups: { title: string; tools: Tool[] }[] = [
         shortcut: { href: "/poker/live/players", label: "Players" },
       },
       {
+        href: "/poker/hud",
+        name: "HUD",
+        description: "PokerTracker 4 stats of the players at the table, with their notes.",
+      },
+      {
         href: "/poker/spots",
         name: "Solver notes",
         description: "Spots from the solver, studied node by node.",
@@ -92,8 +97,12 @@ export default function Home() {
             <h2 className="mb-2 px-1 text-[11px] font-semibold tracking-wide text-muted uppercase">{g.title}</h2>
             {/* Hairlines between rows (and columns) are the border colour showing through a 1px gap. */}
             <ul className={`grid gap-px overflow-hidden rounded-xl border border-line bg-line ${g.title === "Poker" ? "sm:grid-cols-2" : ""}`}>
-              {g.tools.map((t) => (
-                <li key={t.href} className="relative bg-surface">
+              {g.tools.map((t, i) => (
+                <li
+                  key={t.href}
+                  // An odd last tile spans both columns rather than leave a grey hole.
+                  className={`relative bg-surface ${g.title === "Poker" && g.tools.length % 2 && i === g.tools.length - 1 ? "sm:col-span-2" : ""}`}
+                >
                   <Link href={t.href} className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-background/60">
                     <span className="min-w-0 flex-1">
                       <span className="font-medium group-hover:text-accent">{t.name}</span>
